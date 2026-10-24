@@ -5,6 +5,8 @@ import { getDb } from "@/lib/db";
 import * as s from "@/lib/db/schema";
 import { toCsv } from "@/lib/server/csv";
 import { json } from "@/lib/server/http";
+import { loadAccountingJournal } from "@/lib/server/accounting-export";
+import { AccountingExportError, exportLedgerCsv, exportQuickBooksAccountsCsv, exportQuickBooksJournalCsv, QBO_IMPORT_INSTRUCTIONS } from "@/lib/accounting";
 
 const STAFF = new Set(["organizer", "controller", "auditor"]);
 
@@ -24,12 +26,35 @@ export async function GET(request: Request) {
   const db = getDb();
   const orgId = actor.orgId;
 
-  if (type === "ledger") {
-    const rows = await db.select({ e: s.journalEntry, l: s.journalLine, a: s.ledgerAccount }).from(s.journalLine)
-      .innerJoin(s.journalEntry, eq(s.journalEntry.id, s.journalLine.entryId)).innerJoin(s.ledgerAccount, eq(s.ledgerAccount.id, s.journalLine.accountId))
-      .where(eq(s.journalEntry.orgId, orgId)).orderBy(asc(s.journalEntry.postedAt), asc(s.journalEntry.id));
-    return csvResponse("ledger.csv", toCsv(["entry_id", "entry_date", "memo", "source_type", "source_id", "reverses_entry_id", "account_code", "account_name", "debit_minor", "credit_minor", "currency", "line_memo"],
-      rows.map(({ e, l, a }) => [e.id, e.entryDate, e.memo, e.sourceType, e.sourceId, e.reversesEntryId, a.code, a.name, l.debitMinor, l.creditMinor, l.currency, l.memo])));
+  if (type === "qbo-accounts") return csvResponse("eve-quickbooks-accounts.csv", exportQuickBooksAccountsCsv());
+  if (type === "ledger" || type === "qbo" || type === "qbo-manifest") {
+    const dateFormat = url.searchParams.get("dateFormat") ?? "MDY";
+    const multicurrency = url.searchParams.get("multicurrency") ?? "false";
+    if (!["MDY", "DMY", "ISO"].includes(dateFormat) || !["true", "false"].includes(multicurrency)) return json({ ok: false, message: "Use dateFormat MDY, DMY or ISO, and multicurrency true or false." }, 400);
+    try {
+      const entries = await loadAccountingJournal(db, orgId);
+      if (type === "ledger") return csvResponse("eve-ledger.csv", exportLedgerCsv(entries));
+      const [org] = await db.select({ currency: s.organization.currency }).from(s.organization).where(eq(s.organization.id, orgId));
+      const result = exportQuickBooksJournalCsv(entries, { homeCurrency: org?.currency ?? "USD", multicurrency: multicurrency === "true", dateFormat: dateFormat as "MDY" | "DMY" | "ISO" });
+      const { csv, ...manifest } = result;
+      if (type === "qbo-manifest") return json({ ...manifest, instructions: QBO_IMPORT_INSTRUCTIONS });
+      // Never hand over an apparently complete file that silently omitted foreign-currency entries.
+      if (result.excluded.length) return json({ ok: false, message: "This export contains foreign-currency entries. Enable multicurrency in your QuickBooks sandbox and request multicurrency=true, or download the native ledger CSV.", excluded: result.excluded }, 409);
+      return csvResponse("eve-quickbooks-sandbox-journals.csv", csv);
+    } catch (error) {
+      if (error instanceof AccountingExportError) return json({ ok: false, message: "Ledger export needs review before it can be downloaded.", problems: error.problems }, 409);
+      throw error;
+    }
+  }
+  if (type === "packet-csv" && id) {
+    const [row] = await db.select({ packet: s.sponsorPacket, payout: s.payout, person: s.person, method: s.payoutMethod }).from(s.sponsorPacket)
+      .innerJoin(s.payout, and(eq(s.payout.id, s.sponsorPacket.payoutId), eq(s.payout.orgId, orgId)))
+      .innerJoin(s.person, and(eq(s.person.id, s.payout.personId), eq(s.person.orgId, orgId)))
+      .leftJoin(s.payoutMethod, and(eq(s.payoutMethod.id, s.payout.payoutMethodId), eq(s.payoutMethod.orgId, orgId)))
+      .where(and(eq(s.sponsorPacket.id, id), eq(s.sponsorPacket.orgId, orgId)));
+    if (!row) return json({ ok: false, message: "Packet not found." }, 404);
+    const { packet: pk, payout: p, person, method } = row;
+    return csvResponse("eve-sponsor-request.csv", toCsv(["packet_id", "payout_id", "recipient", "country", "requested_minor", "gross_minor", "withholding_minor", "fee_minor", "net_minor", "currency", "destination_currency", "expected_received_minor", "account_last4", "status", "tax_rule", "truth"], [[pk.id, p.id, person.name, person.country, pk.requestedMinor, p.grossMinor, p.withholdingMinor, p.feeMinor, p.netMinor, p.currency, p.destinationCurrency, p.destinationNetMinor, method?.last4 ?? "", pk.status, `${p.ruleId} v${p.ruleVersion}`, p.truth]]));
   }
   if (type === "claims") {
     const rows = await db.select({ c: s.claim, p: s.person }).from(s.claim).innerJoin(s.person, eq(s.person.id, s.claim.personId)).where(eq(s.claim.orgId, orgId)).orderBy(asc(s.claim.createdAt));
@@ -58,5 +83,5 @@ export async function GET(request: Request) {
     if (!doc) return json({ ok: false, message: "Not found." }, 404);
     return new Response(new Uint8Array(doc.bytes), { headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="${doc.name.replace(/"/g, "")}"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
   }
-  return json({ ok: false, message: "type must be ledger, claims, payouts, filings, packet or filing." }, 400);
+  return json({ ok: false, message: "Choose ledger, qbo, qbo-accounts, qbo-manifest, claims, payouts, filings, packet, packet-csv or filing." }, 400);
 }
