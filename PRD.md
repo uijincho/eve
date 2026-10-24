@@ -76,7 +76,7 @@ At `/events/new`, organized as tabs the organizer can fill in any order. The age
 
 | Screen | Route | Purpose |
 | --- | --- | --- |
-| Inbox | `/` | Everything waiting on this person, ranked by urgency. Each card: what, why the agent escalated, the evidence, and Approve / Reject / Ask for info buttons |
+| Inbox | `/` | Everything waiting on this person, ranked by urgency, with the live agent feed in a collapsible right rail. Each card: what, why the agent escalated, the evidence, and Approve / Reject / Ask for info buttons |
 | Claims | `/claims` | Every travel and expense claim; filters by status, flag type, origin; click through to receipt, extracted fields, and policy result |
 | Prizes and winners | `/prizes` | Judges enter winners here; per winner: tax form status, ship/local/cash recommendation, net payout |
 | Payouts | `/payouts` | Proposed batches with totals, withholding, and fees; the controller releases a batch here; live status per payout |
@@ -85,10 +85,35 @@ At `/events/new`, organized as tabs the organizer can fill in any order. The age
 | Sponsor | `/sponsor` | Packets submitted, aging, questioned, paid, and reconciliation exceptions (shown only in sponsor or hybrid mode) |
 | Audit trail | `/audit` | Searchable decision log; any number links to its source documents and rules |
 | Filings | `/filings` | Year-end packet: forms per person, totals, downloads |
-| Agent | `/agent` | Live activity feed, scoreboard against the answer key, the computer use stream when it runs |
+| Agent | `/agent` | Full-page agent activity feed with filters, scoreboard against the answer key, the computer use stream when it runs |
 | Settings | `/settings` | Everything from setup, plus rule overrides with a required reason |
 
 **Design rules:** the inbox is the home page; every agent decision shows its evidence one click away; approval buttons are disabled with a reason when segregation of duties blocks the current user; mobile-friendly approvals so a controller can release a batch from their phone during closing ceremony.
+
+### Agent activity feed
+
+The feed shows the agent's work as it happens, so judges and organizers can see Eve acting without a prompt. It lives in the main app in two places, not as a separate page: a right rail on the Inbox (latest runs, collapsible) and the full view at `/agent`.
+
+**Unit of display:** one entry per workflow run on a business object (a receipt, a winner, a payout), never per process or spawned agent. Expanding an entry shows its steps.
+
+| Element | Content |
+| --- | --- |
+| Counters | Running, Waiting, Done today, Escalated. Waiting = workflows sleeping on a chase schedule or paused on an approval hook |
+| Entry header | Object name and person ("Receipt C-2241 · Marcus Lee, YYZ to SFO") + status pill: Running (step n of m), Waiting (next action and time), Escalated, Frozen, Auto-approved, Paid |
+| Step line | Timestamp, one plain-language sentence, tool name and rule version in small monospace (`checkPolicy · rule v3`) |
+| Step icons | Done, in progress, sent to inbox |
+| Filters | All, Running, Waiting, Escalated, Done; search by person or object id |
+| Click-through | Any step opens the evidence drawer (source document, extracted fields, rule, model reasoning summary) |
+
+**Behavior:**
+
+- Running entries stay expanded and tick forward live; finished and waiting entries collapse to one line so auto-approvals don't flood the view.
+- An escalation in the feed and its card in the Inbox link to each other.
+- The computer use run shows here like any other run, with its VNC stream embedded in the expanded entry.
+
+**Build:** the feed is a read-only view over `decision_log`, grouped by workflow run id. Poll every 2 seconds for the demo; upgrade to streaming steps from the workflow with Workflow DevKit's `getWritable()` if time allows. No new tables.
+
+**Demo use:** inbox on the left, feed on the right. Trigger the bank-detail change live; the five steps appear in the feed, then the frozen card lands in the inbox.
 
 ### Organizer lifecycle
 
