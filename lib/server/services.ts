@@ -236,7 +236,7 @@ async function awardCreate(tx: Executor, actor: ActorContext, p: { personId?: st
  * estimate and the shipping and local-purchase estimates are converted back.
  */
 async function fulfillmentFor(tx: Executor, draft: { kind: "cash" | "item"; amountMinor: bigint; currency: string } & Omit<typeof s.award.$inferInsert, "kind" | "amountMinor" | "currency">, person: typeof s.person.$inferSelect, profile: Awaited<ReturnType<typeof currentProfile>>, now: Date) {
-  if (draft.kind === "cash") return { recommendation: "Cash prize: pay out after the tax form and withholding.", shippingMinor: "0", localMinor: "0" };
+  if (draft.kind === "cash") return { recommendation: "Cash award: pay out after the tax form and withholding.", shippingMinor: "0", localMinor: "0" };
   const fx = await toUsd(tx, draft.amountMinor, draft.currency, now);
   const base = { ...draft, id: draft.id!, eventId: draft.eventId, orgId: draft.orgId, personId: draft.personId, track: draft.track, title: draft.title, dueAt: draft.dueAt, requestedBy: draft.requestedBy, teamId: draft.teamId ?? null, splitBps: draft.splitBps ?? 10000, splitConfirmed: draft.splitConfirmed ?? true };
   const rec = recommendFulfillment(toAward({ ...base, amountMinor: fx.usdMinor, currency: "USD", fulfillment: "undecided", status: "draft", recommendation: "", shippingMinor: 0n, localMinor: 0n, createdAt: now }, person.name), toPerson(person, { profile, paidYtdMinor: 0n, outstandingMinor: 0n, now }));

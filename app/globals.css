@@ -235,3 +235,12 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Keep selection visible when the operating system replaces authored colors. */
+@media (forced-colors: active) {
+  button[data-id][aria-pressed="true"],
+  [role="tab"][aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
+}

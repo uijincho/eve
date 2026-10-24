@@ -45,7 +45,7 @@ export function SponsorView() {
           { key: "sub", header: "Submitted", stack: "meta", sort: (k) => k.submittedAt ?? "", cell: (k) => (k.submittedAt ? `Submitted ${fmtDate(k.submittedAt)}` : "Not submitted") },
           { key: "status", header: "Status", stack: "end", sort: (k) => k.status, cell: (k) => <StatusBadge status={k.status} /> },
           { key: "req", header: "Requested", align: "end", stack: "meta", sort: (k) => big(k.requestedMinor), cell: (k) => <><span className="md:hidden">Requested </span><Money amountMinor={big(k.requestedMinor)} /></> },
-          { key: "paid", header: "Remitted", align: "end", stack: "end", sort: (k) => big(k.paidMinor), cell: (k) => <Money amountMinor={big(k.paidMinor)} className={big(k.paidMinor) !== big(k.requestedMinor) && k.status !== "draft" && k.status !== "submitted" ? "font-semibold text-critical" : "font-semibold"} /> },
+          { key: "paid", header: "Remitted", align: "end", stack: "end", sort: (k) => big(k.paidMinor), cell: (k) => <><span className="text-caption text-muted-foreground md:hidden">Remitted </span><Money amountMinor={big(k.paidMinor)} className={big(k.paidMinor) !== big(k.requestedMinor) && k.status !== "draft" && k.status !== "submitted" ? "font-semibold text-critical" : "font-semibold"} /></> },
           { key: "due", header: "Aging", align: "end", stack: "hide", sort: (k) => k.dueAt, cell: (k) => <DueChip due={k.dueAt} now={s.now} align="end" /> },
         ];
         return (
@@ -127,7 +127,7 @@ function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snaps
           </>
         ) : k.status === "exception" || k.status === "questioned" ? (
           <>
-            {control.allowed ? (
+            {diff >= 0n ? <p className="text-small text-muted-foreground">Ask the sponsor to correct the remittance, then record the corrected total above. An overpayment cannot be accepted as a fee.</p> : control.allowed ? (
               <ReasonAction label="Accept shortfall as a fee" variant="secondary" submitLabel="Accept and close" pendingLabel="Reconciling" prompt="Why is the short payment acceptable? This note stays on the ledger entry." build={(r) => payloads.sponsorReconcile(k.id, { acceptShortfall: true, note: r })} />
             ) : (
               <ActionButton wide size="default" label="Accept shortfall as a fee" permission={control} call={() => null} />

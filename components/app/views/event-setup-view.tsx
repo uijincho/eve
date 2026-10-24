@@ -2,7 +2,7 @@
 
 import { cn } from "cn";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ActionButton, ResultText } from "@/components/app/action-button";
 import { Field } from "@/components/app/field";
@@ -47,12 +47,18 @@ function useTab(): [Tab, (t: Tab) => void] {
 
 export function EventSetupView() {
   const [tab, setTab] = useTab();
+  const tabs = useRef<HTMLDivElement>(null);
+  const { snapshot } = useEve();
+  const loaded = Boolean(snapshot);
+  useEffect(() => {
+    tabs.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+  }, [tab, loaded]);
   return (
     <PageFrame
       title="Event setup"
       lede={(s) => `${s.event.name} is the event in this workspace; each tab saves to it, in any order. Eve reviews each tab and warns inline.`}
       toolbar={() => (
-        <div role="tablist" aria-label="Event setup" className="-mb-4 flex gap-1 overflow-x-auto">
+        <div ref={tabs} role="tablist" aria-label="Event setup" className="-mb-4 flex gap-1 overflow-x-auto">
           {TABS.map((t) => (
             <button
               key={t.id}

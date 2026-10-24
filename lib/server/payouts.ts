@@ -171,7 +171,7 @@ export async function loadSource(tx: Executor, orgId: string, ref: { sourceType:
   if (a.currency !== BOOKS_CURRENCY) {
     const fx = await toUsd(tx, a.amountMinor, a.currency, new Date());
     source.grossMinor = fx.usdMinor;
-    source.note = `Prize of ${money(a.amountMinor, a.currency)} converted to ${usd(fx.usdMinor)} for the USD books at ${fx.fxRate} (${fx.fxSource}).`;
+    source.note = `${source.paymentType === "stipend" ? "Stipend" : "Prize"} of ${money(a.amountMinor, a.currency)} converted to ${usd(fx.usdMinor)} for the USD books at ${fx.fxRate} (${fx.fxSource}).`;
   }
   return { source, personId: a.personId, eventId: a.eventId, award: a, blockers, override: await liveOverride(tx, "award", a.id) };
 }

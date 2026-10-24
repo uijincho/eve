@@ -35,11 +35,15 @@ describe("sponsor remittance and quote disclosure", () => {
     expect(html).not.toContain("Accept shortfall as a fee");
   });
   it("allows correction of a partial remittance while keeping separate controller acceptance", () => {
-    packetSnapshot("exception");
+    const s = packetSnapshot("exception");
     const html = renderToStaticMarkup(createElement(SponsorView));
     expect(html).toContain("Record remittance");
     expect(html).toContain("including any earlier partial payment");
     expect(html).toContain("Accept shortfall as a fee");
+    s.packets[0].paidMinor = (BigInt(s.packets[0].requestedMinor) + 1n).toString();
+    const overpaid = renderToStaticMarkup(createElement(SponsorView));
+    expect(overpaid).not.toContain("Accept shortfall as a fee");
+    expect(overpaid).toContain("An overpayment cannot be accepted as a fee.");
   });
   it("shows the destination rate and substantial recipient fees before release", () => {
     const s = packetSnapshot("submitted");

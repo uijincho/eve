@@ -75,7 +75,7 @@ export function recommendFulfillment(
 
   if (award.kind === "cash") {
     return {
-      recommendation: "Cash prize: pay out after the tax form and withholding.",
+      recommendation: "Cash award: pay out after the tax form and withholding.",
       shippingMinor: "0", localMinor: "0", dutyMinor: "0", choice: "cash", truth: "Simulated",
       reasons: ["The prize is already cash."],
     };
