@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 import { ActionButton } from "@/components/app/action-button";
 import { Field, NativeSelect, TextArea } from "@/components/app/field";
@@ -64,6 +64,7 @@ export function MoneyMovementForm({ snapshot: s, submitLabel = "Save money movem
   const [feesPaidBy, setFeesPaidBy] = useState(s.org.feesPaidBy);
   const [policyNotes, setPolicyNotes] = useState(s.org.policyNotes ?? "");
   const [errors, setErrors] = useState<Errors>({});
+  const group = useId();
   return (
     <div className="flex max-w-xl flex-col gap-4">
       <fieldset className="flex flex-col gap-2">
@@ -73,8 +74,8 @@ export function MoneyMovementForm({ snapshot: s, submitLabel = "Save money movem
           ["sponsor", "Sponsor packet", "A university or fiscal sponsor holds the account; Eve prepares packets they pay from."],
           ["hybrid", "Hybrid", "Some payouts go direct, the rest through the sponsor."],
         ] as const).map(([v, label, help]) => (
-          <label key={v} className="flex items-start gap-2.5 rounded-lg border px-3 py-2.5 has-checked:border-ring has-checked:bg-surface">
-            <input type="radio" name="mode" value={v} checked={mode === v} onChange={() => setMode(v)} className="mt-0.5 size-4 accent-foreground" />
+          <label key={v} className="flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors duration-150 hover:bg-surface has-checked:border-input has-checked:bg-surface has-focus-visible:border-ring has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
+            <input type="radio" name={group} value={v} checked={mode === v} onChange={() => setMode(v)} className="mt-0.5 size-4 shrink-0 accent-foreground focus-visible:outline-none" />
             <span className="flex flex-col">
               <span className="font-medium">{label}</span>
               <span className="text-small text-muted-foreground">{help}</span>

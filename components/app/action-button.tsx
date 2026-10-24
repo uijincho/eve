@@ -75,6 +75,8 @@ export function ActionButton({
         aria-describedby={result ? statusId : undefined}
         className={cn("enabled:active:scale-[0.96] transition-[background-color,scale] duration-150", wide && "w-full")}
         onClick={async () => {
+          // aria-busy keeps the fill, so guard repeat clicks here instead of disabling.
+          if (pending) return;
           const next = typeof call === "function" ? call() : call;
           if (!next) return;
           const r = await run(next);

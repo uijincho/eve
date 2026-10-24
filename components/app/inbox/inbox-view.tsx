@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import type { AppSnapshot } from "@/lib/contracts";
 import { buildInbox, groupRuns, runCounters, type InboxCategory, type InboxItem } from "@/lib/client/derive";
 import { fmtTime } from "@/lib/client/format";
+import { rovingKeyDown } from "@/lib/client/roving";
 import { useEve } from "@/lib/client/use-eve";
 
 import { ItemActions } from "./item-actions";
@@ -108,7 +109,10 @@ function Inbox({ snapshot }: { snapshot: AppSnapshot }) {
                 role="tab"
                 type="button"
                 aria-selected={filter === f.value}
+                tabIndex={filter === f.value ? 0 : -1}
                 onClick={() => setFilter(f.value)}
+                onKeyDown={(e) => rovingKeyDown(e, FILTERS.map((x) => x.value), filter, setFilter)}
+                data-roving
                 className={cn(
                   "flex h-10 shrink-0 items-center gap-1.5 border-b-2 px-2 font-medium transition-colors duration-150",
                   filter === f.value ? "border-foreground text-foreground" : "border-transparent text-foreground/60 hover:text-foreground",

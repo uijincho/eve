@@ -17,6 +17,7 @@ import type { ActionResult, AppSnapshot } from "@/lib/contracts";
 import { big, canManage } from "@/lib/client/derive";
 import { parsePeopleCsv } from "@/lib/client/csv";
 import { payloads, toMinor } from "@/lib/client/payloads";
+import { rovingKeyDown } from "@/lib/client/roving";
 import { initialParam } from "@/lib/client/url-param";
 import { useEve } from "@/lib/client/use-eve";
 
@@ -46,7 +47,10 @@ export function EventSetupView() {
               id={`tab-${t.id}`}
               aria-selected={tab === t.id}
               aria-controls={`panel-${t.id}`}
+              tabIndex={tab === t.id ? 0 : -1}
               onClick={() => setTab(t.id)}
+              onKeyDown={(e) => rovingKeyDown(e, TABS.map((x) => x.id), tab, setTab)}
+              data-roving
               className={cn(
                 "flex h-10 shrink-0 items-center border-b-2 px-2 font-medium transition-colors duration-150",
                 tab === t.id ? "border-foreground text-foreground" : "border-transparent text-foreground/60 hover:text-foreground",

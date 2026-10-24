@@ -14,6 +14,7 @@ import type { ActionResult, Person } from "@/lib/contracts";
 import { ApiError, uploadDocument } from "@/lib/client/api";
 import { big } from "@/lib/client/derive";
 import { payloads, toMinor } from "@/lib/client/payloads";
+import { rovingKeyDown } from "@/lib/client/roving";
 import { useEve, useLivePolling } from "@/lib/client/use-eve";
 
 const ACCEPT = "image/png,image/jpeg,image/webp,application/pdf";
@@ -54,6 +55,9 @@ export function ClaimForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [phase, setPhase] = useState<"idle" | "uploading" | "submitting">("idle");
   const [result, setResult] = useState<ActionResult | null>(null);
+  // One key per claim, kept across retries so a resend after a dropped
+  // response cannot file the same receipt twice. Renewed after success.
+  const idempotencyKey = useRef<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,6 +85,7 @@ export function ClaimForm({
       }
     }
     setPhase("submitting");
+    idempotencyKey.current ??= crypto.randomUUID();
     const r = await act(
       payloads.claimSubmit({
         type,
@@ -94,12 +99,13 @@ export function ClaimForm({
         origin: type === "travel" ? origin.toUpperCase() || undefined : undefined,
         cabin: type === "travel" ? cabin || undefined : undefined,
         category: type === "travel" ? "Travel" : undefined,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: idempotencyKey.current,
       }),
     );
     setPhase("idle");
     setResult(r);
     if (r.ok) {
+      idempotencyKey.current = null;
       const id = typeof r.data?.id === "string" ? r.data.id : typeof r.data?.claimId === "string" ? r.data.claimId : null;
       onSubmitted?.(id);
       setFile(null);
@@ -120,7 +126,10 @@ export function ClaimForm({
             type="button"
             role="radio"
             aria-checked={type === t}
+            tabIndex={type === t ? 0 : -1}
             onClick={() => setType(t)}
+            onKeyDown={(e) => rovingKeyDown(e, ["travel", "expense"] as const, type, setType)}
+            data-roving
             className={
               type === t
                 ? "h-8 rounded-md bg-surface-hover px-3 text-small font-medium"
