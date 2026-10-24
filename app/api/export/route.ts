@@ -7,6 +7,7 @@ import { toCsv } from "@/lib/server/csv";
 import { json } from "@/lib/server/http";
 import { loadAccountingJournal } from "@/lib/server/accounting-export";
 import { AccountingExportError, exportLedgerCsv, exportQuickBooksAccountsCsv, exportQuickBooksJournalCsv, QBO_IMPORT_INSTRUCTIONS } from "@/lib/accounting";
+import { render1042Summary } from "@/lib/pdf";
 
 const STAFF = new Set(["organizer", "controller", "auditor"]);
 
@@ -25,6 +26,17 @@ export async function GET(request: Request) {
   const id = url.searchParams.get("id");
   const db = getDb();
   const orgId = actor.orgId;
+
+  if (type === "1042-summary") {
+    const year = Number(url.searchParams.get("year") ?? new Date().getUTCFullYear());
+    if (!Number.isInteger(year) || year < 2020 || year > 2100) return json({ ok: false, message: "Choose a tax year from 2020 to 2100." }, 400);
+    const [org] = await db.select({ name: s.organization.name, country: s.organization.country }).from(s.organization).where(eq(s.organization.id, orgId));
+    if (org?.country !== "US") return json({ ok: false, message: "The 1042 summary is available for US organizations." }, 409);
+    const filings = await db.select({ filing: s.filing, person: s.person }).from(s.filing).innerJoin(s.person, and(eq(s.person.id, s.filing.personId), eq(s.person.orgId, orgId)))
+      .where(and(eq(s.filing.orgId, orgId), eq(s.filing.form, "1042-S"), eq(s.filing.year, year))).orderBy(asc(s.person.name));
+    const bytes = await render1042Summary({ year, payerName: org.name, recipients: filings.map(({ filing: f, person: p }) => ({ name: p.name, country: p.country, grossMinor: f.grossMinor.toString(), withholdingMinor: f.withholdingMinor.toString(), filingId: f.id })) });
+    return new Response(new Uint8Array(bytes), { headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="eve-1042-summary-${year}-DRAFT.pdf"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+  }
 
   if (type === "qbo-accounts") return csvResponse("eve-quickbooks-accounts.csv", exportQuickBooksAccountsCsv());
   if (type === "ledger" || type === "qbo" || type === "qbo-manifest") {

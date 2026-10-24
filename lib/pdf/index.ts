@@ -39,18 +39,26 @@ class Writer {
     const size = 11;
     const width = this.bold.widthOfTextAtSize(this.stamp, size);
     this.page.drawText(pdfSafe(this.stamp), { x: 564 - width, y: 760, size, font: this.bold, color: STAMP });
-    this.page.drawText(pdfSafe(this.footer), { x: 48, y: 30, size: 7.5, font: this.font, color: MUTED, maxWidth: 516 });
+    const footerLines = wrap(pdfSafe(this.footer), this.font, 7.5, 516);
+    footerLines.forEach((line, index) => this.page.drawText(line, { x: 48, y: 36 - index * 9, size: 7.5, font: this.font, color: MUTED }));
   }
   private ensure(h: number) {
     if (this.y - h < 60) this.addPage();
   }
   title(text: string, sub?: string) {
     this.ensure(50);
-    this.page.drawText(pdfSafe(text), { x: 48, y: this.y, size: 18, font: this.bold, color: INK });
-    this.y -= 22;
+    for (const line of wrap(pdfSafe(text), this.bold, 18, 516)) {
+      this.ensure(22);
+      this.page.drawText(line, { x: 48, y: this.y, size: 18, font: this.bold, color: INK });
+      this.y -= 22;
+    }
     if (sub) {
-      this.page.drawText(pdfSafe(sub), { x: 48, y: this.y, size: 9.5, font: this.font, color: MUTED, maxWidth: 516 });
-      this.y -= 18;
+      for (const line of wrap(pdfSafe(sub), this.font, 9.5, 516)) {
+        this.ensure(13);
+        this.page.drawText(line, { x: 48, y: this.y, size: 9.5, font: this.font, color: MUTED });
+        this.y -= 13;
+      }
+      this.y -= 5;
     }
   }
   section(text: string) {
@@ -63,12 +71,12 @@ class Writer {
   }
   row(label: string, value: string) {
     const lines = wrap(pdfSafe(value), this.font, 10, 330);
-    this.ensure(14 * lines.length);
-    this.page.drawText(pdfSafe(label), { x: 48, y: this.y, size: 10, font: this.font, color: MUTED });
-    for (const line of lines) {
-      this.page.drawText(line, { x: 234, y: this.y, size: 10, font: this.font, color: INK });
-      this.y -= 14;
-    }
+    const labels = wrap(pdfSafe(label), this.font, 10, 170);
+    const height = 14 * Math.max(lines.length, labels.length);
+    this.ensure(height);
+    labels.forEach((line, index) => this.page.drawText(line, { x: 48, y: this.y - 14 * index, size: 10, font: this.font, color: MUTED }));
+    lines.forEach((line, index) => this.page.drawText(line, { x: 234, y: this.y - 14 * index, size: 10, font: this.font, color: INK }));
+    this.y -= height;
   }
   warning(text: string) {
     for (const line of wrap(pdfSafe(text), this.bold, 10, 516)) {
@@ -92,7 +100,17 @@ function wrap(text: string, font: PDFFont, size: number, width: number): string[
   const out: string[] = [];
   for (const paragraph of text.split("\n")) {
     let line = "";
-    for (const word of paragraph.split(/\s+/)) {
+    const words = paragraph.split(/\s+/).flatMap((word) => {
+      if (font.widthOfTextAtSize(word, size) <= width) return [word];
+      const pieces: string[] = [];
+      let piece = "";
+      for (const char of word) {
+        if (piece && font.widthOfTextAtSize(piece + char, size) > width) { pieces.push(piece); piece = ""; }
+        piece += char;
+      }
+      return [...pieces, piece];
+    });
+    for (const word of words) {
       const next = line ? `${line} ${word}` : word;
       if (font.widthOfTextAtSize(next, size) > width && line) {
         out.push(line);
@@ -296,4 +314,35 @@ export function renderT4ADraft(d: CraDraftInput): Promise<Uint8Array> {
 /** NR4 worksheet for a Canadian payer and non-resident (rule ca-nonca-prize, unverified). */
 export function renderNR4Draft(d: CraDraftInput): Promise<Uint8Array> {
   return renderFilingDraft({ ...d, form: "NR4", currency: d.currency ?? "CAD", box: d.box ?? "Gross income (income code to verify)" });
+}
+
+export interface Annual1042SummaryData {
+  year: number;
+  payerName: string;
+  recipients: { name: string; country: string; grossMinor: string; withholdingMinor: string; filingId: string }[];
+}
+
+/** Reconciles saved 1042-S drafts; it does not assert that tax deposits were made. */
+export async function render1042Summary(d: Annual1042SummaryData): Promise<Uint8Array> {
+  const { doc, w } = await start(`1042 annual summary ${d.year}`, FOOTER);
+  w.title(`1042 annual summary, tax year ${d.year}`, "Reconciliation worksheet of saved 1042-S drafts. Not an official Form 1042 or an e-filing export.");
+  w.row("Withholding agent", d.payerName);
+  w.row("1042-S drafts included", String(d.recipients.length));
+  let gross = 0n, withheld = 0n;
+  for (const recipient of d.recipients) {
+    if (!/^\d+$/.test(recipient.grossMinor) || !/^\d+$/.test(recipient.withholdingMinor)) throw new Error("Summary amounts must be nonnegative integer minor units.");
+    gross += BigInt(recipient.grossMinor);
+    withheld += BigInt(recipient.withholdingMinor);
+  }
+  w.section("Recorded totals");
+  w.row("Gross reportable income", money(gross.toString(), "USD"));
+  w.row("Withholding recorded", money(withheld.toString(), "USD"));
+  w.warning("Tax deposits are not tracked by Eve. Recorded withholding is not evidence of payment to the IRS. The controller must reconcile deposits, adjustments, exemptions and liability dates before preparing the official return.");
+  w.section("Recipients and source drafts");
+  if (!d.recipients.length) w.para("No saved 1042-S drafts for this year. Generate the filing packet before using this worksheet.");
+  for (const recipient of d.recipients) {
+    w.row(recipient.name, `${recipient.country}; gross ${money(recipient.grossMinor, "USD")}; withheld ${money(recipient.withholdingMinor, "USD")}`);
+    w.row("Source filing", recipient.filingId);
+  }
+  return doc.save();
 }
