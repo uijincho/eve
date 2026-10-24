@@ -1,6 +1,6 @@
 # Eve acceptance review (independent)
 
-Reviewed commit `8350f44` (main, 2026-10-24 ~10:50 UTC) against PRD.md and PRODUCT.md. Reviewer did not edit product source.
+Reviewed commit `8350f44` (main, 2026-10-24 ~10:50 UTC) against PRD.md and PRODUCT.md. Reviewer did not edit product source. Main has since moved to `061e82d` (financial fixes `3e13506`/`ba4aa76`, controller sponsor UI); this report was not re-run against it, so recheck each finding on current main before fixing.
 
 ## How this was checked
 
@@ -16,11 +16,14 @@ Reviewed commit `8350f44` (main, 2026-10-24 ~10:50 UTC) against PRD.md and PRODU
 - **Trigger:** in any non-demo org, an attendee (or organizer) calls `payout.bankChange` for a person with no method. This is the *only* way to create a payout method (`lib/server/payouts.ts:305`; the other insert is the seed). Then `payout.verify`.
 - **Observed (executed, both orgs):** the method is created `pending_verification` and the person's payouts freeze. The 6-digit code goes only through `deliverBankVerification`, which sends real email only when `EVE_NOTIFICATIONS_LIVE=true` and both `RESEND_API_KEY` and `EVE_EMAIL_FROM` are set (`lib/notifications/index.ts:33-46`). None of these are in the root `.env`. The portal notice body contains no code (`has6digit: false`), and `snapshot.ts:94-95` reveals it only to a demo persona in the demo org. A guessed code returns `409 That code does not match… 4 attempts left`. Every award or claim payout for a person without a method stays `held: No verified payout method on file`, and payouts frozen by the change stay `frozen`.
 - **Expected:** PRD core flow 1.5 says the attendee picks a payout method, and the M1 spine requires that the controller release it. Original-channel verification applies to *changes* near a payout, not to the first method.
-- **Minimal fix:** in `changeBankDetails`, when the person has no active method and the actor is that attendee (`actor.personId === personId`), insert the method as `active` (version 1, `verifiedBy` = self, decision logged as "initial method, entered by the account owner") and skip the freeze. Keep the current freeze-and-verify path for every later change and for organizer-entered methods. Alternatively, configure Resend on Preview and document it, but a missing provider should not brick payouts.
+- **Framing:** holding a *bank change* when notifications are disabled is intentional, and `8350f44` wires the delivery helper after commit. The gap is that no separate path exists for a person's *first* method, so initial enrollment is caught by the replacement safeguard.
+- **Minimal fix:** add a dedicated attendee-only initial enrollment, distinct from replacement. In `changeBankDetails` (or a new `payout.enroll` action), when the person has no active method and the actor is that attendee (`actor.personId === personId`), insert the method as `active` (version 1, `verifiedBy` = self, decision logged as "initial method, entered by the account owner") and skip the freeze. Keep the current freeze-and-verify path for every later change and for organizer-entered methods. Alternatively, configure Resend on Preview and document it, but a missing provider should not brick payouts.
 
 ### D2 (critical for CAD orgs): `award.create` fails for every CAD prize and stipend
 
-- **Trigger:** in a CA org (default currency CAD), call `award.create {kind:"cash", currency:"CAD", amountMinor:"100000"}`, or the same with track "Judge stipend".
+This is a known engine limitation (fulfillment estimates are USD-only), but it blocks non-stretch scope: a CAD org cannot enter any prize or paid role.
+
+- **Exact trigger:** create a CA org via `POST /api/onboarding/organization` with `org.country: "CA"` (currency defaults to `CAD`), import an adult attendee, then `POST /api/actions {action:"award.create", payload:{personId, track:"Best Hack", title:"First Overall", kind:"cash", amountMinor:"100000", currency:"CAD"}}`. The same 409 occurs with `track:"Judge stipend"` and with `kind:"item"`. Omitting `currency` avoids the error only because it defaults to `"USD"`, which records a CAD org's prize as USD.
 - **Observed (executed):** `409 fulfillment estimates are in USD; convert the item value first`, thrown from `lib/engines/fulfillment.ts:70` through `recommendFulfillment` in `services.ts:174`. This happens even for cash awards. No award rows are created.
 - **Expected:** a Canadian org can enter prizes and paid roles in its own currency.
 - **Minimal fix:** in the `award.create` handler, convert the amount to USD with the existing `core.ts` FX helper before building the recommendation input, or skip `recommendFulfillment` for `kind: "cash"`. `sourceFromAward` (`payouts.ts:62`) must also convert: it passes `amountMinor` as USD gross regardless of `award.currency`, so a CAD 1,000 prize would be paid as USD 1,000.
