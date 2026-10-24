@@ -3,6 +3,7 @@
 // demo countries, not a tariff schedule. Every recommendation carries
 // truth "Simulated" so the UI labels it.
 import type { Award, Person, Truth } from "@/lib/contracts";
+import { formatMoney } from "@/lib/design/money";
 
 import { EngineError, applyBps, parseNonNegativeMinor, scaleBps, toMinor } from "./money";
 
@@ -99,7 +100,7 @@ export function recommendFulfillment(
   const tooCostly = value > 0n && shipping * 10_000n > value * BigInt(policy.maxLandedCostBps);
   if (shipBlocked) reasons.push(`No carrier takes battery electronics to ${country}.`);
   if (tooSlow) reasons.push(`Transit about ${row.transitDays} days.`);
-  if (tooCostly) reasons.push(`Shipping plus duty is ${toMinor(shipping)} on a ${toMinor(value)} item, over ${policy.maxLandedCostBps / 100}%.`);
+  if (tooCostly) reasons.push(`Estimated shipping plus duty is ${formatMoney(shipping)} on a ${formatMoney(value)} item, over ${policy.maxLandedCostBps / 100}% of its value.`);
 
   const localOk = local !== null && local * 10_000n <= value * BigInt(policy.maxLocalPremiumBps);
   let choice: FulfillmentResult["choice"];
@@ -108,14 +109,14 @@ export function recommendFulfillment(
     reasons.push(country === "US" ? "Domestic winner." : "Ships cleanly with modest duty.");
   } else if (localOk) {
     choice = "local";
-    reasons.push(`Sold locally for about ${toMinor(local!)} (warranty valid in ${country}).`);
+    reasons.push(`Estimated local price is ${formatMoney(local!)} in USD, with local warranty coverage.`);
   } else {
     choice = "cash";
-    reasons.push(local === null ? `Not sold locally in ${country}.` : `Local price ${toMinor(local)} is more than ${(policy.maxLocalPremiumBps - 10_000) / 100}% above US retail.`);
+    reasons.push(local === null ? `No local retail estimate for ${country}.` : `Estimated local price of ${formatMoney(local)} in USD is more than ${(policy.maxLocalPremiumBps - 10_000) / 100}% above US retail.`);
   }
 
   if (country !== "US") {
-    reasons.push("Withholding cannot come out of an item, so for a non-US winner the org pays it on top (see computeTax grossUp); cash lets it come out of the payout.");
+    reasons.push("When withholding applies to an item, the organization covers the tax on top of its value. For cash, the tax comes out of the payout.");
   }
 
   const label = { ship: "Ship the item", local: "Buy it locally", cash: "Offer the cash equivalent" }[choice];

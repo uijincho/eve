@@ -5,6 +5,7 @@
 // effective dates and a source link), never from the model or hardcoded
 // math. This is plain, tested code; the LLM only picks which facts apply.
 import type { TaxRule } from "@/lib/contracts";
+import { formatMoney } from "@/lib/design/money";
 import {
   EngineError,
   applyBps,
@@ -217,7 +218,8 @@ export function computeTax(input: ComputeTaxInput): ComputeTaxResult {
   }
   if (paymentType === "item_prize" && rateBps > 0 && gross > 0n) {
     result.grossUp = grossUp(gross, rateBps);
-    result.reason += ` Tax cannot be withheld from an item; the org pays ${result.grossUp.withholdingMinor} on a grossed-up ${result.grossUp.grossMinor}, or offers cash.`;
+    const currency = input.payerCountry === "CA" ? "CAD" : "USD";
+    result.reason += ` Tax cannot be withheld from an item; the organization covers ${formatMoney(BigInt(result.grossUp.withholdingMinor), currency)} in tax, bringing the reportable value to ${formatMoney(BigInt(result.grossUp.grossMinor), currency)}. Offering cash is another option.`;
   }
   return result;
 }
@@ -300,6 +302,6 @@ export function stateRuleFlags(input: {
   return [{
     ruleId: rule.id, ruleVersion: rule.version, verified: false,
     potentialWithholdingMinor: toMinor(applyBps(gross, rule.rateBps)),
-    message: `Possible ${input.eventState} nonresident withholding (${rule.rateBps / 100}% over ${threshold} minor units for the year). Unverified; review before release.`,
+    message: `Possible ${input.eventState} nonresident withholding (${rule.rateBps / 100}% over ${formatMoney(threshold)} for the year). Unverified; review before release.`,
   }];
 }

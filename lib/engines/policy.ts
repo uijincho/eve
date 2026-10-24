@@ -2,6 +2,7 @@
 // history always produce the same checks and status. The agent explains the
 // result; it does not decide it.
 import type { Check, Claim, EventRecord, Organization, Person } from "@/lib/contracts";
+import { formatMoney } from "@/lib/design/money";
 
 import { EngineError, convertMinor, currencyExponent, parseMinor, parseRate } from "./money";
 
@@ -193,7 +194,7 @@ export function checkClaim(input: CheckClaimInput): CheckClaimResult {
     if (amount <= 0n) {
       add("amount_valid", "Amount readable", false, "Claimed amount must be greater than zero.");
     } else {
-      add("amount_valid", "Amount readable", true, `${claim.amountMinor} ${claim.currency} minor units.`);
+      add("amount_valid", "Amount readable", true, `${formatMoney(amount, claim.currency)}.`);
       if (claim.currency === "USD") {
         usd = amount;
       } else {
@@ -208,7 +209,7 @@ export function checkClaim(input: CheckClaimInput): CheckClaimResult {
             "Converted at a sourced rate",
             sourced && diff <= policy.fxToleranceMinor,
             sourced
-              ? `${claim.currency}→USD at ${claim.fxRate} (${claim.fxSource}) = ${usd} USD minor${diff > policy.fxToleranceMinor ? `; stated ${stated} differs` : ""}.`
+              ? `${claim.currency}→USD at ${claim.fxRate} (${claim.fxSource}) = ${formatMoney(usd)}${diff > policy.fxToleranceMinor ? `; the entered ${formatMoney(stated)} differs` : ""}.`
               : "FX rate has no recorded source.",
           );
         } catch (e) {
@@ -293,7 +294,7 @@ export function checkClaim(input: CheckClaimInput): CheckClaimResult {
     }
     if (usd !== undefined && cap !== undefined) {
       const underCap = usd <= cap;
-      add("cap", "Under the travel cap", underCap, `${usd} USD minor against a ${cap} cap${claim.currency !== "USD" ? " after conversion" : ""}.`);
+      add("cap", "Under the travel cap", underCap, `${formatMoney(usd)} against a ${formatMoney(cap)} cap${claim.currency !== "USD" ? " after conversion to USD" : ""}.`);
       if (underCap && usd * 10_000n >= cap * BigInt(policy.capHuggingBps)) {
         add("cap_hugging", "Not hugging the cap", false, `Within ${(10_000 - policy.capHuggingBps) / 100}% of the cap; check against typical fares.`);
       }
@@ -307,7 +308,7 @@ export function checkClaim(input: CheckClaimInput): CheckClaimResult {
     } catch {
       add("agent_limit", "Within the agent's auto-approve limit", false, "The org's auto-approve limit is not a valid amount.");
     }
-    if (limit !== undefined) add("agent_limit", "Within the agent's auto-approve limit", usd <= limit, `${usd} against a ${limit} limit.`);
+    if (limit !== undefined) add("agent_limit", "Within the agent's auto-approve limit", usd <= limit, `${formatMoney(usd)} against a ${formatMoney(limit)} limit.`);
   }
 
   const failed = checks.filter((c) => !c.passed);
