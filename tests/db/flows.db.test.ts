@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { createTestOrg, dropTestOrg, eq, hasDatabase } from "./helpers";
+import { and, createTestOrg, dropTestOrg, eq, hasDatabase } from "./helpers";
 
 describe.skipIf(!hasDatabase)("business flows against real Postgres", { timeout: 120_000 }, () => {
   let orgId = "";
@@ -152,10 +152,17 @@ describe.skipIf(!hasDatabase)("business flows against real Postgres", { timeout:
     // Another attendee cannot verify Priya's change.
     expect((await run(sam, "payout.verify", { id: ids.priya, confirmation: "123456" })).status).toBe(403);
 
-    // Only Priya's own snapshot reveals the code (delivered to her original email).
+    // No real session ever sees the code, not even Priya's; it goes only to her original email.
+    const [pending] = await db.select().from(s.payoutMethod).where(and(eq(s.payoutMethod.personId, ids.priya), eq(s.payoutMethod.status, "pending_verification")));
+    const code = (await vault.openSecret(db, orgId, pending.verificationVaultId!))!; // stands in for Priya's inbox
     const own = await m.snapshot.buildSnapshot(priya);
-    const notice = own.notices.find((n) => n.title.includes("Confirm your new payout account"))!;
-    const code = /code: (\d{6})/.exec(notice.body)![1];
+    expect(JSON.stringify(own)).not.toContain(code);
+    expect(own.notices.find((n) => n.title.includes("Confirm your new payout account"))!.body).toContain("never shows confirmation codes");
+    // The shared demo's recipient persona sees it in a labeled simulated inbox, only in demo mode.
+    vi.stubEnv("EVE_DEMO_MODE", "true");
+    const demoView = await m.snapshot.buildSnapshot({ ...priya, demo: true });
+    vi.unstubAllEnvs();
+    expect(demoView.notices.find((n) => n.title.includes("Confirm your new payout account"))!.body).toContain(`[Simulated email inbox, demo only] Your confirmation code: ${code}`);
     const staff = await m.snapshot.buildSnapshot(dana);
     expect(JSON.stringify(staff)).not.toContain(`code: ${code}`);
     expect(JSON.stringify(staff)).not.toContain("0012349902");

@@ -1,8 +1,9 @@
 // GET /api/app: role-filtered AppSnapshot. Attendees see only their own
 // person, claims, awards, payouts, notices, filings and decisions. Staff
 // (organizer/controller/auditor) see the org. Raw identifiers never appear:
-// tax ids and bank numbers are only ever last 4. Verification codes are shown
-// only to the attendee they were sent to.
+// tax ids and bank numbers are only ever last 4. Verification codes are never
+// shown for real organizations (see bank-verification-delivery.ts); the shared
+// demo shows them to the recipient persona as a labeled simulated inbox.
 
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
@@ -84,15 +85,17 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
 
   const payoutPerson = new Map(payouts.map((p) => [p.id, p.personId]));
   const noticesOut: C.Notice[] = [];
+  // Verification codes are never decrypted into a real org's snapshot, not even for the recipient:
+  // a code shown in the session that requested a bank change proves nothing. Only the shared demo
+  // shows it, labeled as a simulated channel.
+  const simulatedInbox = self && actor.demo && org.isDemo && demoModeEnabled();
   for (const n of notices) {
     let body = n.body;
     if (n.privateVaultId) {
-      if (self && n.personId === actor.personId) {
-        const code = await openSecret(db, orgId, n.privateVaultId);
-        if (code) body = `${body} Your confirmation code: ${code}`;
-      } else {
-        body = `${body} (Confirmation code delivered privately to the recipient.)`;
-      }
+      const code = simulatedInbox && n.personId === actor.personId ? await openSecret(db, orgId, n.privateVaultId) : null;
+      body = code
+        ? `${body} [Simulated email inbox, demo only] Your confirmation code: ${code}`
+        : `${body} (Eve never shows confirmation codes in the app; they go only to the email on file.)`;
     }
     noticesOut.push({ id: n.id, personId: n.personId ?? undefined, channel: n.channel, title: n.title, body, createdAt: n.createdAt.toISOString(), status: n.status });
   }

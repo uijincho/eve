@@ -1,5 +1,5 @@
 import { loadEnvConfig } from "@next/env";
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 loadEnvConfig(process.cwd());
 
@@ -21,7 +21,7 @@ export async function dropTestOrg(orgId: string) {
   await getDb().transaction(async (tx) => purgeOrg(tx, orgId, { deleteOrg: true }));
 }
 
-export { eq, inArray, sql };
+export { and, eq, inArray, sql };
 
 /** Resolves to the full error text, including the Postgres cause that Drizzle wraps. */
 export async function failure(promise: Promise<unknown>): Promise<string> {
