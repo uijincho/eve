@@ -1,0 +1,2490 @@
+{
+ "source": "b28f559 preview ovu33bdeg (rerun) + da167e0 preview hj2fnowlg (first pass, same results)",
+ "matrix": {
+  "started": "2026-10-24T13:03:26.540Z",
+  "finished": "2026-10-24T13:06:31.274Z",
+  "base": "https://eve-calhacks-ovu33bdeg-badbird5907s-projects.vercel.app",
+  "routes": [
+   {
+    "role": "organizer",
+    "route": "/",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/",
+    "ms": 2470,
+    "docOverflow": 0,
+    "clipped": [
+     {
+      "text": "Bank details changed from ••4471 to ••9902 via email; frozen until confirmed thr",
+      "title": null,
+      "w": 530,
+      "sw": 609
+     },
+     {
+      "text": "Bank details changed from ••9434 to ••5531 via email; frozen until confirmed thr",
+      "title": null,
+      "w": 530,
+      "sw": 609
+     },
+     {
+      "text": "Rule us-ca-prize-treaty v1 is unverified; a person must review it before payment",
+      "title": null,
+      "w": 530,
+      "sw": 809
+     },
+     {
+      "text": "A valid W-8BEN is missing or expired. Payment is held, not defaulted. Rule us-no",
+      "title": null,
+      "w": 538,
+      "sw": 1390
+     },
+     {
+      "text": "A valid W-8BEN is missing or expired. Payment is held, not defaulted. Withholdin",
+      "title": null,
+      "w": 538,
+      "sw": 874
+     },
+     {
+      "text": "A valid W-8BEN is missing or expired. Payment is held, not defaulted. Withholdin",
+      "title": null,
+      "w": 538,
+      "sw": 874
+     },
+     {
+      "text": "A valid W-8BEN is missing or expired. Payment is held, not defaulted. Withholdin",
+      "title": null,
+      "w": 538,
+      "sw": 874
+     },
+     {
+      "text": "A valid W-8BEN is missing or expired. Payment is held, not defaulted. Withholdin",
+      "title": null,
+      "w": 538,
+      "sw": 874
+     },
+     {
+      "text": "Buy it locally. Estimated shipping plus duty is $233.87 on a $1,299.00 item, ove",
+      "title": null,
+      "w": 530,
+      "sw": 2155
+     },
+     {
+      "text": "Sponsor paid $970.00 on a $1,000.00 request (short $30.00). Nothing posted; the ",
+      "title": null,
+      "w": 525,
+      "sw": 698
+     }
+    ],
+    "scrollers": [],
+    "h1": [
+     "Inbox"
+    ],
+    "mains": 1,
+    "title": "Inbox · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "color-contrast",
+       "impact": "serious",
+       "tags": [
+        "wcag2aa",
+        "wcag143"
+       ],
+       "help": "Elements must meet minimum color contrast ratio thresholds",
+       "nodes": 3,
+       "targets": [
+        ".transition-opacity.duration-200.absolute:nth-child(2) > .left-0.-translate-x-2\\.5.z-10",
+        ".right-0",
+        ".bg-surface-hover > .min-w-0.gap-0\\.5.flex-col > .gap-2.items-center.flex > .bg-critical\\/12.text-critical[data-variant="
+       ],
+       "summary": "Fix any of the following:\n  Element has insufficient color contrast of 1.93 (foreground color: #4a4c84, background color: #1e2246, font size: 10.5pt (14px), font weight: normal). Expected contrast rat"
+      }
+     ],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/claims",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/claims",
+    "ms": 2350,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Claims"
+    ],
+    "mains": 1,
+    "title": "Claims · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/prizes",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/prizes",
+    "ms": 2421,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Prizes and winners"
+    ],
+    "mains": 1,
+    "title": "Prizes · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/payouts",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/payouts",
+    "ms": 2367,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Payouts"
+    ],
+    "mains": 1,
+    "title": "Payouts · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/people",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/people",
+    "ms": 2432,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "People"
+    ],
+    "mains": 1,
+    "title": "People · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/budget",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/budget",
+    "ms": 2360,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Budget"
+    ],
+    "mains": 1,
+    "title": "Budget · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/sponsor",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/sponsor",
+    "ms": 2324,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Sponsor"
+    ],
+    "mains": 1,
+    "title": "Sponsor · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/audit",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/audit",
+    "ms": 2328,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Audit trail"
+    ],
+    "mains": 1,
+    "title": "Audit trail · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/filings",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/filings",
+    "ms": 2274,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Filings"
+    ],
+    "mains": 1,
+    "title": "Filings · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/agent",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/agent",
+    "ms": 2284,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Agent"
+    ],
+    "mains": 1,
+    "title": "Agent · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": [
+      {
+       "id": "form-field-multiple-labels",
+       "nodes": 1
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/settings",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/settings",
+    "ms": 2698,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Settings"
+    ],
+    "mains": 1,
+    "title": "Settings · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/setup",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/setup",
+    "ms": 2254,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Organization setup"
+    ],
+    "mains": 1,
+    "title": "Organization setup · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/events/new",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/events/new",
+    "ms": 2333,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Event setup"
+    ],
+    "mains": 1,
+    "title": "Event setup · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/",
+    "ms": 2179,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Inbox"
+    ],
+    "mains": 1,
+    "title": "Inbox · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/claims",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/claims",
+    "ms": 2180,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Claims"
+    ],
+    "mains": 1,
+    "title": "Claims · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/prizes",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/prizes",
+    "ms": 2154,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Prizes and winners"
+    ],
+    "mains": 1,
+    "title": "Prizes · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/payouts",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/payouts",
+    "ms": 2143,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Payouts"
+    ],
+    "mains": 1,
+    "title": "Payouts · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/people",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/people",
+    "ms": 2591,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "People"
+    ],
+    "mains": 1,
+    "title": "People · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/budget",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/budget",
+    "ms": 2252,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Budget"
+    ],
+    "mains": 1,
+    "title": "Budget · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/sponsor",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/sponsor",
+    "ms": 2150,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Sponsor"
+    ],
+    "mains": 1,
+    "title": "Sponsor · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/audit",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/audit",
+    "ms": 2254,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Audit trail"
+    ],
+    "mains": 1,
+    "title": "Audit trail · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/filings",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/filings",
+    "ms": 2445,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Filings"
+    ],
+    "mains": 1,
+    "title": "Filings · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/agent",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/agent",
+    "ms": 2210,
+    "docOverflow": 0,
+    "clipped": [
+     {
+      "text": "Payout held: Rule us-ca-prize-treaty v1 is unverified; a person must review it b",
+      "title": "Payout held: Rule us-ca-prize-treaty v1 is unverified; a person must review it before payment. Reportable on 1042-S income code 23, exemption code 04.",
+      "w": 231,
+      "sw": 496
+     },
+     {
+      "text": "Auto-approved $152.81: all checks passed within the agent limit.",
+      "title": "Auto-approved $152.81: all checks passed within the agent limit.",
+      "w": 256,
+      "sw": 344
+     },
+     {
+      "text": "Auto-approved $175.62: all checks passed within the agent limit.",
+      "title": "Auto-approved $175.62: all checks passed within the agent limit.",
+      "w": 256,
+      "sw": 344
+     },
+     {
+      "text": "Auto-approved $235.71: all checks passed within the agent limit.",
+      "title": "Auto-approved $235.71: all checks passed within the agent limit.",
+      "w": 256,
+      "sw": 344
+     },
+     {
+      "text": "Auto-approved $275.01: all checks passed within the agent limit.",
+      "title": "Auto-approved $275.01: all checks passed within the agent limit.",
+      "w": 256,
+      "sw": 344
+     },
+     {
+      "text": "Escalated: Within the agent's auto-approve limit: $375.52 against a $300.00 limi",
+      "title": "Escalated: Within the agent's auto-approve limit: $375.52 against a $300.00 limit.",
+      "w": 231,
+      "sw": 430
+     },
+     {
+      "text": "Auto-approved $148.38: all checks passed within the agent limit.",
+      "title": "Auto-approved $148.38: all checks passed within the agent limit.",
+      "w": 256,
+      "sw": 344
+     },
+     {
+      "text": "Escalated: Within the agent's auto-approve limit: $313.99 against a $300.00 limi",
+      "title": "Escalated: Within the agent's auto-approve limit: $313.99 against a $300.00 limit.",
+      "w": 231,
+      "sw": 430
+     },
+     {
+      "text": "Auto-approved $215.63: all checks passed within the agent limit.",
+      "title": "Auto-approved $215.63: all checks passed within the agent limit.",
+      "w": 256,
+      "sw": 344
+     },
+     {
+      "text": "Escalated: Within the agent's auto-approve limit: $381.04 against a $300.00 limi",
+      "title": "Escalated: Within the agent's auto-approve limit: $381.04 against a $300.00 limit.",
+      "w": 231,
+      "sw": 430
+     },
+     {
+      "text": "Auto-approved $168.61: all checks passed within the agent limit.",
+      "title": "Auto-approved $168.61: all checks passed within the agent limit.",
+      "w": 256,
+      "sw": 344
+     },
+     {
+      "text": "Auto-approved $257.87: all checks passed within the agent limit.",
+      "title": "Auto-approved $257.87: all checks passed within the agent limit.",
+      "w": 256,
+      "sw": 344
+     }
+    ],
+    "scrollers": [],
+    "h1": [
+     "Agent"
+    ],
+    "mains": 1,
+    "title": "Agent · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/settings",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/settings",
+    "ms": 2505,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Settings"
+    ],
+    "mains": 1,
+    "title": "Settings · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/setup",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/setup",
+    "ms": 2065,
+    "docOverflow": 174,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "OL",
+      "label": null,
+      "role": null,
+      "cw": 548,
+      "sw": 687,
+      "tabindex": null,
+      "scrollbar": "auto"
+     }
+    ],
+    "h1": [
+     "Organization setup"
+    ],
+    "mains": 1,
+    "title": "Organization setup · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/events/new",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/events/new",
+    "ms": 2296,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "DIV",
+      "label": "Event setup",
+      "role": "tablist",
+      "cw": 358,
+      "sw": 454,
+      "tabindex": null,
+      "scrollbar": "auto"
+     }
+    ],
+    "h1": [
+     "Event setup"
+    ],
+    "mains": 1,
+    "title": "Event setup · Eve",
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/",
+    "ms": 3985,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "DIV",
+      "label": "Filter inbox",
+      "role": "tablist",
+      "cw": 288,
+      "sw": 332,
+      "tabindex": null,
+      "scrollbar": "auto"
+     }
+    ],
+    "h1": [
+     "Inbox"
+    ],
+    "mains": 1,
+    "title": "Inbox · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": [
+      {
+       "id": "color-contrast",
+       "nodes": 2
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/claims",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/claims",
+    "ms": 2218,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Claims"
+    ],
+    "mains": 1,
+    "title": "Claims · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/prizes",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/prizes",
+    "ms": 2202,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Prizes and winners"
+    ],
+    "mains": 1,
+    "title": "Prizes · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/payouts",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/payouts",
+    "ms": 2196,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Payouts"
+    ],
+    "mains": 1,
+    "title": "Payouts · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/people",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/people",
+    "ms": 2611,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "People"
+    ],
+    "mains": 1,
+    "title": "People · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/budget",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/budget",
+    "ms": 2172,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Budget"
+    ],
+    "mains": 1,
+    "title": "Budget · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/sponsor",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/sponsor",
+    "ms": 2232,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Sponsor"
+    ],
+    "mains": 1,
+    "title": "Sponsor · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/audit",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/audit",
+    "ms": 2232,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Audit trail"
+    ],
+    "mains": 1,
+    "title": "Audit trail · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/filings",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/filings",
+    "ms": 2018,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Filings"
+    ],
+    "mains": 1,
+    "title": "Filings · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/agent",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/agent",
+    "ms": 2022,
+    "docOverflow": 0,
+    "clipped": [
+     {
+      "text": "Day 0: portal and email reminders recorded.",
+      "title": "Day 0: portal and email reminders recorded. Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.",
+      "w": 170,
+      "sw": 237
+     },
+     {
+      "text": "Day 0: portal and email reminders recorded.",
+      "title": "Day 0: portal and email reminders recorded. Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.",
+      "w": 170,
+      "sw": 237
+     },
+     {
+      "text": "Day 0: portal and email reminders recorded.",
+      "title": "Day 0: portal and email reminders recorded. Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.",
+      "w": 170,
+      "sw": 237
+     },
+     {
+      "text": "Day 0: portal and email reminders recorded.",
+      "title": "Day 0: portal and email reminders recorded. Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.",
+      "w": 170,
+      "sw": 237
+     },
+     {
+      "text": "Day 0: portal and email reminders recorded.",
+      "title": "Day 0: portal and email reminders recorded. Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.",
+      "w": 170,
+      "sw": 237
+     },
+     {
+      "text": "Day 0: portal and email reminders recorded.",
+      "title": "Day 0: portal and email reminders recorded. Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.",
+      "w": 170,
+      "sw": 237
+     },
+     {
+      "text": "Day 0: portal and email reminders recorded.",
+      "title": "Day 0: portal and email reminders recorded. Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.",
+      "w": 170,
+      "sw": 237
+     },
+     {
+      "text": "Day 0: portal and email reminders recorded.",
+      "title": "Day 0: portal and email reminders recorded. Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.",
+      "w": 170,
+      "sw": 237
+     },
+     {
+      "text": "Day 0: portal and email reminders recorded.",
+      "title": "Day 0: portal and email reminders recorded. Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.",
+      "w": 170,
+      "sw": 237
+     },
+     {
+      "text": "Day 0: portal and email reminders recorded.",
+      "title": "Day 0: portal and email reminders recorded. Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.",
+      "w": 170,
+      "sw": 237
+     },
+     {
+      "text": "Day 0: portal and email reminders recorded.",
+      "title": "Day 0: portal and email reminders recorded. Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.",
+      "w": 170,
+      "sw": 237
+     },
+     {
+      "text": "Day 0: portal and email reminders recorded.",
+      "title": "Day 0: portal and email reminders recorded. Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.",
+      "w": 170,
+      "sw": 237
+     }
+    ],
+    "scrollers": [],
+    "h1": [
+     "Agent"
+    ],
+    "mains": 1,
+    "title": "Agent · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": [
+      {
+       "id": "form-field-multiple-labels",
+       "nodes": 1
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/settings",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/settings",
+    "ms": 6960,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Settings"
+    ],
+    "mains": 1,
+    "title": "Settings · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/setup",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/setup",
+    "ms": 2141,
+    "docOverflow": 244,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "OL",
+      "label": null,
+      "role": null,
+      "cw": 548,
+      "sw": 687,
+      "tabindex": null,
+      "scrollbar": "auto"
+     }
+    ],
+    "h1": [
+     "Organization setup"
+    ],
+    "mains": 1,
+    "title": "Organization setup · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": [
+      {
+       "id": "color-contrast",
+       "nodes": 9
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/events/new",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/events/new",
+    "ms": 2141,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "DIV",
+      "label": "Event setup",
+      "role": "tablist",
+      "cw": 288,
+      "sw": 454,
+      "tabindex": null,
+      "scrollbar": "auto"
+     }
+    ],
+    "h1": [
+     "Event setup"
+    ],
+    "mains": 1,
+    "title": "Event setup · Eve",
+    "axe": {
+     "violations": [],
+     "incomplete": [
+      {
+       "id": "color-contrast",
+       "nodes": 2
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/portal",
+    "ms": 1964,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Your event money"
+    ],
+    "mains": 1,
+    "title": "Portal · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "label-content-name-mismatch",
+       "impact": "serious",
+       "tags": [
+        "wcag21a",
+        "wcag253"
+       ],
+       "help": "Elements must have their visible text as part of their accessible name",
+       "nodes": 1,
+       "targets": [
+        "button"
+       ],
+       "summary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+      }
+     ],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/claims",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/portal/claims",
+    "ms": 2420,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Claims"
+    ],
+    "mains": 1,
+    "title": "Your claims · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "label-content-name-mismatch",
+       "impact": "serious",
+       "tags": [
+        "wcag21a",
+        "wcag253"
+       ],
+       "help": "Elements must have their visible text as part of their accessible name",
+       "nodes": 1,
+       "targets": [
+        ".ml-auto"
+       ],
+       "summary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+      }
+     ],
+     "incomplete": [
+      {
+       "id": "form-field-multiple-labels",
+       "nodes": 1
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/payouts",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/portal/payouts",
+    "ms": 1855,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Payouts"
+    ],
+    "mains": 1,
+    "title": "Your payouts · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "label-content-name-mismatch",
+       "impact": "serious",
+       "tags": [
+        "wcag21a",
+        "wcag253"
+       ],
+       "help": "Elements must have their visible text as part of their accessible name",
+       "nodes": 1,
+       "targets": [
+        ".ml-auto"
+       ],
+       "summary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+      }
+     ],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/prizes",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/portal/prizes",
+    "ms": 1815,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Prizes"
+    ],
+    "mains": 1,
+    "title": "Your prizes · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "label-content-name-mismatch",
+       "impact": "serious",
+       "tags": [
+        "wcag21a",
+        "wcag253"
+       ],
+       "help": "Elements must have their visible text as part of their accessible name",
+       "nodes": 1,
+       "targets": [
+        ".ml-auto"
+       ],
+       "summary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+      }
+     ],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/profile",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/portal/profile",
+    "ms": 1948,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Profile and tax form"
+    ],
+    "mains": 1,
+    "title": "Profile and tax form · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "label-content-name-mismatch",
+       "impact": "serious",
+       "tags": [
+        "wcag21a",
+        "wcag253"
+       ],
+       "help": "Elements must have their visible text as part of their accessible name",
+       "nodes": 1,
+       "targets": [
+        ".ml-auto"
+       ],
+       "summary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+      }
+     ],
+     "incomplete": [
+      {
+       "id": "aria-valid-attr-value",
+       "nodes": 1
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/travel",
+    "vw": 1440,
+    "status": 200,
+    "finalPath": "/portal/travel",
+    "ms": 1824,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Travel"
+    ],
+    "mains": 1,
+    "title": "Travel · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "label-content-name-mismatch",
+       "impact": "serious",
+       "tags": [
+        "wcag21a",
+        "wcag253"
+       ],
+       "help": "Elements must have their visible text as part of their accessible name",
+       "nodes": 1,
+       "targets": [
+        ".ml-auto"
+       ],
+       "summary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+      }
+     ],
+     "incomplete": []
+    },
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/portal",
+    "ms": 1726,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "NAV",
+      "label": "Portal",
+      "role": null,
+      "cw": 390,
+      "sw": 476,
+      "tabindex": null,
+      "scrollbar": "none"
+     }
+    ],
+    "h1": [
+     "Your event money"
+    ],
+    "mains": 1,
+    "title": "Portal · Eve",
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/claims",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/portal/claims",
+    "ms": 1757,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "NAV",
+      "label": "Portal",
+      "role": null,
+      "cw": 390,
+      "sw": 476,
+      "tabindex": null,
+      "scrollbar": "none"
+     }
+    ],
+    "h1": [
+     "Claims"
+    ],
+    "mains": 1,
+    "title": "Your claims · Eve",
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/payouts",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/portal/payouts",
+    "ms": 1758,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "NAV",
+      "label": "Portal",
+      "role": null,
+      "cw": 390,
+      "sw": 476,
+      "tabindex": null,
+      "scrollbar": "none"
+     }
+    ],
+    "h1": [
+     "Payouts"
+    ],
+    "mains": 1,
+    "title": "Your payouts · Eve",
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/prizes",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/portal/prizes",
+    "ms": 1746,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "NAV",
+      "label": "Portal",
+      "role": null,
+      "cw": 390,
+      "sw": 476,
+      "tabindex": null,
+      "scrollbar": "none"
+     }
+    ],
+    "h1": [
+     "Prizes"
+    ],
+    "mains": 1,
+    "title": "Your prizes · Eve",
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/profile",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/portal/profile",
+    "ms": 1763,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "NAV",
+      "label": "Portal",
+      "role": null,
+      "cw": 390,
+      "sw": 476,
+      "tabindex": null,
+      "scrollbar": "none"
+     }
+    ],
+    "h1": [
+     "Profile and tax form"
+    ],
+    "mains": 1,
+    "title": "Profile and tax form · Eve",
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/travel",
+    "vw": 390,
+    "status": 200,
+    "finalPath": "/portal/travel",
+    "ms": 1898,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "NAV",
+      "label": "Portal",
+      "role": null,
+      "cw": 390,
+      "sw": 476,
+      "tabindex": null,
+      "scrollbar": "none"
+     }
+    ],
+    "h1": [
+     "Travel"
+    ],
+    "mains": 1,
+    "title": "Travel · Eve",
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/portal",
+    "ms": 2210,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "NAV",
+      "label": "Portal",
+      "role": null,
+      "cw": 320,
+      "sw": 476,
+      "tabindex": null,
+      "scrollbar": "none"
+     }
+    ],
+    "h1": [
+     "Your event money"
+    ],
+    "mains": 1,
+    "title": "Portal · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "label-content-name-mismatch",
+       "impact": "serious",
+       "tags": [
+        "wcag21a",
+        "wcag253"
+       ],
+       "help": "Elements must have their visible text as part of their accessible name",
+       "nodes": 1,
+       "targets": [
+        "button"
+       ],
+       "summary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+      }
+     ],
+     "incomplete": [
+      {
+       "id": "color-contrast",
+       "nodes": 3
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/claims",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/portal/claims",
+    "ms": 1723,
+    "docOverflow": 0,
+    "clipped": [
+     {
+      "text": "Choose a photo or PDF",
+      "title": null,
+      "w": 69,
+      "sw": 135
+     }
+    ],
+    "scrollers": [
+     {
+      "tag": "NAV",
+      "label": "Portal",
+      "role": null,
+      "cw": 320,
+      "sw": 476,
+      "tabindex": null,
+      "scrollbar": "none"
+     }
+    ],
+    "h1": [
+     "Claims"
+    ],
+    "mains": 1,
+    "title": "Your claims · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "label-content-name-mismatch",
+       "impact": "serious",
+       "tags": [
+        "wcag21a",
+        "wcag253"
+       ],
+       "help": "Elements must have their visible text as part of their accessible name",
+       "nodes": 1,
+       "targets": [
+        ".ml-auto"
+       ],
+       "summary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+      }
+     ],
+     "incomplete": [
+      {
+       "id": "color-contrast",
+       "nodes": 3
+      },
+      {
+       "id": "form-field-multiple-labels",
+       "nodes": 1
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/payouts",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/portal/payouts",
+    "ms": 1896,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "NAV",
+      "label": "Portal",
+      "role": null,
+      "cw": 320,
+      "sw": 476,
+      "tabindex": null,
+      "scrollbar": "none"
+     }
+    ],
+    "h1": [
+     "Payouts"
+    ],
+    "mains": 1,
+    "title": "Your payouts · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "label-content-name-mismatch",
+       "impact": "serious",
+       "tags": [
+        "wcag21a",
+        "wcag253"
+       ],
+       "help": "Elements must have their visible text as part of their accessible name",
+       "nodes": 1,
+       "targets": [
+        ".ml-auto"
+       ],
+       "summary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+      }
+     ],
+     "incomplete": [
+      {
+       "id": "color-contrast",
+       "nodes": 1
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/prizes",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/portal/prizes",
+    "ms": 1891,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "NAV",
+      "label": "Portal",
+      "role": null,
+      "cw": 320,
+      "sw": 476,
+      "tabindex": null,
+      "scrollbar": "none"
+     }
+    ],
+    "h1": [
+     "Prizes"
+    ],
+    "mains": 1,
+    "title": "Your prizes · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "label-content-name-mismatch",
+       "impact": "serious",
+       "tags": [
+        "wcag21a",
+        "wcag253"
+       ],
+       "help": "Elements must have their visible text as part of their accessible name",
+       "nodes": 1,
+       "targets": [
+        ".ml-auto"
+       ],
+       "summary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+      }
+     ],
+     "incomplete": [
+      {
+       "id": "color-contrast",
+       "nodes": 1
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/profile",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/portal/profile",
+    "ms": 2408,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "NAV",
+      "label": "Portal",
+      "role": null,
+      "cw": 320,
+      "sw": 476,
+      "tabindex": null,
+      "scrollbar": "none"
+     }
+    ],
+    "h1": [
+     "Profile and tax form"
+    ],
+    "mains": 1,
+    "title": "Profile and tax form · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "label-content-name-mismatch",
+       "impact": "serious",
+       "tags": [
+        "wcag21a",
+        "wcag253"
+       ],
+       "help": "Elements must have their visible text as part of their accessible name",
+       "nodes": 1,
+       "targets": [
+        ".ml-auto"
+       ],
+       "summary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+      }
+     ],
+     "incomplete": [
+      {
+       "id": "aria-valid-attr-value",
+       "nodes": 1
+      },
+      {
+       "id": "color-contrast",
+       "nodes": 3
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "attendee",
+    "route": "/portal/travel",
+    "vw": 320,
+    "status": 200,
+    "finalPath": "/portal/travel",
+    "ms": 1702,
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "NAV",
+      "label": "Portal",
+      "role": null,
+      "cw": 320,
+      "sw": 476,
+      "tabindex": null,
+      "scrollbar": "none"
+     }
+    ],
+    "h1": [
+     "Travel"
+    ],
+    "mains": 1,
+    "title": "Travel · Eve",
+    "axe": {
+     "violations": [
+      {
+       "id": "label-content-name-mismatch",
+       "impact": "serious",
+       "tags": [
+        "wcag21a",
+        "wcag253"
+       ],
+       "help": "Elements must have their visible text as part of their accessible name",
+       "nodes": 1,
+       "targets": [
+        ".ml-auto"
+       ],
+       "summary": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+      }
+     ],
+     "incomplete": [
+      {
+       "id": "color-contrast",
+       "nodes": 3
+      }
+     ]
+    },
+    "errors": []
+   },
+   {
+    "role": "organizer",
+    "route": "/",
+    "vw": 1280,
+    "mode": "base",
+    "docOverflow": 0,
+    "clipped": [
+     {
+      "text": "Bank details changed from ••4471 to ••9902 via email; frozen until confirmed thr",
+      "title": null,
+      "w": 370,
+      "sw": 609
+     },
+     {
+      "text": "Bank details changed from ••9434 to ••5531 via email; frozen until confirmed thr",
+      "title": null,
+      "w": 370,
+      "sw": 609
+     },
+     {
+      "text": "Rule us-ca-prize-treaty v1 is unverified; a person must review it before payment",
+      "title": null,
+      "w": 370,
+      "sw": 809
+     },
+     {
+      "text": "A valid W-8BEN is missing or expired. Payment is held, not defaulted. Rule us-no",
+      "title": null,
+      "w": 378,
+      "sw": 1390
+     },
+     {
+      "text": "A valid W-8BEN is missing or expired. Payment is held, not defaulted. Withholdin",
+      "title": null,
+      "w": 378,
+      "sw": 874
+     },
+     {
+      "text": "A valid W-8BEN is missing or expired. Payment is held, not defaulted. Withholdin",
+      "title": null,
+      "w": 378,
+      "sw": 874
+     },
+     {
+      "text": "A valid W-8BEN is missing or expired. Payment is held, not defaulted. Withholdin",
+      "title": null,
+      "w": 378,
+      "sw": 874
+     },
+     {
+      "text": "A valid W-8BEN is missing or expired. Payment is held, not defaulted. Withholdin",
+      "title": null,
+      "w": 378,
+      "sw": 874
+     },
+     {
+      "text": "Buy it locally. Estimated shipping plus duty is $233.87 on a $1,299.00 item, ove",
+      "title": null,
+      "w": 370,
+      "sw": 2155
+     },
+     {
+      "text": "Also: Close to the travel cap: within 5% of the cap; check against typical fares",
+      "title": null,
+      "w": 378,
+      "sw": 451
+     },
+     {
+      "text": "Name mismatch: Ticket says \"J. Doe\", profile says \"Reese Davis\"",
+      "title": null,
+      "w": 378,
+      "sw": 400
+     },
+     {
+      "text": "Name mismatch: Ticket says \"J. Doe\", profile says \"Alex Moore\"",
+      "title": null,
+      "w": 378,
+      "sw": 397
+     }
+    ],
+    "scrollers": [],
+    "h1": [
+     "Inbox"
+    ],
+    "mains": 1,
+    "title": "Inbox · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/",
+    "vw": 1280,
+    "mode": "text200",
+    "rootPx": "32px",
+    "h1Px": "56px",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [
+     {
+      "tag": "DIV",
+      "label": "Filter inbox",
+      "role": "tablist",
+      "cw": 320,
+      "sw": 665,
+      "tabindex": null,
+      "scrollbar": "auto"
+     }
+    ],
+    "h1": [
+     "Inbox"
+    ],
+    "mains": 1,
+    "title": "Inbox · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/claims",
+    "vw": 1280,
+    "mode": "base",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Claims"
+    ],
+    "mains": 1,
+    "title": "Claims · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/claims",
+    "vw": 1280,
+    "mode": "text200",
+    "rootPx": "32px",
+    "h1Px": "56px",
+    "docOverflow": 132,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Claims"
+    ],
+    "mains": 1,
+    "title": "Claims · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/payouts",
+    "vw": 1280,
+    "mode": "base",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Payouts"
+    ],
+    "mains": 1,
+    "title": "Payouts · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/payouts",
+    "vw": 1280,
+    "mode": "text200",
+    "rootPx": "32px",
+    "h1Px": "56px",
+    "docOverflow": 379,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Payouts"
+    ],
+    "mains": 1,
+    "title": "Payouts · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/people",
+    "vw": 1280,
+    "mode": "base",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "People"
+    ],
+    "mains": 1,
+    "title": "People · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/people",
+    "vw": 1280,
+    "mode": "text200",
+    "rootPx": "32px",
+    "h1Px": "56px",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "People"
+    ],
+    "mains": 1,
+    "title": "People · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/agent",
+    "vw": 1280,
+    "mode": "base",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Agent"
+    ],
+    "mains": 1,
+    "title": "Agent · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/agent",
+    "vw": 1280,
+    "mode": "text200",
+    "rootPx": "32px",
+    "h1Px": "56px",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Agent"
+    ],
+    "mains": 1,
+    "title": "Agent · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/audit",
+    "vw": 1280,
+    "mode": "base",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Audit trail"
+    ],
+    "mains": 1,
+    "title": "Audit trail · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/audit",
+    "vw": 1280,
+    "mode": "text200",
+    "rootPx": "32px",
+    "h1Px": "56px",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Audit trail"
+    ],
+    "mains": 1,
+    "title": "Audit trail · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/settings",
+    "vw": 1280,
+    "mode": "base",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Settings"
+    ],
+    "mains": 1,
+    "title": "Settings · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/settings",
+    "vw": 1280,
+    "mode": "text200",
+    "rootPx": "32px",
+    "h1Px": "56px",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Settings"
+    ],
+    "mains": 1,
+    "title": "Settings · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/",
+    "vw": 640,
+    "mode": "zoom200",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Inbox"
+    ],
+    "mains": 1,
+    "title": "Inbox · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/claims",
+    "vw": 640,
+    "mode": "zoom200",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Claims"
+    ],
+    "mains": 1,
+    "title": "Claims · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/payouts",
+    "vw": 640,
+    "mode": "zoom200",
+    "docOverflow": 0,
+    "clipped": [],
+    "scrollers": [],
+    "h1": [
+     "Payouts"
+    ],
+    "mains": 1,
+    "title": "Payouts · Eve"
+   },
+   {
+    "role": "organizer",
+    "route": "/agent",
+    "vw": 640,
+    "mode": "zoom200",
+    "docOverflow": 0,
+    "clipped": [
+     {
+      "text": "Payout held: Rule us-ca-prize-treaty v1 is unverified; a person must review it b",
+      "title": "Payout held: Rule us-ca-prize-treaty v1 is unverified; a person must review it before payment. Reportable on 1042-S income code 23, exemption code 04.",
+      "w": 465,
+      "sw": 496
+     }
+    ],
+    "scrollers": [],
+    "h1": [
+     "Agent"
+    ],
+    "mains": 1,
+    "title": "Agent · Eve"
+   }
+  ]
+ },
+ "interactions": {
+  "at": "2026-10-24T13:06:47.395Z",
+  "results": [
+   {
+    "id": "anon /payouts redirects to login",
+    "pass": false,
+    "detail": "/payouts"
+   },
+   {
+    "id": "axe /login",
+    "pass": true,
+    "detail": []
+   },
+   {
+    "id": "login inputs labelled + autocomplete",
+    "pass": true,
+    "detail": [
+     {
+      "type": "email",
+      "name": "",
+      "ac": "email",
+      "label": "Email"
+     },
+     {
+      "type": "password",
+      "name": "",
+      "ac": "current-password",
+      "label": "Password"
+     }
+    ]
+   },
+   {
+    "id": "login empty submit marks invalid + focuses first + describedby",
+    "pass": false,
+    "detail": {
+     "invalid": [
+      "_R_klfivb_",
+      "_R_slfivb_"
+     ],
+     "active": "BUTTON",
+     "described": [
+      "Enter an email address like dana@example.org.",
+      "Use at least 12 characters."
+     ]
+    }
+   },
+   {
+    "id": "invalid invite shows explicit state, no crash",
+    "pass": true,
+    "detail": {
+     "status": 200,
+     "h1": "Invitation not found",
+     "body": "Eve\nInvitation not found\n\nThis invitation link is not valid. Check that you copied all of it.",
+     "axe": []
+    }
+   },
+   {
+    "id": "invalid invite 320 reflow",
+    "pass": true,
+    "detail": 0
+   },
+   {
+    "id": "anon /onboarding goes to login",
+    "pass": true,
+    "detail": "/login?next=/onboarding"
+   },
+   {
+    "id": "persona picker click lands on inbox",
+    "pass": true,
+    "detail": "/"
+   },
+   {
+    "id": "skip link first, visible on focus, moves to main",
+    "pass": true,
+    "detail": {
+     "f1": "Skip to content",
+     "vis": true,
+     "after": {
+      "hash": "#main",
+      "active": "BODY"
+     }
+    }
+   },
+   {
+    "id": "inbox first 25 Tab stops all show outline/box-shadow focus indicator",
+    "pass": true,
+    "detail": {
+     "stops": 25,
+     "noRing": []
+    }
+   },
+   {
+    "id": "inbox filter tabs ArrowRight moves selection+focus, Home/End",
+    "pass": true,
+    "detail": {
+     "before": "All67",
+     "sel": "Approvals51",
+     "focus": "Approvals51",
+     "tabpanel": false,
+     "controls": null,
+     "end": "Exceptions3",
+     "home": "All67"
+    }
+   },
+   {
+    "id": "inbox search no-match shows empty state",
+    "pass": true,
+    "detail": {
+     "text": "No items match",
+     "status": [
+      "Filing drafts 2026Drafted 2 filingsDoneQuinn Davis$600.00Quo",
+      ""
+     ]
+    }
+   },
+   {
+    "id": "600-char search input no doc overflow",
+    "pass": true,
+    "detail": 0
+   },
+   {
+    "id": "inbox item opens labelled modal, focus inside, trapped, Escape closes, focus restored",
+    "pass": false,
+    "detail": {
+     "trigName": "Payout frozen: bank details changedFroze",
+     "d": {
+      "open": false,
+      "modal": false,
+      "focusInside": false,
+      "url": "/"
+     },
+     "stillInside": false,
+     "after": {
+      "open": false,
+      "active": "Over the $300.00 auto-approve limit: $42"
+     }
+    }
+   },
+   {
+    "id": "agent-sheet-1280",
+    "pass": false,
+    "detail": "threw: locator.focus: Timeout 30000ms exceeded."
+   },
+   {
+    "id": "blocked /api/app shows error + retry recovers without reload",
+    "pass": false,
+    "detail": {
+     "st": {
+      "text": "Claims\n\nEve could not load this page\n\nCould not reach Eve. Your data is unchanged; try again in a moment.\n\nTry again",
+      "alert": [
+       "Eve could not load this pageCould not reach Eve. Your data is unchanged; try aga"
+      ],
+      "buttons": [
+       "Try again"
+      ]
+     },
+     "rec": {
+      "h1": "Claims",
+      "rows": 0
+     }
+    }
+   },
+   {
+    "id": "claims search empty state",
+    "pass": true,
+    "detail": "No claims match"
+   },
+   {
+    "id": "claim-type radiogroup ArrowRight",
+    "pass": null,
+    "detail": "claim form not on organizer /claims page without opening"
+   },
+   {
+    "id": "settings native radios ArrowDown changes value (not saved), visible focus",
+    "pass": true,
+    "detail": {
+     "name": "_r_9_",
+     "v0": "hybrid",
+     "v1": "direct",
+     "inputOutline": "none 2px rgb(195, 199, 240)",
+     "labelRing": "none rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0"
+    }
+   },
+   {
+    "id": "settings radio change not persisted without submit",
+    "pass": true,
+    "detail": {
+     "v2": "hybrid"
+    }
+   },
+   {
+    "id": "export /audit",
+    "pass": true,
+    "detail": [
+     {
+      "label": "Ledger CSV",
+      "file": "eve-ledger.csv",
+      "bytes": 4509,
+      "magic": "entry",
+      "csvHeader": "entry_id,entry_date,source_type,source_id,reverses_entry_id,account_code,account"
+     }
+    ]
+   },
+   {
+    "id": "export /filings",
+    "pass": true,
+    "detail": [
+     {
+      "label": "Filings CSV",
+      "file": "filings.csv",
+      "bytes": 244,
+      "magic": "filin",
+      "csvHeader": "filing_id,person,country,year,form,gross_minor,withholding_minor,currency,tin_la"
+     }
+    ]
+   },
+   {
+    "id": "export /payouts",
+    "pass": true,
+    "detail": [
+     {
+      "label": "Export CSV",
+      "file": "payouts.csv",
+      "bytes": 19900,
+      "magic": "payou",
+      "csvHeader": "payout_id,person,source_type,source_id,gross_minor,withholding_minor,fee_minor,n"
+     }
+    ]
+   },
+   {
+    "id": "export /sponsor",
+    "pass": null,
+    "detail": []
+   },
+   {
+    "id": "export /claims",
+    "pass": true,
+    "detail": [
+     {
+      "label": "Export CSV",
+      "file": "claims.csv",
+      "bytes": 32887,
+      "magic": "claim",
+      "csvHeader": "claim_id,person,type,merchant,category,amount_minor,currency,usd_minor,fx_rate,f"
+     }
+    ]
+   },
+   {
+    "id": "payout checkbox Space toggles, named, visible focus (selection only, not released)",
+    "pass": true,
+    "detail": {
+     "label": "Select all releasable payouts",
+     "b0": false,
+     "b1": true,
+     "outline": "solid 2px rgb(195, 199, 240)",
+     "disabledButtons": []
+    }
+   },
+   {
+    "id": "portal nav 320: offscreen tabs reachable by keyboard, scroll into view",
+    "pass": true,
+    "detail": {
+     "nav": {
+      "cw": 320,
+      "sw": 476,
+      "mask": "linear-gradient(to right, rgb(0, 0, 0), rgb(0, 0, 0) calc(100% - 48px), rgba(0, 0, 0, 0))",
+      "hidden": [
+       "Travel",
+       "Prizes",
+       "Payouts"
+      ]
+     },
+     "after": {
+      "scrollLeft": 156,
+      "visible": true,
+      "mask": "linear-gradient(to right, rgba(0, 0, 0, 0), rgb(0, 0, 0) 32px, rgb(0, 0, 0))"
+     }
+    }
+   },
+   {
+    "id": "portal account dialog open/Escape/restore",
+    "pass": true,
+    "detail": {
+     "nm": {
+      "aria": "Priya Raman, switch demo persona",
+      "visible": "PR"
+     },
+     "d": {
+      "open": true,
+      "inside": true
+     },
+     "back": "Priya Raman, switch demo persona"
+    }
+   },
+   {
+    "id": "portal label-content-name-mismatch detail",
+    "pass": false,
+    "detail": [
+     {
+      "html": "<button type=\"button\" aria-label=\"Priya Raman, switch demo persona\" class=\"ml-auto flex items-center gap-2 rounded-md px-1.5 py-1 text-small hover:bg-surface\">",
+      "sum": "Fix any of the following:\n  Text inside the element is not included in the accessible name"
+     }
+    ]
+   }
+  ],
+  "networkAndConsole": [
+   {
+    "kind": "http404",
+    "req": "/api/invitations/lookup?token=eve-browserqa-not-a-real-token",
+    "url": "/invite/eve-browserqa-not-a-real-token"
+   },
+   {
+    "kind": "console-error",
+    "text": "Failed to load resource: the server responded with a status of 404 ()",
+    "url": "/invite/eve-browserqa-not-a-real-token"
+   },
+   {
+    "kind": "http401",
+    "req": "/api/onboarding",
+    "url": "/invite/eve-browserqa-not-a-real-token"
+   },
+   {
+    "kind": "console-error",
+    "text": "Failed to load resource: the server responded with a status of 401 ()",
+    "url": "/invite/eve-browserqa-not-a-real-token"
+   },
+   {
+    "kind": "http401",
+    "req": "/api/onboarding",
+    "url": "/onboarding"
+   },
+   {
+    "kind": "console-error",
+    "text": "Failed to load resource: the server responded with a status of 401 ()",
+    "url": "/onboarding"
+   },
+   {
+    "kind": "requestfailed",
+    "text": "net::ERR_FAILED",
+    "req": "/api/app",
+    "url": "/claims"
+   },
+   {
+    "kind": "console-error",
+    "text": "Failed to load resource: net::ERR_FAILED",
+    "url": "/claims"
+   }
+  ]
+ }
+}
