@@ -1,5 +1,27 @@
 # Final validation record
 
+## Browser QA follow-up, October 24, 2026
+
+Current application source: `81ae42a`, deployed to [the protected preview](https://eve-calhacks-bnzqx9gf8-badbird5907s-projects.vercel.app). Later commits contain reports and documentation. See the [QA index](browser-qa-summary.md) for the journeys and all source-specific reports.
+
+| Check | Result | Scope |
+| --- | --- | --- |
+| Combined Vitest suite | **273 passed, 37 files**, no skips, 576.18 seconds | Real Postgres enabled; source `dfbf030`, started 06:27:56 Pacific. |
+| Sponsor destination correction | **4 new database tests and 2 existing sponsor regressions passed** | Later correction `f47017c`; full and shortfall amounts, USD/CAD, PDF input, fees and balanced journals. The broad suite was not rerun after this correction. |
+| Final presentation and permission checks | **104 passed across 5 files** | Sponsor render, permissions, portal, client derivations and engines after the final changes. Sponsor render then passed 3/3 after its overpayment assertion. |
+| Typecheck and lint | Passed | Final application source; Next route types generated first. |
+| Vercel production build | Passed | Preview source `81ae42a`; protection retained. |
+| Browser route matrix | **19 routes at 1440/390/320**, 38 axe runs | Earlier route report; defects were rechecked on later builds, not counted as passes on the original build. |
+| Final preview and local API | **HTTP 200 on both** | Preserved sample: 300 people, 160 claims, 25 awards; saved 40/40 benchmark, zero false positives and wrongful payouts. |
+| Final sponsor browser flows | **Full and shortfall settlement passed** | Exact `81ae42a` preview: PDF, recorded net/fee/CAD amounts, controller note, one journal each and balanced ledger; [report](browser-qa-sponsor-settlement-final.md). |
+| Final accessibility fixes | **All four passed** | Independent `81ae42a` preview addendum: internal table scroll at 200% text, links, visible selected phone tab, forced-color outlines. |
+
+The financial and account journeys are linked from the QA index, including their deliberate authorization probes and fixture-setup exceptions. Money, bookings and physical fulfillment remain simulated. A real screen reader and real Windows High Contrast were not tested.
+
+All QA fixtures were cleaned up. Independent root reads confirm zero `orgtest_` organizations, zero `eve-browserqa-*` organizations and zero matching auth users; the retained Canadian credentials file is absent. The shared sample and local durable-workflow state were preserved. The final sponsor report retains two minor presentation observations rather than claiming every surface is flawless.
+
+## Original overnight handover (historical)
+
 Completed October 24, 2026, approximately 05:49 Pacific. The delivered application source is `da167e0`; subsequent commits contain only reports, documentation and screenshots.
 
 | Check | Result | Scope |

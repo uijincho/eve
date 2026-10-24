@@ -4,7 +4,7 @@ The implemented application is on GitHub `main`. It uses real Postgres persisten
 
 ## Open the app
 
-- [Vercel preview](https://eve-calhacks-hj2fnowlg-badbird5907s-projects.vercel.app). Vercel deployment protection is retained; use your Vercel account to open it.
+- [Vercel preview](https://eve-calhacks-bnzqx9gf8-badbird5907s-projects.vercel.app). Vercel deployment protection is retained; use your Vercel account to open it.
 - [Local demo](http://localhost:3000). The development server is running. To restart it, run `pnpm dev` in `/Users/evanyu/calhacks` with the existing environment files.
 - [GitHub main](https://github.com/uijincho/calhacks/tree/main).
 
@@ -24,13 +24,15 @@ The benchmark records the last evaluated run. Your actions change the sample sta
 ## Validation evidence
 
 - [Fresh demo benchmark](demo-benchmark.json): **40/40 planted cases caught, zero false positives and zero wrongful payouts**, through HTTP, Postgres and Workflow execution, in 404 seconds. Source `680aeca`.
-- [Final validation](final-validation.md): **245 tests passed across 34 files**, including real Postgres tests. The final rail-copy follow-ups separately passed 30 tests. Typecheck, lint and the final preview production build passed.
+- [Browser QA follow-up](browser-qa-summary.md): real US and Canadian account journeys, team prizes, receipts, sponsor remittances, route/mobile/keyboard checks and their corrections. Each report identifies its source build and any API or fixture-setup deviations.
+- [Final validation](final-validation.md): **273 tests passed across 37 files**, including real Postgres tests, on `dfbf030`. The later sponsor correction passed four new database regressions and two existing sponsor regressions; final presentation changes passed 104 targeted tests. Typecheck, lint and the `81ae42a` preview build passed.
 - [Deployed account acceptance](preview-account-acceptance.md): 56 HTTPS checks against the earlier `8d8ec80` preview.
 - [Deployed Workflow acceptance](preview-workflow-acceptance.md): 21 HTTPS checks proving automatic proposal, controller release, settlement and idempotent replay against that earlier preview.
-- [Current preview financial acceptance](preview-financial-acceptance.md): 31 checks over 34 HTTPS requests at `1e36ec1`. Two $1,500 prizes for a December 2025 event were paid under 2026 rules, withholding $0 and $360, with a $3,000 / $360 1099-MISC draft and four balanced journals.
+- [Earlier preview financial acceptance](preview-financial-acceptance.md): 31 checks over 34 HTTPS requests at `1e36ec1`. Two $1,500 prizes for a December 2025 event were paid under 2026 rules, withholding $0 and $360, with a $3,000 / $360 1099-MISC draft and four balanced journals.
 - [Independent financial review, round 3](review-financial-r3.md): no high or medium findings on `81c4d73`. The two low Canadian threshold findings were fixed in `852be62`, with engine and real Postgres boundary tests.
-- [Final deployment check](final-deployment.md): the `da167e0` preview built successfully; five desktop/mobile views loaded with no browser errors or horizontal overflow, and its protected API returned the settled 40/40 demo.
-- [Final visual verdict](../.impeccable/review/eve-finish-review-r3.md): **`fix`**, with seven of eight assigned findings resolved. One closed-release status still truncates in the activity rail; its full text is available when expanded. This is a verdict on the listed fixes, not whole-surface approval. The two unattended correction batches are complete.
+- [Final sponsor browser check](browser-qa-sponsor-settlement-final.md): full and shortfall CAD payouts agree across the PDF, USD net, recipient fee, CAD estimate and ledger. All QA organizations and synthetic accounts were cleaned up.
+- [Final deployment check](final-deployment.md): application source `81ae42a` is deployed. The final accessibility addendum confirms table reflow at 200% text, real link semantics, visible phone tabs and forced-color selection outlines.
+- [Historical visual verdict](../.impeccable/review/eve-finish-review-r3.md): **`fix`**, seven of eight assigned findings resolved on its reviewed source. The remaining rail truncation was subsequently corrected to “Quote changed; closed” and independently checked at 1440 and 1280 in the [browser verification](browser-qa-final-verification.md). No new whole-surface Impeccable verdict is claimed.
 - [Design documentation](../.impeccable/review/eve-design-documentation.md): the Blue Hour system is preserved; pre-existing context drift and component documentation debt are recorded.
 - [Implementation record](../IMPLEMENTATION.md) tracks later independent reviews and deployment validation. [Requirement coverage](requirement-coverage.md) records the implemented scope and remaining work.
 
@@ -38,8 +40,10 @@ The benchmark records the last evaluated run. Your actions change the sample sta
 
 Stripe recipient settlement, Duffel searches and QuickBooks company imports have not been validated against real sandbox accounts. The application uses the authorized wire, flight and CSV fallbacks. Notifications require a configured provider and the live-delivery switch; invitations currently use copyable links.
 
-Real accounts do not yet verify email ownership, and first simulated bank enrollment does not prove ownership of that account. These are known limitations for a production rollout. Canadian and treaty rules remain visibly unverified and require a controller's recorded resolution where applicable. The internal books use USD; Canadian policy inputs and filing worksheets are labeled in CAD.
+Real accounts do not yet verify email ownership, and first simulated bank enrollment does not prove ownership of that account. These are known limitations for a production rollout. Canadian and treaty rules remain visibly unverified and require a controller's recorded resolution where applicable. The internal books use USD; Canadian policy inputs and filing worksheets are labeled in CAD. Simulated CAD-to-CAD payouts still travel through USD books, dated FX tables and a destination spread instead of domestic CAD routing. Destination values are estimates; sponsor settlement now recomputes them from the amount actually received at the locked quote rate.
 
 The review reports retain smaller limitations: a Canadian payout's reportable label can differ by a cent at an FX rounding boundary (the CAD filing calculation is authoritative); sponsor payments spanning a year end need further tax-date work; replacing an unverified bank change lacks a separate rejection timestamp for historical scoreboard analysis. These cases are outside the measured US sample scenarios.
+
+The final sponsor browser run records two minor presentation items: long PDF descriptions can clip, and recording a remittance exception uses green confirmation styling. Both leave the exception and financial controls intact.
 
 This build supports one event per organization. Named backup approvers, origin-specific travel caps, automatic hybrid payout routing, official filing templates/e-filing, live sponsor portals and historical fare intelligence remain outside the completed scope. No real money was moved.

@@ -4,7 +4,7 @@ Event finance for travel claims, prizes, controller approvals, sponsor handoffs 
 
 The application uses real Postgres persistence, deterministic financial rules, an immutable balanced ledger, Better Auth accounts and Vercel Workflow jobs. Money movement is **simulated**. Tax documents are **drafts, not for filing**. Integration and validation details are tracked in [IMPLEMENTATION.md](IMPLEMENTATION.md).
 
-Open the [Vercel preview](https://eve-calhacks-hj2fnowlg-badbird5907s-projects.vercel.app) with your Vercel account. The [overnight handover](docs/overnight-handover.md) contains the walkthrough, validation evidence and remaining limitations.
+Open the [Vercel preview](https://eve-calhacks-bnzqx9gf8-badbird5907s-projects.vercel.app) with your Vercel account. The [overnight handover](docs/overnight-handover.md) contains the walkthrough and remaining limitations; the [browser QA index](docs/browser-qa-summary.md) links the tested journeys, fixes and evidence.
 
 ## Run locally
 
