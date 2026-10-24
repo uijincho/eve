@@ -28,7 +28,7 @@ The benchmark records the last evaluated run. Your actions change the sample sta
 - [Deployed account acceptance](preview-account-acceptance.md): 56 HTTPS checks against the earlier `8d8ec80` preview.
 - [Deployed Workflow acceptance](preview-workflow-acceptance.md): 21 HTTPS checks proving automatic proposal, controller release, settlement and idempotent replay against that earlier preview.
 - [Current preview financial acceptance](preview-financial-acceptance.md): 31 checks over 34 HTTPS requests at `1e36ec1`. Two $1,500 prizes for a December 2025 event were paid under 2026 rules, withholding $0 and $360, with a $3,000 / $360 1099-MISC draft and four balanced journals.
-- [Independent financial review, round 3](review-financial-r3.md): no high or medium findings on `81c4d73`; the two low Canadian threshold findings are tracked in the implementation record.
+- [Independent financial review, round 3](review-financial-r3.md): no high or medium findings on `81c4d73`. The two low Canadian threshold findings were fixed in `852be62`, with engine and real Postgres boundary tests.
 - [Implementation record](../IMPLEMENTATION.md) tracks later independent reviews and deployment validation. [Requirement coverage](requirement-coverage.md) records the implemented scope and remaining work.
 
 ## Boundaries to keep visible
@@ -36,5 +36,7 @@ The benchmark records the last evaluated run. Your actions change the sample sta
 Stripe recipient settlement, Duffel searches and QuickBooks company imports have not been validated against real sandbox accounts. The application uses the authorized wire, flight and CSV fallbacks. Notifications require a configured provider and the live-delivery switch; invitations currently use copyable links.
 
 Real accounts do not yet verify email ownership, and first simulated bank enrollment does not prove ownership of that account. These are known limitations for a production rollout. Canadian and treaty rules remain visibly unverified and require a controller's recorded resolution where applicable. The internal books use USD; Canadian policy inputs and filing worksheets are labeled in CAD.
+
+The review reports retain smaller limitations: a Canadian payout's reportable label can differ by a cent at an FX rounding boundary (the CAD filing calculation is authoritative); sponsor payments spanning a year end need further tax-date work; replacing an unverified bank change lacks a separate rejection timestamp for historical scoreboard analysis. These cases are outside the measured US sample scenarios.
 
 This build supports one event per organization. Named backup approvers, origin-specific travel caps, automatic hybrid payout routing, official filing templates/e-filing, live sponsor portals and historical fare intelligence remain outside the completed scope. No real money was moved.
