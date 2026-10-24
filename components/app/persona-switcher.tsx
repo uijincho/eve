@@ -5,7 +5,8 @@ import { LoaderCircleIcon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { ResultText } from "@/components/app/action-button";
+import { ResultText } from "@/components/app/result-text";
+import { SignOutButton } from "@/components/app/sign-out-button";
 import type { ActionResult, Role } from "@/lib/contracts";
 import { ROLE_LABEL, initials } from "@/lib/client/format";
 import { useEve } from "@/lib/client/use-eve";
@@ -41,7 +42,8 @@ export function PersonaSwitcher({ className }: { className?: string }) {
         </span>
         {pending ? <LoaderCircleIcon aria-label="Switching" className="ml-auto size-3.5 animate-spin text-muted-foreground" /> : null}
       </div>
-      {personas.length > 1 ? (
+      {!snapshot.demo ? <SignOutButton className="self-start" /> : null}
+      {snapshot.demo && personas.length > 1 ? (
         <div className="flex flex-col gap-1">
           <label htmlFor={id} className="text-caption text-faint">
             Demo persona

@@ -37,7 +37,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setPersonaOpen(true)}
-            aria-label={snapshot ? `${snapshot.actor.name}, switch demo persona` : "Switch demo persona"}
+            aria-label={snapshot ? `${snapshot.actor.name}, ${snapshot.demo ? "switch demo persona" : "account"}` : "Account"}
             className="ml-auto flex items-center gap-2 rounded-md px-1.5 py-1 text-small hover:bg-surface"
           >
             <span aria-hidden className="grid size-7 place-items-center rounded-full bg-border text-caption font-semibold">
@@ -71,7 +71,12 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
       <div id="main" className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6">
         {children}
       </div>
-      <Sheet open={personaOpen} onOpenChange={setPersonaOpen} title="Demo persona" description="Sample data only. The server decides what each persona may see and do.">
+      <Sheet
+        open={personaOpen}
+        onOpenChange={setPersonaOpen}
+        title={snapshot?.demo ? "Demo persona" : "Your account"}
+        description={snapshot?.demo ? "Sample data only. The server decides what each persona may see and do." : snapshot?.actor.email}
+      >
         <PersonaSwitcher />
       </Sheet>
     </div>

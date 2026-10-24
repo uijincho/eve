@@ -132,7 +132,7 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
       <div id="main" className="flex min-w-0 flex-1 flex-col">
         {attendeeHere ? (
           <p role="note" className="border-b bg-surface px-4 py-2 text-small text-muted-foreground sm:px-6">
-            Your sample persona is an attendee, so organizer data is hidden.{" "}
+            {snapshot?.demo ? "Your sample persona is an attendee, so organizer data is hidden." : "You are signed in as an attendee, so organizer pages are hidden."}{" "}
             <Link href="/portal" className="font-medium text-foreground underline">
               Open your portal
             </Link>

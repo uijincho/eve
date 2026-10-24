@@ -23,29 +23,40 @@ export function AgentView() {
   return (
     <PageFrame
       title="Agent"
-      lede={() => "Every workflow run Eve is doing or has done, one entry per receipt, winner, or payout. The agent works inside policy limits and cannot release money."}
-      actions={(s) => (
-        <ActionButton
-          size="default"
-          variant="default"
-          label="Run the answer key"
-          pendingLabel="Running"
-          permission={canManage(s.actor)}
-          call={payloads.demoRun()}
-        />
-      )}
+      lede={(s) => `Every workflow run Eve is doing or has done, one entry per receipt, winner, or payout. Eve works inside ${s.org.name}'s policy limits and cannot release money.`}
+      actions={(s) =>
+        s.demo ? (
+          <ActionButton
+            size="default"
+            variant="default"
+            label="Run the answer key"
+            pendingLabel="Starting"
+            permission={canManage(s.actor)}
+            call={payloads.demoRun()}
+          />
+        ) : (
+          <ActionButton
+            size="default"
+            variant="default"
+            label="Run Eve"
+            pendingLabel="Starting"
+            permission={canManage(s.actor)}
+            call={payloads.agentRun("all")}
+          />
+        )
+      }
     >
       {(s) => (
         <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="flex min-w-0 flex-col gap-10">
-            <Scoreboard snapshot={s} />
+            {s.demo ? <Scoreboard snapshot={s} /> : null}
             <Section title="Activity" aside="Refreshes every 2 seconds">
               <AgentFeed variant="page" />
             </Section>
           </div>
           <div className="flex flex-col gap-10">
             <TryReceipt snapshot={s} />
-            <TryWinner snapshot={s} />
+            {s.demo ? <TryWinner snapshot={s} /> : null}
           </div>
         </div>
       )}
@@ -56,9 +67,9 @@ export function AgentView() {
 function Scoreboard({ snapshot: s }: { snapshot: AppSnapshot }) {
   const b = s.scoreboard;
   return (
-    <Section title="Scoreboard" aside={b.lastRunAt ? `Last run ${fmtDateTime(b.lastRunAt)}` : "Not run yet"}>
+    <Section title="Scoreboard" aside={b.lastRunAt ? `Last evaluated run ${fmtDateTime(b.lastRunAt)}` : "No evaluated run yet"}>
       <p className="max-w-[64ch] text-small text-muted-foreground">
-        Measured against the seeded event&rsquo;s answer key of planted errors. These numbers come from the last actual run, not a target.
+        Compares Eve&rsquo;s saved decisions on the sample event with its answer key of planted errors. The numbers are measured from those decisions, not a target; running the answer key re-evaluates them.
       </p>
       <dl className="grid max-w-2xl grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
         <Stat label="Caught" value={b.evaluated ? `${b.caught} of ${b.total}` : `— of ${b.total}`} />
@@ -84,7 +95,7 @@ function Scoreboard({ snapshot: s }: { snapshot: AppSnapshot }) {
           </ul>
         </details>
       ) : (
-        <EmptyState title="No run yet">Run the answer key and Eve processes the seeded event, then this compares its decisions to the planted errors.</EmptyState>
+        <EmptyState title="No evaluated run yet">Run the answer key and Eve processes the sample event, then this compares its decisions to the planted errors.</EmptyState>
       )}
     </Section>
   );
@@ -103,9 +114,9 @@ function TryReceipt({ snapshot: s }: { snapshot: AppSnapshot }) {
   const [claimId, setClaimId] = useState<string | null>(null);
   const forOthers = s.actor.role !== "attendee";
   return (
-    <Section title="Try your own receipt">
+    <Section title={s.demo ? "Try your own receipt" : "Run Eve on a receipt"}>
       <p className="text-small text-muted-foreground">
-        Upload any receipt photo or PDF. Eve reads it, runs the same policy checks, and records the result as a real claim.
+        Upload a receipt photo or PDF. Eve reads it, runs the policy checks, and records the result as a claim{s.demo ? " in the sample event" : ""}.
       </p>
       {canManage(s.actor).allowed || s.actor.role === "attendee" ? (
         <>
