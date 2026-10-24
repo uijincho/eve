@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Person } from "@/lib/contracts";
-import { isAdultOn, suggestedForm } from "@/lib/client/derive";
+import { isAdultOn } from "@/lib/client/derive";
 import { fmtDate } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 
@@ -87,7 +87,8 @@ function Identity({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
 }
 
 function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
-  const suggested = suggestedForm({ country: me.country, citizenship: me.citizenship });
+  // The server decides which form applies (payer country, US-person status); use its answer.
+  const suggested = me.taxForm;
   const [form, setForm] = useState<Person["taxForm"]>(me.taxStatus === "valid" ? me.taxForm : suggested);
   const [tin, setTin] = useState("");
   const [treaty, setTreaty] = useState(me.country !== s.org.country ? me.country : "");
@@ -100,12 +101,16 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
   return (
     <Section title="Tax form" aside={<span className="inline-flex items-center gap-2">{me.taxForm} <StatusBadge status={me.taxStatus} />{me.taxLast4 ? ` TIN ••${me.taxLast4}` : ""}</span>}>
       <p className="text-small text-muted-foreground">
-        Because you live in {COUNTRIES.find(([c]) => c === me.country)?.[1] ?? me.country} and are a citizen of {COUNTRIES.find(([c]) => c === me.citizenship)?.[1] ?? me.citizenship}, Eve asks for a <span className="font-medium text-foreground">{suggested}</span>.
+        {s.org.country === "CA"
+          ? <>Because {s.org.name} pays from Canada, Eve asks for a <span className="font-medium text-foreground">{suggested}</span>.</>
+          : me.citizenship === "US" && me.country !== "US"
+            ? <>As a US citizen, you file a <span className="font-medium text-foreground">{suggested}</span> even though you live in {COUNTRIES.find(([c]) => c === me.country)?.[1] ?? me.country}.</>
+            : <>Because you live in {COUNTRIES.find(([c]) => c === me.country)?.[1] ?? me.country} and are a citizen of {COUNTRIES.find(([c]) => c === me.citizenship)?.[1] ?? me.citizenship}, Eve asks for a <span className="font-medium text-foreground">{suggested}</span>.</>}
         {me.taxExpiresAt ? ` Your current form expires ${fmtDate(me.taxExpiresAt, true)}.` : ""}
       </p>
       {rule && !rule.verified ? (
         <p className="flex flex-wrap items-center gap-2 text-small text-muted-foreground">
-          <TruthLabel kind="unverified" /> The treaty rate for your country has not been verified yet, so Eve shows the default rate.
+          <TruthLabel kind="unverified" /> {form === "W-8BEN" ? "The treaty rate for your country has not been verified yet, so a controller reviews it before you are paid." : "The tax rule for this payment has not been verified yet, so a controller reviews it before you are paid."}
         </p>
       ) : null}
       <form noValidate className="flex flex-col gap-4" onSubmit={(e) => e.preventDefault()}>
@@ -119,7 +124,7 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
               </NativeSelect>
             )}
           </Field>
-          <Field label={form === "W-9" ? "SSN or ITIN" : "Foreign tax ID (optional)"} error={errors.tin} help="Sent once to the vault. It is never shown again.">
+          <Field label={form === "W-9" ? "SSN or ITIN" : form === "Residency declaration" ? (me.country === "CA" ? "SIN (optional)" : "Tax ID (optional)") : "Foreign tax ID (optional)"} error={errors.tin} help="Sent once to the vault. It is never shown again.">
             {(p) => <Input {...p} type="password" autoComplete="off" inputMode="text" value={tin} onChange={(e) => setTin(e.target.value.replace(/[^0-9A-Za-z-]/g, ""))} />}
           </Field>
           {form === "W-8BEN" ? (
