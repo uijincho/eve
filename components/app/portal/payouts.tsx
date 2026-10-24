@@ -64,7 +64,9 @@ function PayoutMethod({ me }: { me: Person }) {
     <Section title="Payout account">
       <p className="text-small">{me.payoutLast4 ? `${me.payoutCurrency} account ••${me.payoutLast4}` : "No account on file yet."}</p>
       <p className="text-small text-muted-foreground">
-        Changing it freezes unpaid payouts until you confirm with a code sent to your original email. This protects you if someone else asks us to change it.
+        {me.payoutLast4
+          ? "Changing it freezes unpaid payouts until you confirm with a code sent to your original email. This protects you if someone else asks us to change it."
+          : "Add the account Eve pays you into. Later changes freeze unpaid payouts until you confirm them from your original email."}
       </p>
       <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
         <Field label="Account, last 4 digits" error={error}>
