@@ -72,6 +72,19 @@ describe.skipIf(!hasDatabase)("onboarding and invitations against real Postgres"
     expect(status.canCreateOrganization).toBe(false);
   });
 
+  it("maps onboarding errors to JSON 4xx even across duplicated module instances", async () => {
+    const { svc } = m;
+    const { onboardingRoute } = await import("@/lib/server/http");
+    const direct = await onboardingRoute(async () => { throw new svc.OnboardingError(410, "expired", "This invitation expired."); });
+    expect(direct.status).toBe(410);
+    expect(await direct.json()).toEqual({ ok: false, code: "expired", message: "This invitation expired." });
+    // A copy of the class from a second bundle instance carries the same brand.
+    const foreign = Object.assign(new Error("Sign in."), { status: 401, code: "unauthenticated", [Symbol.for("eve.onboarding-error")]: true });
+    expect((await onboardingRoute(async () => { throw foreign; })).status).toBe(401);
+    expect(svc.isOnboardingError(Object.assign(new Error("x"), { name: "OnboardingError", status: 400, code: "invalid" }))).toBe(false);
+    await expect(onboardingRoute(async () => { throw new Error("boom"); })).rejects.toThrow("boom");
+  });
+
   it("validates organization input and refuses anonymous callers", async () => {
     const { svc } = m;
     await expect(svc.createOrganization(null, orgBody("Nope"))).rejects.toMatchObject({ status: 401 });
@@ -111,8 +124,12 @@ describe.skipIf(!hasDatabase)("onboarding and invitations against real Postgres"
     await expect(svc.acceptInvitation(users.ari, { token: first.token })).rejects.toMatchObject({ code: "revoked" });
     await expect(svc.acceptInvitation(users.ari, { token: "x".repeat(43) })).rejects.toMatchObject({ status: 404 });
 
-    const pending = await svc.onboardingStatus(users.ari);
-    expect(pending.needsSetup).toBe(true);
+    // Pending invitations are listed only to a verified email; anyone can register an address they do not own.
+    const unverified = await svc.onboardingStatus(users.ari);
+    expect(unverified.needsSetup).toBe(true);
+    expect(unverified).toMatchObject({ pendingInvitations: [], pendingInvitationsHidden: true });
+    const pending = await svc.onboardingStatus({ ...users.ari, emailVerified: true });
+    expect(pending.pendingInvitationsHidden).toBe(false);
     expect(pending.pendingInvitations.map((i) => i.id)).toEqual([second.invitation.id]);
 
     const accepted = await svc.acceptInvitation(users.ari, { token: second.token });

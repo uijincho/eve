@@ -11,6 +11,10 @@
 //   the role from the invitation row, never from the request, and requires the
 //   signed-in user's email to match the invited email. Existing members cannot
 //   change role through an invitation.
+// - Email ownership: accounts are not email-verified while no email provider
+//   is configured. Pending invitations are listed only to verified emails; an
+//   unverified account can still accept with the link token, because holding
+//   the token (delivered out of band by the organizer) is the proof of inbox.
 // - Delivery is honest: no email provider is configured, so the organizer gets
 //   a copy-link and the invitee sees pending invites in GET /api/onboarding.
 
@@ -33,11 +37,22 @@ import { maskEmail, recordDecision } from "./core";
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const INVITABLE_ROLES = ["organizer", "controller", "auditor"] as const;
 
+const ONBOARDING_ERROR = Symbol.for("eve.onboarding-error");
+
 export class OnboardingError extends Error {
+  readonly [ONBOARDING_ERROR] = true;
   constructor(public readonly status: 400 | 401 | 403 | 404 | 409 | 410, public readonly code: string, message: string) {
     super(message);
     this.name = "OnboardingError";
   }
+}
+
+/**
+ * Brand check that survives duplicated module instances (dev bundles can load
+ * this file twice, which made `instanceof` miss and turned 4xx into empty 500s).
+ */
+export function isOnboardingError(e: unknown): e is OnboardingError {
+  return e instanceof OnboardingError || (typeof e === "object" && e !== null && (e as Record<symbol, unknown>)[ONBOARDING_ERROR] === true);
 }
 
 // ------------------------------------------------------------------ schemas
@@ -119,7 +134,8 @@ export async function onboardingStatus(userIn: SessionUser | null, db: Executor 
     .from(s.orgMember).innerJoin(s.organization, eq(s.organization.id, s.orgMember.orgId))
     .where(eq(s.orgMember.userId, user.id)).orderBy(asc(s.orgMember.createdAt));
   const [owned] = await db.select({ orgId: orgOwner.orgId }).from(orgOwner).where(eq(orgOwner.userId, user.id));
-  const invitations = await db.select({ id: orgInvitation.id, orgId: orgInvitation.orgId, orgName: s.organization.name, role: orgInvitation.role, expiresAt: orgInvitation.expiresAt, invitedByName: s.orgMember.name })
+  // Listing by email would leak org names and inviters to anyone who registers an address they do not own.
+  const invitations = !user.emailVerified ? [] : await db.select({ id: orgInvitation.id, orgId: orgInvitation.orgId, orgName: s.organization.name, role: orgInvitation.role, expiresAt: orgInvitation.expiresAt, invitedByName: s.orgMember.name })
     .from(orgInvitation)
     .innerJoin(s.organization, eq(s.organization.id, orgInvitation.orgId))
     .innerJoin(s.orgMember, eq(s.orgMember.id, orgInvitation.invitedBy))
@@ -131,6 +147,7 @@ export async function onboardingStatus(userIn: SessionUser | null, db: Executor 
     ownedOrgId: owned?.orgId ?? null,
     // Accepting from this list still needs the token from the invite link; the list tells the invitee to ask for it.
     pendingInvitations: invitations.map((i) => ({ ...i, expiresAt: i.expiresAt.toISOString() })),
+    pendingInvitationsHidden: !user.emailVerified,
     needsSetup: memberships.length === 0,
     canCreateOrganization: !owned,
   };

@@ -13,7 +13,7 @@ Real Better Auth accounts only (`/api/auth/*`, email + password). Demo persona c
 
 | Method | Path | Body | Success |
 | --- | --- | --- | --- |
-| GET | `/api/onboarding` | none | `{ ok, user: { id, name, email, emailVerified }, memberships: [{ memberId, orgId, orgName, role, isDemo }], ownedOrgId, pendingInvitations: [{ id, orgId, orgName, role, expiresAt, invitedByName }], needsSetup, canCreateOrganization }` |
+| GET | `/api/onboarding` | none | `{ ok, user: { id, name, email, emailVerified }, memberships: [{ memberId, orgId, orgName, role, isDemo }], ownedOrgId, pendingInvitations: [{ id, orgId, orgName, role, expiresAt, invitedByName }], pendingInvitationsHidden, needsSetup, canCreateOrganization }` |
 | POST | `/api/onboarding/organization` | see below | 201 (created) or 200 (already created; same org returned) `{ ok, created, orgId, eventId, memberId }`; sets the active-org cookie |
 | POST | `/api/onboarding/active-org` | `{ orgId }` | `{ ok, orgId, role, orgName }`; sets the active-org cookie (membership required) |
 | GET | `/api/invitations` | none | `{ ok, orgId, invitations: [{ id, email, role, invitedBy, createdAt, expiresAt, status: "pending"\|"accepted"\|"revoked"\|"expired", acceptedAt }] }` (organizer/controller/auditor of the active org) |
@@ -42,6 +42,8 @@ Only `org.name`, `org.country` (US or CA) and the `event` fields are required. D
 
 ## Notes
 
-- No email provider is configured, so invites are delivered by copy-link. The invitee also sees pending invites in `GET /api/onboarding`, but still needs the link token to accept.
-- The token is 256 bits of randomness; only its SHA-256 is stored. It expires after 7 days and works once. Possessing it together with a matching signed-in email is the proof of invitation (accounts are not email-verified).
+- No email provider is configured, so invites are delivered by copy-link. `GET /api/onboarding` lists pending invites only when the account's email is verified; otherwise `pendingInvitations` is empty and `pendingInvitationsHidden` is true. Accepting always needs the link token.
+- Email ownership limitation: sign-up does not verify email while no provider is configured, so anyone can register any address. That is why the pending list is hidden from unverified accounts (it would reveal org names, roles and inviters). Acceptance does not require verification: the token, which the organizer delivers out of band to the invited address, is the proof of inbox access. Someone who registers an invitee's address first can block that invitee from signing up (emails are unique); the organizer then revokes and invites another address.
+- The token is 256 bits of randomness; only its SHA-256 is stored. It expires after 7 days and works once. Possessing it together with a matching signed-in email is the proof of invitation.
+- All errors here are JSON `{ ok: false, code, message }` with a 4xx status. `onboardingRoute` recognizes `OnboardingError` by a `Symbol.for` brand, so a duplicated module instance in a dev bundle cannot turn them into empty 500s.
 - Attendees are first imported with `people.import`, then invited with `POST /api/invitations/attendee`. The invite page and accept call are the same as for staff. At acceptance the person is looked up again by the invited email and must still exist and be an adult; the new membership is attendee-only and linked to that person, so the attendee portal shows only their own records.

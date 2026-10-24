@@ -2,6 +2,8 @@
 
 import { DEMO_COOKIE, createDemoToken, demoCookieHeader, demoModeEnabled, loadDemoPersona, resolveSession, type ActorContext } from "@/lib/auth/session";
 
+import { isOnboardingError } from "./onboarding";
+
 export const DEMO_ORG_ID = "org_demo_bluehour";
 export const DEFAULT_DEMO_PERSONA = "mem_demo_dana";
 
@@ -45,11 +47,10 @@ export function sameOrigin(request: Request): boolean {
 
 /** Shared error mapping for onboarding/invitation routes. */
 export async function onboardingRoute(run: () => Promise<Response>): Promise<Response> {
-  const { OnboardingError } = await import("./onboarding");
   try {
     return await run();
   } catch (e) {
-    if (e instanceof OnboardingError) return json({ ok: false, code: e.code, message: e.message }, e.status);
+    if (isOnboardingError(e)) return json({ ok: false, code: e.code, message: e.message }, e.status);
     throw e;
   }
 }
