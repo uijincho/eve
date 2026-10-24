@@ -8,7 +8,7 @@ import { Section } from "@/components/app/page-header";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Money } from "@/components/eve/money";
 import { big } from "@/lib/client/derive";
-import { fmtDate, fmtDay, humanize } from "@/lib/client/format";
+import { fmtDay, humanize } from "@/lib/client/format";
 
 import { PortalFrame } from "./portal-frame";
 
