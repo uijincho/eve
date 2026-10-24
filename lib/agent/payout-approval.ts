@@ -12,11 +12,12 @@ export interface ControllerApproval { memberId: string; quoteFingerprint: string
 export class ApprovalConflictError extends Error {}
 
 /** Approval is bound to these exact terms. A bank change or re-quote needs a new release. */
-export function payoutQuoteFingerprint(p: Pick<PayoutRow, "id" | "orgId" | "personId" | "grossMinor" | "withholdingMinor" | "feeMinor" | "netMinor" | "currency" | "destinationCurrency" | "destinationNetMinor" | "fxRate" | "provider" | "payoutMethodId" | "bankVersion" | "ruleId" | "ruleVersion" | "requestedBy" | "idempotencyKey">): string {
+export function payoutQuoteFingerprint(p: Pick<PayoutRow, "id" | "orgId" | "personId" | "grossMinor" | "withholdingMinor" | "feeMinor" | "netMinor" | "currency" | "destinationCurrency" | "destinationNetMinor" | "fxRate" | "provider" | "payoutMethodId" | "bankVersion" | "ruleId" | "ruleVersion" | "ruleVerified" | "reportingForm" | "reportable" | "createdAt" | "requestedBy" | "idempotencyKey">): string {
   return createHash("sha256").update(JSON.stringify([
     p.id, p.orgId, p.personId, p.grossMinor.toString(), p.withholdingMinor.toString(), p.feeMinor.toString(), p.netMinor.toString(),
     p.currency, p.destinationCurrency, p.destinationNetMinor.toString(), p.fxRate, p.provider,
-    p.payoutMethodId, p.bankVersion, p.ruleId, p.ruleVersion, p.requestedBy, p.idempotencyKey,
+    p.payoutMethodId, p.bankVersion, p.ruleId, p.ruleVersion, p.ruleVerified, p.reportingForm, p.reportable,
+    p.createdAt.toISOString(), p.requestedBy, p.idempotencyKey,
   ])).digest("hex");
 }
 
@@ -24,10 +25,11 @@ export function approvalToken(target: ApprovalTarget): string {
   return `payout-release:${target.orgId}:${target.payoutId}:${target.quoteFingerprint}`;
 }
 
-export function assertControllerApproval(actor: Pick<ActorContext, "role" | "memberId" | "orgId">, payout: Pick<PayoutRow, "orgId" | "requestedBy" | "status">): void {
+export function assertControllerApproval(actor: Pick<ActorContext, "role" | "memberId" | "orgId" | "personId">, payout: Pick<PayoutRow, "orgId" | "requestedBy" | "status" | "personId">): void {
   if (actor.role !== "controller") throw new ApprovalConflictError("Only a controller can release money.");
   if (payout.orgId !== actor.orgId) throw new ApprovalConflictError("Payout not found.");
   if (payout.requestedBy === actor.memberId) throw new ApprovalConflictError("The requester cannot release their own payout.");
+  if (actor.personId && actor.personId === payout.personId) throw new ApprovalConflictError("The recipient cannot release their own payout.");
   if (!["proposed", "approved"].includes(payout.status)) throw new ApprovalConflictError(`This payout is ${payout.status} and cannot be released.`);
 }
 
@@ -41,7 +43,12 @@ export async function loadApprovalTarget(orgId: string, payoutId: string): Promi
 export async function recordApprovalWait(target: ApprovalTarget, runId: string, stage: number): Promise<boolean> {
   return getDb().transaction(async (tx) => {
     const [payout] = await tx.select().from(s.payout).where(and(eq(s.payout.id, target.payoutId), eq(s.payout.orgId, target.orgId))).for("update");
-    if (!payout || !["proposed", "approved"].includes(payout.status) || payoutQuoteFingerprint(payout) !== target.quoteFingerprint) return false;
+    if (!payout) return false;
+    if (!["proposed", "approved"].includes(payout.status) || payoutQuoteFingerprint(payout) !== target.quoteFingerprint) {
+      const id = createHash("sha256").update(`${runId}:superseded`).digest("hex").slice(0, 32);
+      await tx.insert(s.decisionLog).values({ id: `dec_${id}`, orgId: target.orgId, runId, objectType: "payout", objectId: payout.id, action: "Previous release request closed", summary: "This quote changed or the payout no longer awaits release. Any new proposal needs a fresh controller approval.", actor: "Eve (agent)", actorRole: "agent", status: "done", tool: "waitForController" }).onConflictDoNothing();
+      return false;
+    }
     const [person] = await tx.select({ name: s.person.name }).from(s.person).where(eq(s.person.id, payout.personId));
     const id = createHash("sha256").update(`${runId}:approval-wait:${stage}`).digest("hex").slice(0, 32);
     const next = stage < 3 ? new Date(Date.now() + (stage === 0 ? 60 * 60_000 : 24 * 60 * 60_000)) : null;
@@ -64,10 +71,13 @@ export async function recordApprovalWait(target: ApprovalTarget, runId: string, 
 export async function executeControllerApproval(target: ApprovalTarget, approval: ControllerApproval, runId: string): Promise<{ payoutId: string; status: string; replayed: boolean }> {
   const { releasePayout } = await import("@/lib/server/payouts");
   return getDb().transaction(async (tx) => {
+    const [org] = await tx.select().from(s.organization).where(eq(s.organization.id, target.orgId)).for("no key update");
+    if (!org) throw new ApprovalConflictError("Organization no longer exists.");
     const [member] = await tx.select().from(s.orgMember).where(and(eq(s.orgMember.id, approval.memberId), eq(s.orgMember.orgId, target.orgId))).for("update");
     if (!member || member.role !== "controller") throw new ApprovalConflictError("The approver no longer has controller access.");
-    const [org] = await tx.select().from(s.organization).where(eq(s.organization.id, target.orgId));
     if (!org || (member.demoPersona && (!org.isDemo || !demoModeEnabled()))) throw new ApprovalConflictError("The demo approval is no longer valid.");
+    const [recipient] = await tx.select({ personId: s.payout.personId }).from(s.payout).where(and(eq(s.payout.id, target.payoutId), eq(s.payout.orgId, target.orgId)));
+    if (recipient) await tx.select({ id: s.person.id }).from(s.person).where(and(eq(s.person.id, recipient.personId), eq(s.person.orgId, target.orgId))).for("update");
     const [payout] = await tx.select().from(s.payout).where(and(eq(s.payout.id, target.payoutId), eq(s.payout.orgId, target.orgId))).for("update");
     if (!payout) throw new ApprovalConflictError("Payout no longer exists.");
     if (approval.quoteFingerprint !== target.quoteFingerprint || payoutQuoteFingerprint(payout) !== target.quoteFingerprint) {

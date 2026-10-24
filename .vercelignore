@@ -1,7 +1,10 @@
 .env
 .env.*
 .agents
+.claude
 .impeccable
+.swc
+.workflow-data
 .git
 node_modules
 .next
