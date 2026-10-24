@@ -11,7 +11,7 @@
 // client-entered value is kept for review but the claim goes to a person.
 
 import { postJournal } from "@/lib/ledger";
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 
 import type { ActorContext } from "@/lib/auth/session";
 import type { Check } from "@/lib/contracts";
@@ -106,6 +106,8 @@ export function evaluate(input: {
   claim: ClaimRow; person: PersonRow; org: OrgRow; event: EventRow; existing: ClaimRow[]; personNames: Map<string, string>;
   /** Remaining room on the claim's budget line (cap minus approved/paid), if the org has one for it. */
   budget?: { name: string; remainingMinor: bigint };
+  /** Travel claims from the same event and origin, for the peer fare check. Omitted, the check does not run. */
+  farePeers?: ClaimRow[];
 }): { checks: Check[]; status: ClaimRow["status"]; reason: string } {
   const { claim, person, org, event } = input;
   const ev = (claim.extracted ?? {}) as Partial<ClaimEvidence>;
@@ -118,6 +120,8 @@ export function evaluate(input: {
     // Travel tickets must show a name; a missing one fails the match rather than defaulting to the profile.
     ticketName: claim.type === "travel" ? (claim.nameOnReceipt ?? "") : (claim.nameOnReceipt ?? undefined),
     asOf: claim.createdAt.toISOString(),
+    // Org bookings are priced by a server-verified offer, not chosen by the attendee.
+    fareCandidates: claim.category === ORG_BOOKED_FLIGHT ? undefined : input.farePeers?.map((c) => toClaim(c, "")),
   });
   const checks = [...result.checks];
   const trusted = ev.source === "trusted_fixture" || ev.source === "org_booking";
@@ -148,6 +152,13 @@ export function evaluate(input: {
   return { checks, status, reason };
 }
 
+/** Travel claims on the same route for the same event (the engine picks comparable ones). */
+async function farePeersFor(db: Executor, claim: Pick<ClaimRow, "orgId" | "eventId" | "type" | "origin">): Promise<ClaimRow[] | undefined> {
+  if (claim.type !== "travel" || !claim.origin?.trim()) return undefined;
+  return db.select().from(s.claim).where(and(eq(s.claim.orgId, claim.orgId), eq(s.claim.eventId, claim.eventId), eq(s.claim.type, "travel"),
+    sql`upper(trim(${s.claim.origin})) = ${claim.origin.trim().toUpperCase()}`));
+}
+
 async function claimsForChecks(db: Executor, orgId: string, claim: Pick<ClaimRow, "personId" | "receiptHash">) {
   const rows = await db.select().from(s.claim).where(and(eq(s.claim.orgId, orgId),
     claim.receiptHash ? or(eq(s.claim.personId, claim.personId), eq(s.claim.receiptHash, claim.receiptHash)) : eq(s.claim.personId, claim.personId)));
@@ -164,7 +175,8 @@ async function applyEvaluation(tx: Executor, actor: ActorContext, claim: ClaimRo
   const budget = await claimBudgetRoom(tx, claim);
   // Claims are in USD books; a non-USD org's limits and travel cap are converted, never compared raw.
   const books = await limitsInBooks(tx, org, event);
-  const result = evaluate({ claim, person, org: books.org, event: books.event, existing: rows, personNames: names, budget: budget ? { name: budget.name, remainingMinor: budget.remainingMinor } : undefined });
+  const farePeers = await farePeersFor(tx, claim);
+  const result = evaluate({ claim, person, org: books.org, event: books.event, existing: rows, personNames: names, budget: budget ? { name: budget.name, remainingMinor: budget.remainingMinor } : undefined, farePeers });
   if (claim.category === ORG_BOOKED_FLIGHT && result.status === "approved") {
     // The agent never buys tickets: an organizer approves every org booking.
     result.status = "escalated";

@@ -4,6 +4,7 @@
 import type { Check, Claim, EventRecord, Organization, Person } from "@/lib/contracts";
 import { formatMoney } from "@/lib/design/money";
 
+import { checkFare, type FarePolicy } from "./fare-anomaly";
 import { EngineError, convertMinor, currencyExponent, parseMinor, parseRate } from "./money";
 
 export interface ClaimPolicy {
@@ -33,6 +34,12 @@ export interface CheckClaimInput {
   /** Name printed on the ticket or receipt, if extraction found one. Defaults to claim.personName. */
   ticketName?: string;
   policy?: Partial<ClaimPolicy>;
+  /**
+   * Other claims from the same event to compare a travel fare with. Omitted,
+   * the fare check does not run (e.g. org bookings priced by a verified offer).
+   */
+  fareCandidates?: Claim[];
+  farePolicy?: Partial<FarePolicy>;
   /** Evaluation time, ISO. Defaults to now. */
   asOf?: string;
 }
@@ -298,6 +305,11 @@ export function checkClaim(input: CheckClaimInput): CheckClaimResult {
       if (underCap && usd * 10_000n >= cap * BigInt(policy.capHuggingBps)) {
         add("cap_hugging", "Not hugging the cap", false, `Within ${(10_000 - policy.capHuggingBps) / 100}% of the cap; check against typical fares.`);
       }
+    }
+
+    if (usd !== undefined && input.fareCandidates && claim.cabin && isEconomyCabin(claim.cabin)) {
+      const fare = checkFare({ claim, usdMinor: usd, candidates: input.fareCandidates, isEconomy: isEconomyCabin, policy: input.farePolicy });
+      if (fare.check) checks.push(fare.check);
     }
   }
 

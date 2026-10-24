@@ -42,6 +42,11 @@ This records the implemented scope against `PRD.md` and `PRODUCT.md`. It is a de
 - Files and money use exact minor units. Canadian filing worksheets use CAD, while internal financial books use USD; both currencies are labeled explicitly.
 - External integrations use the fallbacks the user authorized. Platform credential authentication alone is not described as an end-to-end Stripe payout.
 
+## Fare anomaly check (stretch, phase 1)
+
+- Travel claims are compared with other attendees' economy fares from the same origin for the same event (`fare_peer`, `lib/engines/fare-anomaly.ts`). A fare more than 20% above the peer 75th percentile is flagged for a person; it is never rejected. Routes with fewer than 5 peer fares are not checked, and org bookings priced by a verified offer are skipped.
+- Seeded plants: Marcus's $495.12 YYZ → SFO (also cap-hugging) and a $285 SEA → SFO fare that is under the cap and the auto-approve limit.
+
 ## Deferred stretch and presentation work
 
-Historical flight-price tracking, peer fare anomaly detection, the fictional sponsor portal and computer-use stream, production filing, organizer interviews and a Devpost submission are outside this overnight build. A customer interview or claimed improvement in real payout time must not be inferred from the synthetic demonstration.
+Historical flight-price tracking, market (SerpApi) fare snapshots, the fictional sponsor portal and computer-use stream, production filing, organizer interviews and a Devpost submission are outside this overnight build. A customer interview or claimed improvement in real payout time must not be inferred from the synthetic demonstration.

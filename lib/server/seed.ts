@@ -75,6 +75,15 @@ function localFromUsd(usdCents: number, currency: string): bigint {
 
 const D = (iso: string) => new Date(iso);
 
+/** Typical economy fare to SFO by origin, in USD cents. Clean claims vary ±10% around it, so a route has a real "usual" price. */
+const ROUTE_FARE_CENTS: Record<string, number> = { YYZ: 30000, SEA: 17000 };
+function routeFareCents(airport: string): number {
+  if (ROUTE_FARE_CENTS[airport]) return ROUTE_FARE_CENTS[airport];
+  let h = 0;
+  for (const ch of airport) h = (h * 31 + ch.charCodeAt(0)) % 997;
+  return 16000 + (h % 19) * 1000;
+}
+
 // --------------------------------------------------------------- seeding
 
 interface Planted { scenario: string; objectType: "claim" | "person" | "packet"; objectId: string; expected: "flag" | "hold" | "freeze" | "exception" | "reportable"; code?: string; description: string }
@@ -244,6 +253,7 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   // Characters from the mockup.
   const marcusClaim = claimRow(marcus, { type: "travel", usdCents: 0, amountMinor: 67940n, currency: "CAD", merchant: "Air Canada", description: "YYZ → SFO", purchasedAt: D("2026-10-03T14:00:00Z") });
   plant(marcusClaim, "Cap-hugging fare", "cap_hugging", "CA$679.40 converts to $495.12 against a $500 cap.");
+  plant(marcusClaim, "Unusually expensive fare", "fare_peer", "$495.12 for YYZ → SFO, where other attendees paid about $300.");
   const anaClaim = claimRow(ana, { type: "travel", usdCents: 61840, currency: "USD", merchant: "LATAM", description: "GRU → SFO" });
   plant(anaClaim, "Over cap", "cap", "GRU → SFO at $618.40 exceeds the $500 cap.");
   const samFirst = claimRow(sam, { type: "expense", usdCents: 3820, merchant: "Lyft", description: "Lyft to venue", purchasedAt: D("2026-10-19T15:10:00Z") });
@@ -262,10 +272,20 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   for (let i = 0; i < 2; i++) plant(claimRow(next(), { type: "travel", usdCents: 23000 + i * 1500, purchasedAt: D(`2026-10-1${4 + i}T12:00:00Z`) }), "Booked after the deadline", "booking_deadline", "Booked after the Oct 10 deadline.");
   for (const m of minors) claimRow(m, { type: "travel", usdCents: 21000 });
 
+  // Peer fares for the fare check: enough clean YYZ and SEA claims to say what those routes usually cost.
+  for (const airport of ["YYZ", "SEA"]) {
+    const base = routeFareCents(airport);
+    pool.filter((p) => p.airport === airport).slice(0, 6).forEach((p, i) => claimRow(p, { type: "travel", usdCents: Math.round(base * (0.92 + i * 0.03)) }));
+  }
+  // Well under the cap and the auto-approve limit, so only the peer comparison catches it.
+  const seaPricey = pool.filter((p) => p.airport === "SEA")[6];
+  plant(claimRow(seaPricey, { type: "travel", usdCents: 28500, currency: "USD", merchant: "Alaska Airlines", description: "SEA → SFO" }), "Unusually expensive fare", "fare_peer", "$285 for SEA → SFO, where other attendees paid about $170.");
+
   // Clean claims up to 120 travel / 40 expense.
   while (claims.filter((c) => c.type === "travel").length < 120) {
     const p = next();
-    claimRow(p, { type: "travel", usdCents: rand() < 0.75 ? 14000 + Math.floor(rand() * 15000) : 31000 + Math.floor(rand() * 14000) });
+    rand(); // Kept so the rest of the seeded sequence does not shift.
+    claimRow(p, { type: "travel", usdCents: Math.round(routeFareCents(p.airport) * (0.9 + 0.2 * rand())) });
   }
   while (claims.filter((c) => c.type === "expense").length < 40) {
     const p = next();
@@ -277,17 +297,23 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   const ordered = [...claims].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   const plantedIds = new Set(planted.filter((x) => x.objectType === "claim").map((x) => x.objectId));
   const liveIds = new Set(planted.filter((x) => x.scenario === "Flight on the wrong dates" || x.scenario === "Business-class ticket").map((x) => x.objectId));
-  for (const c of ordered) if (liveIds.size < 30 && c.type === "travel" && !plantedIds.has(c.id) && rand() < 0.3 && c.personId !== marcus.id) liveIds.add(c.id);
+  // Originals of planted duplicates stay in the seeded pass, so the copy is the one checked against them.
+  const plantedHashes = new Set(claims.filter((c) => plantedIds.has(c.id) && c.receiptHash).map((c) => c.receiptHash));
+  for (const c of ordered) if (liveIds.size < 30 && c.type === "travel" && !plantedIds.has(c.id) && !plantedHashes.has(c.receiptHash) && rand() < 0.3 && c.personId !== marcus.id) liveIds.add(c.id);
   const personById = new Map(people.map((p) => [p.id, p]));
   const names = new Map(people.map((p) => [p.id, p.name]));
   const processed: ClaimRow[] = [];
+  // Every seeded travel claim is on file when the seed checks them, like a live check sees the claims already submitted.
+  const travelByOrigin = new Map<string, ClaimRow[]>();
+  for (const c of claims) if (c.type === "travel" && c.origin) travelByOrigin.set(c.origin, [...(travelByOrigin.get(c.origin) ?? []), c]);
   const decisions: (typeof s.decisionLog.$inferInsert)[] = [];
   const approvals: (typeof s.approval.$inferInsert)[] = [];
   const agent = agentActor(ORG);
   const seedRun = "run_demo_seed";
   for (const c of ordered) {
     if (liveIds.has(c.id)) { c.status = "submitted"; continue; }
-    const r = evaluate({ claim: c, person: personById.get(c.personId)!, org, event, existing: processed, personNames: names });
+    const farePeers = c.type === "travel" ? travelByOrigin.get(c.origin ?? "") : undefined;
+    const r = evaluate({ claim: c, person: personById.get(c.personId)!, org, event, existing: processed, personNames: names, farePeers });
     c.status = r.status; c.checks = r.checks; c.reason = r.reason; c.reviewedBy = r.status === "approved" ? "agent" : null;
     processed.push(c);
     decisions.push(decisionRow({ orgId: ORG, runId: seedRun, objectType: "claim", objectId: c.id, personId: c.personId, personName: names.get(c.personId), action: "claim.check", summary: r.status === "approved" ? "Auto-approved: all checks passed within the agent limit." : `${r.status === "needs_info" ? "Asked for info" : "Escalated"}: ${r.reason}`, actor: agent, status: r.status === "approved" ? "done" : "escalated", tool: "checkPolicy", checks: r.checks, facts: { usdMinor: c.usdMinor.toString(), fxRate: c.fxRate, fxSource: c.fxSource } }));
