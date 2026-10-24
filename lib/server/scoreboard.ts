@@ -25,7 +25,7 @@ const MOVED = new Set(["processing", "paid"]);
 const NON_ERROR_CHECKS = new Set(["agent_limit", "evidence", "budget"]);
 
 export async function computeScoreboard(db: Executor, orgId: string): Promise<Scoreboard> {
-  const [keys, claims, payouts, packets, filings, awards, people, rules, events, methods, profiles, approvals, evidence] = await Promise.all([
+  const [keys, claims, payouts, packets, filings, awards, people, rules, methods, profiles, approvals, evidence] = await Promise.all([
     db.select().from(s.answerKey).where(eq(s.answerKey.orgId, orgId)),
     db.select({ id: s.claim.id, personId: s.claim.personId, status: s.claim.status, checks: s.claim.checks, reviewedBy: s.claim.reviewedBy }).from(s.claim).where(eq(s.claim.orgId, orgId)),
     db.select({ id: s.payout.id, personId: s.payout.personId, claimId: s.payout.claimId, status: s.payout.status, reportingForm: s.payout.reportingForm, reportable: s.payout.reportable, sourceType: s.payout.sourceType, grossMinor: s.payout.grossMinor, paidAt: s.payout.paidAt, ruleId: s.payout.ruleId, ruleVersion: s.payout.ruleVersion, ruleVerified: s.payout.ruleVerified, awardId: s.payout.awardId, createdAt: s.payout.createdAt }).from(s.payout).where(eq(s.payout.orgId, orgId)),
@@ -34,14 +34,14 @@ export async function computeScoreboard(db: Executor, orgId: string): Promise<Sc
     db.select({ personId: s.award.personId, status: s.award.status }).from(s.award).where(eq(s.award.orgId, orgId)),
     db.select({ id: s.person.id, adult: s.person.adult }).from(s.person).where(eq(s.person.orgId, orgId)),
     db.select({ id: s.taxRule.id, version: s.taxRule.version, thresholdMinor: s.taxRule.thresholdMinor }).from(s.taxRule),
-    db.select({ startsAt: s.event.startsAt }).from(s.event).where(and(eq(s.event.orgId, orgId))).orderBy(desc(s.event.startsAt)).limit(1),
     db.select({ personId: s.payoutMethod.personId, version: s.payoutMethod.version, status: s.payoutMethod.status, createdAt: s.payoutMethod.createdAt, verifiedAt: s.payoutMethod.verifiedAt }).from(s.payoutMethod).where(eq(s.payoutMethod.orgId, orgId)),
     db.select({ personId: s.taxProfile.personId, status: s.taxProfile.status, createdAt: s.taxProfile.createdAt, supersededAt: s.taxProfile.supersededAt, expiresAt: s.taxProfile.expiresAt }).from(s.taxProfile).where(eq(s.taxProfile.orgId, orgId)),
     db.select({ objectId: s.approval.objectId, createdAt: s.approval.createdAt }).from(s.approval).where(and(eq(s.approval.orgId, orgId), eq(s.approval.objectType, "payout"), eq(s.approval.decision, "approved"))),
     db.select({ objectId: s.decisionLog.objectId, personId: s.decisionLog.personId, action: s.decisionLog.action, status: s.decisionLog.status, facts: s.decisionLog.facts }).from(s.decisionLog)
       .where(and(eq(s.decisionLog.orgId, orgId), inArray(s.decisionLog.action, ["payout.bankChange", "payout.propose", "payout.requote", "sponsor.reconcile", "payout.resolveRule"]))),
   ]);
-  const year = (events[0]?.startsAt ?? new Date()).getUTCFullYear();
+  // Threshold cases are evaluated for the current payment year, like taxFor and filings.
+  const year = new Date().getUTCFullYear();
   const thresholdOf = new Map(rules.map((r) => [`${r.id}:${r.version}`, r.thresholdMinor]));
   const claimById = new Map(claims.map((c) => [c.id, c]));
   const payoutsByPerson = new Map<string, typeof payouts>();

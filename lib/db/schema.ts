@@ -487,6 +487,8 @@ export const sponsorPacket = pgTable("sponsor_packet", {
   documentId: text("document_id").references(() => document.id, { onDelete: "set null" }),
   /** Remittance amount reported by the sponsor before reconciliation (seeded or imported). */
   remittanceMinor: money("remittance_minor"),
+  /** Fee bearer authorized with the packet (org policy when drafted). Null on older packets = org bears fees. */
+  feesPaidBy: text("fees_paid_by", { enum: ["org", "recipient"] }),
   createdAt: createdAt(),
 }, (t) => [uniqueIndex("sponsor_packet_payout_uq").on(t.payoutId)]);
 

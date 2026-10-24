@@ -36,6 +36,13 @@
       "when": 1792840182421,
       "tag": "0004_ca_rules_rule_override",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792840939734,
+      "tag": "0005_sponsor_packet_fee_bearer",
+      "breakpoints": true
     }
   ]
 }

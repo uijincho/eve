@@ -210,7 +210,9 @@ export function taxFor(ctx: PayoutContext, paymentType: string, grossMinor: bigi
 
 function baseTax(ctx: PayoutContext, paymentType: string, grossMinor: bigint, forceRule?: TaxRule): { tax: ReturnType<typeof computeTax>; ytdMinor: string; overrideId?: string } {
   const { org, person, profile, now } = ctx;
-  const year = ctx.event.startsAt.getUTCFullYear();
+  // Tax year = the payment's calendar year (now: proposals are re-quoted at release), never the event's.
+  // A year with no effective rule holds; an earlier year's rule is never reused.
+  const year = now.getUTCFullYear();
   // YTD only counts payments on the same reporting form (1099-MISC and 1099-NEC thresholds are separate).
   const payeeCountry = taxPayeeCountry(org.country, person);
   const rule = selectRule(ctx.rules, { payerCountry: org.country, payeeCountry, paymentType, year });
@@ -522,27 +524,39 @@ export async function releasePayout(tx: Executor, actor: ActorContext, payoutId:
   return paid;
 }
 
-/** payout.retry: re-submit a failed payout with the same idempotency key (no double pay). */
-export async function retryPayout(tx: Executor, actor: ActorContext, payoutId: string) {
+/**
+ * payout.retry for a failed payout. It never re-sends the old terms: the row
+ * is re-quoted against current form, bank, rules, YTD and budget and returns
+ * to proposed (or held/frozen), keeping its idempotency key so a provider can
+ * deduplicate. A controller must then release it like any other proposal.
+ */
+export async function retryPayout(tx: Executor, actor: ActorContext, payoutId: string): Promise<PayoutRow> {
   if (actor.role !== "controller") throw forbidden("Only a controller can retry payouts.");
   const { p, person } = await lockPayoutChain(tx, actor.orgId, payoutId);
   if (p.status !== "failed") throw conflict(`Only failed payouts can be retried (this one is ${p.status}).`);
-  if (!p.releasedBy) throw conflict("This payout was never released.");
   if (p.requestedBy === actor.memberId) throw forbidden("You requested this payout, so another controller must retry it.");
   assertNotBeneficiary(actor, person, "retry");
   const live = await tx.select({ id: s.payout.id }).from(s.payout)
     .where(and(p.claimId ? eq(s.payout.claimId, p.claimId) : eq(s.payout.awardId, p.awardId!), sql`${s.payout.status} NOT IN ('failed', 'returned')`));
   if (live.length) throw conflict("Another payout for this source is already live; it cannot be retried.");
-  const methods = await methodsFor(tx, p.personId);
-  if (methods.pending || methods.active?.version !== p.bankVersion) throw conflict("Bank details changed since release; re-propose instead.");
-  const [paid] = await tx.update(s.payout).set({ status: "paid", paidAt: new Date(), attempts: p.attempts + 1, providerRef: simulatedProviderRef(p.idempotencyKey) })
-    .where(eq(s.payout.id, p.id)).returning();
-  await postPayoutJournals(tx, paid, actor.memberId, await payoutCategory(tx, paid));
-  if (p.claimId) await tx.update(s.claim).set({ status: "paid" }).where(eq(s.claim.id, p.claimId));
-  if (p.awardId) await tx.update(s.award).set({ status: "paid" }).where(eq(s.award.id, p.awardId));
-  await recordDecision(tx, { orgId: actor.orgId, objectType: "payout", objectId: p.id, personId: p.personId, action: "payout.retry", summary: "Retried with the original idempotency key.", actor, status: "done", tool: "executePayout", facts: { idempotencyKey: p.idempotencyKey } });
-  if (p.sourceType === "award") await requoteSiblings(tx, actor.orgId, p.personId, `payment ${p.id} became final`, p.id, actor);
-  return paid;
+  const loaded = await loadSource(tx, actor.orgId, { sourceType: p.sourceType, sourceId: (p.claimId ?? p.awardId)! }, p.id);
+  const ctx = await loadPayoutContext(tx, actor.orgId, p.personId, p.id);
+  const { row } = buildPayout(ctx, loaded.source, p.requestedBy, loaded.blockers, loaded.override);
+  const [updated] = await tx.update(s.payout).set({
+    grossMinor: row.grossMinor, withholdingMinor: row.withholdingMinor, feeMinor: row.feeMinor, netMinor: row.netMinor,
+    destinationCurrency: row.destinationCurrency, destinationNetMinor: row.destinationNetMinor, fxRate: row.fxRate, provider: row.provider, truth: row.truth,
+    status: row.status, frozenFrom: row.frozenFrom, reason: `Retry after failure: ${row.reason}`, ruleId: row.ruleId, ruleVersion: row.ruleVersion, ruleVerified: row.ruleVerified,
+    reportingForm: row.reportingForm, reportable: row.reportable, payoutMethodId: row.payoutMethodId, bankVersion: row.bankVersion, releasedBy: null, providerRef: null, paidAt: null,
+  }).where(and(eq(s.payout.id, p.id), eq(s.payout.status, "failed"))).returning();
+  if (!updated) throw conflict("Payout changed while retrying; try again.");
+  if (p.awardId) await tx.update(s.award).set({ status: awardStatusFor(updated, ctx) }).where(eq(s.award.id, p.awardId));
+  await recordDecision(tx, {
+    orgId: actor.orgId, objectType: "payout", objectId: p.id, personId: p.personId, personName: person.name, action: "payout.retry",
+    summary: `Failed payout re-quoted (${describeChange(p, row)}); it is ${updated.status} and needs a fresh controller release. Idempotency key kept.`,
+    actor, status: updated.status === "proposed" ? "waiting" : "escalated", tool: "computeWithholding+quotePayouts", ruleId: updated.ruleId, ruleVersion: updated.ruleVersion,
+    facts: { idempotencyKey: p.idempotencyKey },
+  });
+  return updated;
 }
 
 const CODE_TTL_MS = 30 * 60 * 1000;

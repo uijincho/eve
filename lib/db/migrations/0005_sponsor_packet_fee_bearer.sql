@@ -1,0 +1,1 @@
+ALTER TABLE "sponsor_packet" ADD COLUMN "fees_paid_by" text;

@@ -2,7 +2,7 @@
 // flight requests, same-form YTD under re-quote, beneficiary self-release,
 // physical fulfillment as reportable income, sponsor packet ownership and
 // ledger, award mutation locks, threshold-backed scoreboard, budget caps.
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createTestOrg, dropTestOrg, eq, hasDatabase } from "./helpers";
 
@@ -448,8 +448,10 @@ describe.skipIf(!hasDatabase)("tax identity, unverified-rule resolution and scor
     await t.run(amy.self, "person.update", { id: amy.id, citizenship: "CA" });
     const after = await payoutRow(p1.data!.payoutId as string);
     expect(after.status).toBe("held");
-    const [profile] = await db.select().from(s.taxProfile).where(eq(s.taxProfile.personId, amy.id));
-    expect(profile.status).toBe("review");
+    const profiles = await db.select().from(s.taxProfile).where(eq(s.taxProfile.personId, amy.id));
+    expect(profiles.find((x) => !x.supersededAt)?.status).toBe("review");
+    // The signed form is superseded, not rewritten: it stays valid evidence for the period it covered.
+    expect(profiles.find((x) => x.supersededAt)?.status).toBe("valid");
   });
 
   it("resolves an unverified-rule hold per source with a reason, never bypassing a missing form, and needs a separate release", async () => {
@@ -554,5 +556,88 @@ describe.skipIf(!hasDatabase)("CAD organization (real Postgres)", { timeout: 240
     const over = await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: big[0] });
     expect(over.status).toBe(409); // CAD 1,100 cap = USD 801.64; 728.76 + 364.38 exceeds it
     expect(over.message).toMatch(/converted to USD books/);
+  });
+});
+
+describe.skipIf(!hasDatabase)("R2: payment-year tax, authorized fee bearer, retry re-quotes (real Postgres)", { timeout: 240_000 }, () => {
+  let m: Mods;
+  let t: Awaited<ReturnType<typeof setupOrg>>;
+  beforeAll(async () => {
+    m = await load();
+    t = await setupOrg(m, "r2");
+  }, 120_000);
+  afterAll(async () => {
+    vi.useRealTimers();
+    if (t?.orgId) await dropTestOrg(t.orgId);
+  }, 120_000);
+  const payoutRow = async (id: string) => (await m.db.select().from(m.s.payout).where(eq(m.s.payout.id, id)))[0];
+  const award = async (personId: string, amount: string) => ((await t.run(t.dana, "award.create", { personId, track: "Track", title: "Prize", kind: "cash", amountMinor: amount })).data!.ids as string[])[0];
+  const setEvent = (startsAt: string) => m.db.update(m.s.event).set({ startsAt: new Date(startsAt), endsAt: new Date(startsAt), checkInAt: new Date(startsAt), closingAt: new Date(startsAt) }).where(eq(m.s.event.id, `${t.orgId}_evt`));
+
+  it("taxes by the payment year, not the event year: a Dec 2025 event paid in 2026 uses 2026 rules and backup withholding", async () => {
+    await setEvent("2025-12-28T18:00:00Z");
+    const nat = await t.person("Nat Cole", "US");
+    await t.run(nat.self, "tax.submit", { personId: nat.id, form: "W-9", signature: "Nat Cole", certify: true }); // no TIN
+    const a = (await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: await award(nat.id, "150000") })).data!.payoutId as string;
+    const b = (await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: await award(nat.id, "150000") })).data!.payoutId as string;
+    expect((await payoutRow(a)).ruleId).toBe("us-us-prize");
+    expect((await t.run(t.ari, "payout.release", { id: a })).ok).toBe(true);
+    expect((await t.run(t.ari, "payout.release", { id: b })).ok).toBe(true);
+    const second = await payoutRow(b);
+    expect(second).toMatchObject({ status: "paid", ruleId: "us-us-prize", ruleVersion: 2, withholdingMinor: 36000n, reportable: true });
+  });
+
+  it("holds a January 2027 payment for a December 2026 event instead of reusing the 2026 rule", async () => {
+    await setEvent("2026-12-28T18:00:00Z");
+    const ola = await t.person("Ola Reed", "US");
+    await t.run(ola.self, "tax.submit", { personId: ola.id, form: "W-9", signature: "Ola Reed", tin: "123-45-3333", certify: true });
+    const awardId = await award(ola.id, "50000");
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2027-01-04T17:00:00Z"));
+    try {
+      const r = await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: awardId });
+      expect(r.data?.status).toBe("held");
+      const row = await payoutRow(r.data!.payoutId as string);
+      expect(row.ruleId).toBe("none");
+      expect(row.reason).toMatch(/2027/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reconciles with the fee bearer authorized on the packet, not a later policy flip", async () => {
+    await setEvent("2026-10-24T16:00:00Z");
+    const pia = await t.person("Pia Lund", "US");
+    await t.run(pia.self, "tax.submit", { personId: pia.id, form: "W-9", signature: "Pia Lund", tin: "123-45-4444", certify: true });
+    const pid = (await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: await award(pia.id, "50000") })).data!.payoutId as string;
+    const pk = (await t.run(t.dana, "sponsor.create", { payoutId: pid })).data!.id as string;
+    expect((await t.run(t.ari, "sponsor.submit", { id: pk })).ok).toBe(true);
+    expect((await t.run(t.dana, "org.update", { feesPaidBy: "recipient" })).ok).toBe(true);
+    const accept = await t.run(t.ari, "sponsor.reconcile", { id: pk, paidMinor: "45000", acceptShortfall: true, note: "fee flipped after submit" });
+    expect(accept.status).toBe(409);
+    expect(accept.message).toMatch(/authorized with the org bearing/);
+    expect((await payoutRow(pid)).status).toBe("processing");
+    // A draft made under the old policy is withdrawn at submit, not sent on changed terms.
+    const pid2 = (await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: await award(pia.id, "1000") })).data!.payoutId as string;
+    const pk2 = (await t.run(t.dana, "sponsor.create", { payoutId: pid2 })).data!.id as string;
+    await t.run(t.dana, "org.update", { feesPaidBy: "org" });
+    const sub = await t.run(t.ari, "sponsor.submit", { id: pk2 });
+    expect(sub.ok).toBe(false);
+    expect(sub.message).toMatch(/fee policy changed/);
+  });
+
+  it("retries a failed payout only by re-quoting it for a fresh release", async () => {
+    const { db, s } = m;
+    const quin = await t.person("Quin Hale", "US");
+    await t.run(quin.self, "tax.submit", { personId: quin.id, form: "W-9", signature: "Quin Hale", tin: "123-45-5555", certify: true });
+    const pid = (await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: await award(quin.id, "20000") })).data!.payoutId as string;
+    // Simulate a provider failure with stale stored terms.
+    await db.update(s.payout).set({ status: "failed", releasedBy: t.members.ari, withholdingMinor: 999n }).where(eq(s.payout.id, pid));
+    const r = await t.run(t.ari2, "payout.retry", { id: pid });
+    expect(r.ok, r.message).toBe(true);
+    const row = await payoutRow(pid);
+    expect(row).toMatchObject({ status: "proposed", releasedBy: null, withholdingMinor: 0n, paidAt: null });
+    expect(await db.select().from(s.journalEntry).where(eq(s.journalEntry.idempotencyKey, `payment:${pid}`))).toHaveLength(0);
+    expect((await t.run(t.ari, "payout.release", { id: pid })).ok).toBe(true);
   });
 });

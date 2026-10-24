@@ -99,8 +99,13 @@ type PersonInput = { name: string; email: string; country: string; citizenship?:
 async function staleProfileAfterChange(tx: Executor, actor: ActorContext, before: typeof s.person.$inferSelect, after: Pick<typeof s.person.$inferSelect, "name" | "country" | "citizenship" | "adult">) {
   const changed = (["name", "country", "citizenship"] as const).filter((k) => before[k] !== after[k]);
   if (changed.length) {
-    await tx.update(s.taxProfile).set({ status: "review", statusReason: `The profile's ${changed.join(", ")} changed after signing; a new form is required.` })
-      .where(and(eq(s.taxProfile.personId, before.id), sql`${s.taxProfile.supersededAt} IS NULL`, eq(s.taxProfile.status, "valid")));
+    // Supersede rather than mutate: the old row stays valid for the period it covered (audit and scoreboard evidence).
+    const current = await currentProfile(tx, before.id);
+    if (current?.status === "valid") {
+      const now = new Date();
+      await tx.update(s.taxProfile).set({ supersededAt: now }).where(eq(s.taxProfile.id, current.id));
+      await tx.insert(s.taxProfile).values({ ...current, id: newId("tax"), status: "review", statusReason: `The profile's ${changed.join(", ")} changed after signing; a new form is required.`, supersededAt: null, createdAt: now });
+    }
   }
   if (changed.length || before.adult !== after.adult) await reevaluatePerson(tx, actor.orgId, before.id, actor);
   return changed;
@@ -342,7 +347,7 @@ async function awardFulfill(tx: Executor, actor: ActorContext, p: { id: string }
   const withholdingMinor = up ? BigInt(up.withholdingMinor) : 0n;
   if (grossMinor - withholdingMinor !== fmv) throw conflict("Gross-up did not reconcile to the item's value; held for review.");
   // Reportability is judged on the income actually reported (FMV plus any tax paid on the winner's behalf).
-  const year = ctx.event.startsAt.getUTCFullYear();
+  const year = ctx.now.getUTCFullYear(); // payment year, as in taxFor
   const appliedRule = ctx.rules.find((r) => r.id === tax.ruleId && r.version === tax.ruleVersion);
   const reported = computeTax({ payerCountry: ctx.org.country, payeeCountry: taxPayeeCountry(ctx.org.country, ctx.person), paymentType: "item_prize", grossMinor: grossMinor.toString(), hasValidForm: true, hasTin: Boolean(ctx.profile?.tinLast4), year, ytdMinor, rules: ctx.rules, treatyClaim: Boolean(ctx.profile?.treatyArticle), rule: appliedRule });
   assertFits(await prizeBudgetRoom(tx, a.eventId), grossMinor, "Fulfilling");
@@ -404,7 +409,7 @@ async function resolveRule(tx: Executor, actor: ActorContext, p: { sourceType: "
   if (!tax.hold || tax.ruleVerified) throw conflict("Nothing to resolve: this payment is not held by an unverified rule.");
   let applied = { id: tax.ruleId, version: tax.ruleVersion };
   if (p.use === "default") {
-    const year = ctx.event.startsAt.getUTCFullYear();
+    const year = ctx.now.getUTCFullYear();
     const def = selectRule(ctx.rules, { payerCountry: ctx.org.country, payeeCountry: taxPayeeCountry(ctx.org.country, person), paymentType: loaded.source.paymentType, year });
     if (!def?.verified || def.id === tax.ruleId) throw conflict(`No verified default rule exists for this payment; ${tax.ruleId} is the only rule. Accept it with a reason, or keep the hold.`);
     applied = { id: def.id, version: def.version };
@@ -505,7 +510,7 @@ export async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payo
   });
   const doc = await storeDocument(tx, { orgId: actor.orgId, personId: person.id, uploadedBy: actor.memberId, kind: "sponsor_packet", name: `${id}.pdf`, mimeType: "application/pdf", bytes: pdf });
   const requested = payout.grossMinor - payout.withholdingMinor;
-  await tx.insert(s.sponsorPacket).values({ id, orgId: actor.orgId, payoutId: payout.id, requestedMinor: requested, status: "draft", dueAt: new Date(Date.now() + org.sponsorTurnaroundDays * 86_400_000), documentId: doc.id });
+  await tx.insert(s.sponsorPacket).values({ id, orgId: actor.orgId, payoutId: payout.id, requestedMinor: requested, status: "draft", feesPaidBy: org.feesPaidBy, dueAt: new Date(Date.now() + org.sponsorTurnaroundDays * 86_400_000), documentId: doc.id });
   await recordDecision(tx, { orgId: actor.orgId, objectType: "packet", objectId: id, personId: person.id, personName: person.name, action: "sponsor.create", summary: `Sponsor packet drafted for ${usd(requested)} (gross ${usd(payout.grossMinor)} less ${usd(payout.withholdingMinor)} withholding). A controller must submit it; it cannot also be released directly.`, actor, status: "waiting", tool: "sponsorPacket", documentId: doc.id, facts: { payoutId: payout.id, terms: termsKey(payout) } });
   return ok("Sponsor packet drafted.", { id, documentId: doc.id });
 }
@@ -525,15 +530,22 @@ async function loadPacket(tx: Executor, actor: ActorContext, id: string) {
 /** sponsor.submit: the controller's release for a sponsor-paid payout. */
 export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: string }) {
   if (actor.role !== "controller") throw forbidden("Submitting a packet releases money through the sponsor, so only a controller can do it.");
-  const { pk } = await loadPacket(tx, actor, p.id);
+  const { pk, payout: pk0 } = await loadPacket(tx, actor, p.id);
   if (pk.status !== "draft" && pk.status !== "questioned") throw conflict(`Packet is ${pk.status}.`);
+  const { org: orgNow } = await loadOrgEvent(tx, actor.orgId);
+  if ((pk.feesPaidBy ?? "org") !== orgNow.feesPaidBy) {
+    // The fee bearer is part of the authorized terms: a policy change after drafting needs a new packet.
+    await tx.delete(s.sponsorPacket).where(eq(s.sponsorPacket.id, pk.id));
+    await recordDecision(tx, { orgId: actor.orgId, objectType: "packet", objectId: pk.id, personId: pk0.personId, action: "sponsor.withdraw", summary: `Packet withdrawn: fee policy changed from ${pk.feesPaidBy ?? "org"} to ${orgNow.feesPaidBy} after it was drafted. Draft a new packet.`, actor, status: "escalated", tool: "sponsorPacket" });
+    return { ok: false, message: `Not submitted: the fee policy changed after this packet was drafted, so it was withdrawn. Draft a new packet with the current terms.`, data: { withdrawn: pk.id } };
+  }
   const check = await prepareRelease(tx, actor, pk.payoutId, "sponsor");
   if (check.kind === "requoted") {
     return { ok: false, message: `Not submitted: the payout was re-quoted (${check.payout.reason}). Draft a new packet for the new terms.`, data: { payoutId: check.payout.id } };
   }
   const payout = check.p;
   if (pk.requestedMinor !== payout.grossMinor - payout.withholdingMinor) throw conflict("The packet no longer matches the payout's terms; draft a new packet.");
-  const { org } = await loadOrgEvent(tx, actor.orgId);
+  const org = orgNow;
   await tx.insert(s.approval).values({ id: newId("apr"), orgId: actor.orgId, objectType: "payout", objectId: payout.id, requestedBy: payout.requestedBy, approverId: actor.memberId, approverRole: actor.role, decision: "approved", reason: `Submitted to sponsor in packet ${pk.id}`, bankVersion: payout.bankVersion });
   const [sent] = await tx.update(s.payout).set({ status: "processing", provider: SPONSOR_PROVIDER, truth: "Simulated", releasedBy: actor.memberId, providerRef: pk.id, attempts: payout.attempts + 1, feeMinor: 0n, netMinor: pk.requestedMinor, reason: `Submitted to ${org.sponsorName || "the fiscal sponsor"} in packet ${pk.id}; awaiting remittance.` })
     .where(and(eq(s.payout.id, payout.id), inArray(s.payout.status, ["proposed", "approved"]))).returning();
@@ -557,7 +569,9 @@ export async function reconcilePacket(tx: Executor, actor: ActorContext, p: { id
   const paid = p.paidMinor ?? pk.remittanceMinor;
   if (paid == null) throw invalid("Enter the amount the sponsor paid.");
   const short = pk.requestedMinor - paid;
-  const facts = { requestedMinor: pk.requestedMinor.toString(), paidMinor: paid.toString(), payoutId: payout.id, feesPaidBy: org.feesPaidBy };
+  // The fee bearer authorized with the packet governs; a later org policy change does not rewrite it.
+  const feesPaidBy = pk.feesPaidBy ?? "org";
+  const facts = { requestedMinor: pk.requestedMinor.toString(), paidMinor: paid.toString(), payoutId: payout.id, feesPaidBy, orgPolicyNow: org.feesPaidBy };
   if (short !== 0n && !p.acceptShortfall) {
     const reason = `Sponsor paid ${usd(paid)} on a ${usd(pk.requestedMinor)} request (${short > 0n ? "short" : "over"} ${usd(short < 0n ? -short : short)}).${p.note ? ` ${p.note}` : ""} Nothing posted; the payout stays open until this is resolved.`;
     await tx.update(s.sponsorPacket).set({ status: "exception", paidMinor: paid, remittanceMinor: paid, reason }).where(eq(s.sponsorPacket.id, pk.id));
@@ -569,10 +583,10 @@ export async function reconcilePacket(tx: Executor, actor: ActorContext, p: { id
     if (actor.role !== "controller") throw forbidden("Only a controller can accept a remittance that differs from the request.");
     if (!p.note) throw invalid("Explain why the difference is acceptable (note).");
     if (short < 0n) throw conflict(`The sponsor paid ${usd(-short)} more than requested. Ask the sponsor to correct the remittance; Eve does not book overpayments as settled.`);
-    if (org.feesPaidBy === "org") {
-      throw conflict(`Org policy says the org bears transfer fees, so the ${usd(short)} shortfall is still owed to the payee. Ask the sponsor to send the difference, then reconcile with the full amount.`);
+    if (feesPaidBy === "org") {
+      throw conflict(`This packet was authorized with the org bearing transfer fees, so the ${usd(short)} shortfall is still owed to the payee. Ask the sponsor to send the difference, then reconcile with the full amount.`);
     }
-    reason = `Accepted: sponsor sent ${usd(pk.requestedMinor)} and the payee received ${usd(paid)}; ${usd(short)} was deducted in transit, which recipients bear under org policy. ${p.note}`;
+    reason = `Accepted: sponsor sent ${usd(pk.requestedMinor)} and the payee received ${usd(paid)}; ${usd(short)} was deducted in transit, which the recipient bears under the fee terms authorized with this packet. ${p.note}`;
   }
   const settled = pk.requestedMinor;
   if (settled > 0n) {
@@ -602,10 +616,11 @@ export async function missingFormContext(db: Executor, orgId: string) {
   const rows = await db.select({ person: s.person, award: s.award }).from(s.award).innerJoin(s.person, eq(s.person.id, s.award.personId))
     .where(and(eq(s.award.orgId, orgId), eq(s.award.status, "needs_form")));
   const now = new Date();
+  const { org } = await loadOrgEvent(db, orgId);
   const out = [];
   for (const { person, award } of rows) {
     const profile = await currentProfile(db, person.id);
-    out.push({ personId: person.id, name: person.name, emailMasked: maskEmail(person.email), country: person.country, form: expectedForm(person), taxStatus: effectiveTaxStatus(profile, now), awardId: award.id, awardTitle: award.title, amountMinor: award.amountMinor.toString(), chaseCount: person.chaseCount, lastChasedAt: person.lastChasedAt?.toISOString() ?? null });
+    out.push({ personId: person.id, name: person.name, emailMasked: maskEmail(person.email), country: person.country, form: expectedForm(person, org.country), taxStatus: effectiveTaxStatus(profile, now), awardId: award.id, awardTitle: award.title, amountMinor: award.amountMinor.toString(), chaseCount: person.chaseCount, lastChasedAt: person.lastChasedAt?.toISOString() ?? null });
   }
   return out;
 }
@@ -776,7 +791,10 @@ const handlers: Record<AppAction, Handler> = {
     const r = await verifyBankChange(tx, actor, p);
     return { ok: r.ok, message: r.message, data: r.ok ? { payouts: r.payouts } : undefined };
   }) as Handler,
-  "payout.retry": (async (tx, actor, p) => ok("Payout retried.", { payoutId: (await retryPayout(tx, actor, p.id)).id })) as Handler,
+  "payout.retry": (async (tx, actor, p) => {
+    const row = await retryPayout(tx, actor, p.id);
+    return ok(row.status === "proposed" ? "Re-quoted for a fresh controller release." : `Re-quoted; now ${row.status}: ${row.reason}`, { payoutId: row.id, status: row.status });
+  }) as Handler,
   "sponsor.create": sponsorCreate as Handler,
   "sponsor.submit": sponsorSubmit as Handler,
   "sponsor.reconcile": reconcilePacket as Handler,
