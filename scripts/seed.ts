@@ -1,18 +1,25 @@
-// Seed script skeleton. No data yet.
-//
-// Phase 0 target: one org, one event, five attendees in three countries.
-// Later: the 300-person event, planted errors, and the answer key that the
-// tests in tests/ run against.
+// Seeds (or with --reset, re-seeds) the synthetic demo organization only.
+// Never truncates; reset is scoped to the is_demo org by lib/server/reset.ts.
 import { loadEnvConfig } from "@next/env";
 
 loadEnvConfig(process.cwd());
 
-async function main(): Promise<void> {
-  // TODO: insert rows with getDb() from "@/lib/db" once the schema lands.
-  console.log("seed: nothing to seed yet");
+async function main() {
+  const { getDb } = await import("../lib/db");
+  const { ensureDemoOrg, resetDemoOrg } = await import("../lib/server/seed");
+  const db = getDb();
+  const started = Date.now();
+  if (process.argv.includes("--reset")) {
+    await db.transaction((tx) => resetDemoOrg(tx));
+    console.log(`demo org reset in ${Date.now() - started} ms`);
+  } else {
+    const seeded = await ensureDemoOrg(db);
+    console.log(seeded ? `demo org seeded in ${Date.now() - started} ms` : "demo org already exists (use --reset)");
+  }
+  await db.$pool.end();
 }
 
-main().catch((error: unknown) => {
+main().catch((error) => {
   console.error(error);
-  process.exitCode = 1;
+  process.exit(1);
 });

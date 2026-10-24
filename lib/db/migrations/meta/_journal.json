@@ -15,6 +15,13 @@
       "when": 1792834053646,
       "tag": "0001_ledger_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792835508303,
+      "tag": "0002_payout_reportable",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "payout" ADD COLUMN "reportable" boolean DEFAULT false NOT NULL;

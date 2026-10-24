@@ -17,7 +17,7 @@ export async function computeScoreboard(db: Executor, orgId: string): Promise<Sc
   const [keys, claims, payouts, packets, filings, awards, people] = await Promise.all([
     db.select().from(s.answerKey).where(eq(s.answerKey.orgId, orgId)),
     db.select({ id: s.claim.id, personId: s.claim.personId, status: s.claim.status, checks: s.claim.checks }).from(s.claim).where(eq(s.claim.orgId, orgId)),
-    db.select({ id: s.payout.id, personId: s.payout.personId, claimId: s.payout.claimId, status: s.payout.status, reportingForm: s.payout.reportingForm }).from(s.payout).where(eq(s.payout.orgId, orgId)),
+    db.select({ id: s.payout.id, personId: s.payout.personId, claimId: s.payout.claimId, status: s.payout.status, reportingForm: s.payout.reportingForm, reportable: s.payout.reportable }).from(s.payout).where(eq(s.payout.orgId, orgId)),
     db.select({ id: s.sponsorPacket.id, status: s.sponsorPacket.status }).from(s.sponsorPacket).where(eq(s.sponsorPacket.orgId, orgId)),
     db.select({ personId: s.filing.personId, form: s.filing.form }).from(s.filing).where(eq(s.filing.orgId, orgId)),
     db.select({ personId: s.award.personId, status: s.award.status }).from(s.award).where(eq(s.award.orgId, orgId)),
@@ -63,13 +63,14 @@ export async function computeScoreboard(db: Executor, orgId: string): Promise<Sc
       const ps = payoutsByPerson.get(k.objectId) ?? [];
       const filed = filings.filter((f) => f.personId === k.objectId);
       const formPrefix = k.expectedCode ?? "1099";
-      passed = filed.some((f) => f.form.startsWith(formPrefix)) || ps.some((p) => !["failed", "returned"].includes(p.status) && Boolean(p.reportingForm?.startsWith(formPrefix)) && ps.filter((x) => x.status === "paid").length > 0);
-      actual = filed.length ? `filing ${filed.map((f) => f.form).join(", ")}` : ps.length ? `payouts ${ps.map((p) => `${p.status}${p.reportingForm ? ` (${p.reportingForm.split(" ")[0]})` : ""}`).join(", ")}` : "no payouts";
+      passed = filed.some((f) => f.form.startsWith(formPrefix)) || ps.some((p) => !["failed", "returned"].includes(p.status) && p.reportable && Boolean(p.reportingForm?.startsWith(formPrefix)));
+      actual = filed.length ? `filing ${filed.map((f) => f.form).join(", ")}` : ps.length ? `payouts ${ps.map((p) => `${p.status}${p.reportable ? ` (reportable ${p.reportingForm?.split(" ")[0]})` : ""}`).join(", ")}` : "no payouts";
     }
     results.push({ id: k.id, scenario: k.scenario, expected: k.expected + (k.expectedCode ? `:${k.expectedCode}` : ""), actual, passed });
   }
 
-  const falsePositives = claims.filter((c) => !flaggedClaims.has(c.id) && failedCodes(c.checks).length > 0).length;
+  // Claims by people whose planted error is on the person (e.g. minors) are expected to fail checks too.
+  const falsePositives = claims.filter((c) => !flaggedClaims.has(c.id) && !blockedPeople.has(c.personId) && failedCodes(c.checks).length > 0).length;
   const minors = new Set(people.filter((p) => !p.adult).map((p) => p.id));
   const wrongfulPayouts = payouts.filter((p) => MOVED.has(p.status) && (blockedPeople.has(p.personId) || minors.has(p.personId) || (p.claimId != null && flaggedClaims.has(p.claimId)))).length;
   const caught = results.filter((r) => r.passed).length;

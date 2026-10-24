@@ -102,7 +102,7 @@ export function buildPayout(ctx: PayoutContext, source: PayoutSource, requestedB
     currency: "USD", destinationCurrency, destinationNetMinor: big(quote.destinationNetMinor), fxRate: quote.fxRate,
     provider: quote.provider, truth: quote.truth, status, frozenFrom, reason,
     ruleId: tax.ruleId, ruleVersion: tax.ruleVersion, ruleVerified: tax.ruleVerified,
-    reportingForm: tax.reportingForm, requestedBy,
+    reportingForm: tax.reportingForm, reportable: tax.reportable, requestedBy,
     payoutMethodId: active?.id ?? null, bankVersion: active?.version ?? null,
     idempotencyKey: `payout:${source.type}:${source.id}:${newId("v")}`, dueAt: source.dueAt,
   };
@@ -110,9 +110,12 @@ export function buildPayout(ctx: PayoutContext, source: PayoutSource, requestedB
 }
 
 export async function loadPayoutContext(db: Executor, orgId: string, personId: string): Promise<PayoutContext> {
-  const [{ org, event }, person, profile, methods, rules] = await Promise.all([
-    loadOrgEvent(db, orgId), loadPerson(db, orgId, personId), currentProfile(db, personId), methodsFor(db, personId), loadRules(db),
-  ]);
+  // Sequential: this often runs on a single transaction client.
+  const { org, event } = await loadOrgEvent(db, orgId);
+  const person = await loadPerson(db, orgId, personId);
+  const profile = await currentProfile(db, personId);
+  const methods = await methodsFor(db, personId);
+  const rules = await loadRules(db);
   const payments = await paymentsFor(db, personId);
   return { org, event, person, profile, active: methods.active, pending: methods.pending, payments, rules, now: new Date() };
 }
@@ -209,7 +212,8 @@ export async function releasePayout(tx: Executor, actor: ActorContext, payoutId:
   if (p.status === "paid") throw conflict("Payout is already paid.");
   if (p.status !== "proposed" && p.status !== "approved") throw conflict(`Payout is ${p.status}: ${p.reason}`);
   const person = await loadPerson(tx, actor.orgId, p.personId);
-  const [profile, methods] = await Promise.all([currentProfile(tx, p.personId), methodsFor(tx, p.personId)]);
+  const profile = await currentProfile(tx, p.personId);
+  const methods = await methodsFor(tx, p.personId);
   if (!person.adult) throw conflict("Recipient is under 18; payment blocked.");
   if (p.sourceType === "award" && !hasValidForm(profile, new Date())) throw conflict("Tax form is missing or invalid; payment held.");
   if (methods.pending) throw conflict(`Bank details changed to ••${methods.pending.last4}; payout is frozen pending verification.`);
@@ -271,7 +275,7 @@ export async function requote(tx: Executor, p: PayoutRow, ctx: PayoutContext): P
     grossMinor: row.grossMinor, withholdingMinor: row.withholdingMinor, feeMinor: row.feeMinor, netMinor: row.netMinor,
     destinationCurrency: row.destinationCurrency, destinationNetMinor: row.destinationNetMinor, fxRate: row.fxRate,
     status: row.status, frozenFrom: row.frozenFrom, reason: row.reason, ruleId: row.ruleId, ruleVersion: row.ruleVersion,
-    ruleVerified: row.ruleVerified, reportingForm: row.reportingForm, payoutMethodId: row.payoutMethodId, bankVersion: row.bankVersion,
+    ruleVerified: row.ruleVerified, reportingForm: row.reportingForm, reportable: row.reportable, payoutMethodId: row.payoutMethodId, bankVersion: row.bankVersion,
     releasedBy: null,
   }).where(eq(s.payout.id, p.id)).returning();
   if (p.awardId) await tx.update(s.award).set({ status: updated.status === "held" ? "needs_form" : "proposed" }).where(eq(s.award.id, p.awardId));

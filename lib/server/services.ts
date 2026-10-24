@@ -252,7 +252,7 @@ async function payoutRelease(tx: Executor, actor: ActorContext, p: { id?: string
 
 // ---------------------------------------------------------------- sponsor
 
-async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payoutId: string }) {
+export async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payoutId: string }) {
   const [row] = await tx.select({ payout: s.payout, person: s.person }).from(s.payout).innerJoin(s.person, eq(s.person.id, s.payout.personId))
     .where(and(eq(s.payout.id, p.payoutId), eq(s.payout.orgId, actor.orgId)));
   if (!row) throw notFound("Payout not found.");
@@ -284,7 +284,7 @@ async function loadPacket(tx: Executor, actor: ActorContext, id: string) {
   return pk;
 }
 
-async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: string }) {
+export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: string }) {
   const pk = await loadPacket(tx, actor, p.id);
   if (pk.status !== "draft" && pk.status !== "questioned") throw conflict(`Packet is ${pk.status}.`);
   const { org } = await loadOrgEvent(tx, actor.orgId);

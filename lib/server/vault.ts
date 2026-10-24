@@ -53,3 +53,12 @@ export function constantTimeEqual(a: string, b: string): boolean {
   const hb = createHash("sha256").update(b).digest();
   return timingSafeEqual(ha, hb);
 }
+
+/** Builds encrypted vault rows without touching the database (for bulk inserts). */
+export function sealRow(input: { id: string; orgId: string; personId?: string | null; kind: Kind; value: string }): typeof vaultSecret.$inferInsert {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key(), iv);
+  cipher.setAAD(Buffer.from(`${input.orgId}:${input.kind}`));
+  const ciphertext = Buffer.concat([cipher.update(input.value, "utf8"), cipher.final()]);
+  return { id: input.id, orgId: input.orgId, personId: input.personId ?? null, kind: input.kind, ciphertext, iv, tag: cipher.getAuthTag(), last4: input.kind === "verification_code" ? null : last4(input.value) };
+}

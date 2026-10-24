@@ -401,6 +401,8 @@ export const payout = pgTable("payout", {
   ruleVersion: integer("rule_version").notNull(),
   ruleVerified: boolean("rule_verified").notNull(),
   reportingForm: text("reporting_form"),
+  /** Engine result: the payee's same-form YTD total crosses the reporting threshold with this payment. */
+  reportable: boolean("reportable").notNull().default(false),
   requestedBy: text("requested_by").notNull(),
   releasedBy: text("released_by"),
   payoutMethodId: text("payout_method_id").references(() => payoutMethod.id),

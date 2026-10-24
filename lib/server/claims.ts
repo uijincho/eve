@@ -156,7 +156,8 @@ export async function submitClaim(tx: Executor, actor: ActorContext, draft: Clai
   if (!merged.merchant || merged.amountMinor === undefined || !merged.currency || !merged.purchasedAt) {
     throw invalid("Enter the merchant, amount, currency and purchase date (the receipt could not supply them).");
   }
-  const [{ org, event }, person] = await Promise.all([loadOrgEvent(tx, actor.orgId), loadPerson(tx, actor.orgId, personId)]);
+  const { org, event } = await loadOrgEvent(tx, actor.orgId);
+  const person = await loadPerson(tx, actor.orgId, personId);
   const purchasedAt = new Date(merged.purchasedAt);
   const fx = await toUsd(tx, merged.amountMinor, merged.currency, purchasedAt);
   let receiptHash: string | null = evidence.extraction?.receiptHash ?? null;
@@ -184,7 +185,8 @@ export async function processClaim(tx: Executor, actor: ActorContext, claimId: s
   const [claim] = await tx.select().from(s.claim).where(and(eq(s.claim.id, claimId), eq(s.claim.orgId, actor.orgId))).for("update");
   if (!claim) throw notFound("Claim not found.");
   if (!["submitted", "processing"].includes(claim.status)) return claim;
-  const [{ org, event }, person] = await Promise.all([loadOrgEvent(tx, actor.orgId), loadPerson(tx, actor.orgId, claim.personId)]);
+  const { org, event } = await loadOrgEvent(tx, actor.orgId);
+  const person = await loadPerson(tx, actor.orgId, claim.personId);
   return applyEvaluation(tx, actor, claim, person, org, event, runId);
 }
 
