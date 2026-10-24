@@ -43,7 +43,10 @@ export function PortalPayouts() {
             <div className="flex flex-col gap-10">
               {frozen ? (
                 <Section title="Confirm your new account">
-                  <p className="text-small text-muted-foreground">We sent a 6-digit code to {me.email}, the address you registered with. It is also in your portal messages.</p>
+                  <p className="text-small text-muted-foreground">
+                    We sent a 6-digit code to {me.email}, the address you registered with.
+                    {s.demo ? " In this sample event it is also in your portal messages." : " Eve never shows it on screen, so a changed account cannot confirm itself."}
+                  </p>
                   <VerifyCode personId={me.id} personName={me.name} self primary />
                 </Section>
               ) : null}
