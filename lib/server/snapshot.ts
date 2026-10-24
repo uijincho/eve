@@ -13,7 +13,9 @@ import type * as C from "@/lib/contracts";
 import { getDb, type Executor } from "@/lib/db";
 import * as s from "@/lib/db/schema";
 
-import { iso, loadOrgEvent, str, toAward, toClaim, toEvent, toOrg, toPayout, toPerson, type MethodRow, type ProfileRow } from "./core";
+import { BOOKS_CURRENCY, iso, loadOrgEvent, str, toAward, toClaim, toEvent, toOrg, toPayout, toPerson, toUsd, type MethodRow, type ProfileRow } from "./core";
+import { capInBooks } from "./budget";
+import { filingCurrency } from "./filing-currency";
 import { loadRules } from "./payouts";
 import { loadScoreboardView } from "./scoreboard-view";
 import { openSecret } from "./vault";
@@ -52,7 +54,7 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
   const profileBy = new Map<string, ProfileRow>(profiles.map((p) => [p.personId, p]));
   const methodBy = new Map<string, MethodRow>();
   for (const m of methods) if (m.status === "active" || !methodBy.has(m.personId)) methodBy.set(m.personId, m);
-  const year = event.startsAt.getUTCFullYear();
+  const year = now.getUTCFullYear();
   const paidYtd = new Map<string, bigint>();
   const outstanding = new Map<string, bigint>();
   for (const p of payouts) {
@@ -61,7 +63,8 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
   }
 
   // Budget attribution: claims by category, prizes to "prizes".
-  const budgetOut: C.BudgetLine[] = budgets.map((b) => {
+  const budgetOut: C.BudgetLine[] = await Promise.all(budgets.map(async (b) => {
+    const cap = await capInBooks(db, b.capMinor, org.currency, now);
     let spent = 0n, committed = 0n;
     const payoutByClaim = new Map(payouts.filter((p) => p.claimId).map((p) => [p.claimId!, p]));
     if (b.category === "prizes") {
@@ -70,7 +73,7 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
         if (p.status === "paid") spent += p.grossMinor;
         else if (["held", "proposed", "approved", "processing", "frozen"].includes(p.status)) committed += p.grossMinor;
       }
-      for (const a of awards) if (!payouts.some((p) => p.awardId === a.id) && a.status !== "paid") committed += a.amountMinor;
+      for (const a of awards) if (!payouts.some((p) => p.awardId === a.id && !["failed", "returned"].includes(p.status)) && a.status !== "paid") committed += (await toUsd(db, a.amountMinor, a.currency, now)).usdMinor;
     } else {
       for (const c of claims) {
         const matches = c.budgetLineId === b.id || (!c.budgetLineId && (c.category === b.category || (b.category === "travel" && c.type === "travel")));
@@ -80,8 +83,8 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
         else if (c.status === "approved") committed += c.usdMinor;
       }
     }
-    return { id: b.id, name: b.name, capMinor: str(b.capMinor), spentMinor: str(spent), committedMinor: str(committed), fundingSource: b.fundingSource };
-  });
+    return { id: b.id, name: b.name, capMinor: str(cap.capMinor), spentMinor: str(spent), committedMinor: str(committed), fundingSource: b.fundingSource, currency: BOOKS_CURRENCY, enteredCapMinor: str(b.capMinor), enteredCurrency: org.currency, fxSource: cap.note };
+  }));
 
   const payoutPerson = new Map(payouts.map((p) => [p.id, p.personId]));
   const noticesOut: C.Notice[] = [];
@@ -124,7 +127,7 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
       actor: d.actor, createdAt: d.createdAt.toISOString(), status: d.status, tool: d.tool, ruleId: d.ruleId ?? undefined, ruleVersion: d.ruleVersion ?? undefined,
       facts: d.facts, checks: d.checks ?? undefined, documentId: d.documentId ?? undefined, nextActionAt: iso(d.nextActionAt),
     })),
-    filings: filings.map((f) => ({ id: f.id, personId: f.personId, personName: names.get(f.personId) ?? "", year: f.year, form: f.form, grossMinor: str(f.grossMinor), withholdingMinor: str(f.withholdingMinor), status: f.status, documentId: f.documentId ?? undefined })),
+    filings: filings.map((f) => ({ id: f.id, personId: f.personId, personName: names.get(f.personId) ?? "", year: f.year, form: f.form, grossMinor: str(f.grossMinor), withholdingMinor: str(f.withholdingMinor), currency: filingCurrency(f.form), status: f.status, documentId: f.documentId ?? undefined })),
     rules,
     notices: noticesOut,
     scoreboard,

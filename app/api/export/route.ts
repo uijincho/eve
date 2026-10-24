@@ -6,6 +6,7 @@ import * as s from "@/lib/db/schema";
 import { toCsv } from "@/lib/server/csv";
 import { json } from "@/lib/server/http";
 import { loadAccountingJournal } from "@/lib/server/accounting-export";
+import { filingCurrency } from "@/lib/server/filing-currency";
 import { AccountingExportError, exportLedgerCsv, exportQuickBooksAccountsCsv, exportQuickBooksJournalCsv, QBO_IMPORT_INSTRUCTIONS } from "@/lib/accounting";
 import { render1042Summary } from "@/lib/pdf";
 
@@ -84,8 +85,8 @@ export async function GET(request: Request) {
       .where(eq(s.filing.orgId, orgId));
     const seen = new Set<string>();
     const out = rows.filter(({ t }) => !t || !t.supersededAt).filter(({ f }) => (seen.has(f.id) ? false : (seen.add(f.id), true)));
-    return csvResponse("filings.csv", toCsv(["filing_id", "person", "country", "year", "form", "gross_minor", "withholding_minor", "tin_last4", "status"],
-      out.map(({ f, p, t }) => [f.id, p.name, p.country, f.year, f.form, f.grossMinor, f.withholdingMinor, t?.tinLast4 ?? "", f.status])));
+    return csvResponse("filings.csv", toCsv(["filing_id", "person", "country", "year", "form", "gross_minor", "withholding_minor", "currency", "tin_last4", "status"],
+      out.map(({ f, p, t }) => [f.id, p.name, p.country, f.year, f.form, f.grossMinor, f.withholdingMinor, filingCurrency(f.form), t?.tinLast4 ?? "", f.status])));
   }
   if ((type === "packet" || type === "filing") && id) {
     const table = type === "packet" ? s.sponsorPacket : s.filing;

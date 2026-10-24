@@ -10,7 +10,8 @@ export interface Organization {
   notificationChannel?: string; policyNotes?: string;
   /**
    * Functional currency of the books (always "USD" today; absent means USD). Ledger, payout gross/withholding/fee/net,
-   * Claim.usdMinor, BudgetLine amounts, Person.paidYtdMinor/outstandingMinor and Filing amounts are in it.
+   * Claim.usdMinor, BudgetLine amounts and Person.paidYtdMinor/outstandingMinor are in it.
+   * Filing amounts use Filing.currency (CAD for CRA worksheets, USD for US drafts).
    * `currency` is what the org enters policy limits, the travel cap and budget caps in; Award.amountMinor
    * is in Award.currency; Payout.destination* is in the recipient's currency.
    */
@@ -57,7 +58,7 @@ export interface Payout {
   requestedBy: string; releasedBy?: string; createdAt: string; dueAt: string;
   paidAt?: string; providerRef?: string; bankVersion?: string;
 }
-export interface BudgetLine { id: string; name: string; capMinor: Minor; spentMinor: Minor; committedMinor: Minor; fundingSource: string }
+export interface BudgetLine { id: string; name: string; capMinor: Minor; spentMinor: Minor; committedMinor: Minor; fundingSource: string; currency?: string; enteredCapMinor?: Minor; enteredCurrency?: string; fxSource?: string }
 export interface SponsorPacket {
   id: string; payoutId: string; personName: string; requestedMinor: Minor; paidMinor: Minor;
   status: "draft" | "submitted" | "questioned" | "paid" | "exception";
@@ -70,7 +71,7 @@ export interface Decision {
   tool: string; ruleId?: string; ruleVersion?: number;
   facts: Record<string, unknown>; checks?: Check[]; documentId?: string; nextActionAt?: string;
 }
-export interface Filing { id: string; personId: string; personName: string; year: number; form: string; grossMinor: Minor; withholdingMinor: Minor; status: "draft" | "reviewed"; documentId?: string }
+export interface Filing { id: string; personId: string; personName: string; year: number; form: string; grossMinor: Minor; withholdingMinor: Minor; currency?: string; status: "draft" | "reviewed"; documentId?: string }
 export interface TaxRule { id: string; version: number; payerCountry: string; payeeCountry: string; paymentType: string; rateBps: number; thresholdMinor: Minor; form: string; reportingForm: string; verified: boolean; sourceUrl: string; explanation: string; effectiveFrom: string; effectiveTo?: string }
 export interface Notice { id: string; personId?: string; channel: string; title: string; body: string; createdAt: string; status: "queued" | "sent" | "simulated" }
 export interface Scoreboard { total: number; evaluated: number; caught: number; missed: number; falsePositives: number; wrongfulPayouts: number; lastRunAt?: string; results: { id: string; scenario: string; expected: string; actual: string; passed: boolean }[] }

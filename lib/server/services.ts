@@ -21,7 +21,7 @@ import * as s from "@/lib/db/schema";
 import { destinationFor, fixtureOrigins, fixtureOffers, suggestFlights } from "@/lib/flights";
 import { offerSigningKeyFromEnv, signOffers, verifyFlightRequest } from "@/lib/flights/verify";
 import { lockPeriod, postJournal, type JournalLineInput } from "@/lib/ledger";
-import { renderFilingDraft, renderPayoutPacket, renderTaxFormReceipt } from "@/lib/pdf";
+import { renderPayoutPacket, renderTaxFormReceipt } from "@/lib/pdf";
 
 import { actionSchemas } from "./action-schemas";
 import { prepareClaim, processClaim, reviewClaim, submitClaim, type ClaimEvidence } from "./claims";
@@ -39,6 +39,8 @@ import {
 } from "./payouts";
 import { computeScoreboard, saveScoreboard } from "./scoreboard";
 import { vaultTin } from "./tin";
+import { generateFilings } from "./filings";
+export { generateFilings } from "./filings";
 
 export { agentActor, recordDecision, recordNotice } from "./core";
 
@@ -592,40 +594,6 @@ export async function reconcilePacket(tx: Executor, actor: ActorContext, p: { id
 }
 
 // ---------------------------------------------------------------- filings
-
-export async function generateFilings(tx: Executor, actor: ActorContext, p: { year?: number }) {
-  const { org, event } = await loadOrgEvent(tx, actor.orgId);
-  const year = p.year ?? event.startsAt.getUTCFullYear();
-  const rows = await tx.select({ payout: s.payout, person: s.person }).from(s.payout).innerJoin(s.person, eq(s.person.id, s.payout.personId))
-    .where(and(eq(s.payout.orgId, actor.orgId), eq(s.payout.sourceType, "award"), eq(s.payout.status, "paid"), sql`extract(year from ${s.payout.paidAt}) = ${year}`));
-  const groups = new Map<string, { person: typeof s.person.$inferSelect; form: "1099-MISC" | "1099-NEC" | "1042-S"; gross: bigint; wh: bigint; payments: { date: string; description: string; grossMinor: string }[]; rule: { id: string; version: number; verified: boolean } }>();
-  for (const { payout, person } of rows) {
-    const reporting = payout.reportingForm ?? "";
-    const form = reporting.startsWith("1042-S") ? "1042-S" : reporting.startsWith("1099-NEC") ? "1099-NEC" : reporting.startsWith("1099-MISC") ? "1099-MISC" : null;
-    if (!form) continue;
-    const key = `${person.id}:${form}`;
-    const g = groups.get(key) ?? { person, form, gross: 0n, wh: 0n, payments: [], rule: { id: payout.ruleId, version: payout.ruleVersion, verified: payout.ruleVerified } };
-    g.gross += payout.grossMinor;
-    g.wh += payout.withholdingMinor;
-    g.payments.push({ date: payout.paidAt!.toISOString().slice(0, 10), description: `Payout ${payout.id}`, grossMinor: payout.grossMinor.toString() });
-    groups.set(key, g);
-  }
-  const rules = await tx.select().from(s.taxRule);
-  let count = 0;
-  for (const g of groups.values()) {
-    // US forms only once the same-form total reaches the rule threshold; 1042-S has no threshold.
-    const threshold = rules.find((r) => r.id === g.rule.id && r.version === g.rule.version)?.thresholdMinor ?? 0n;
-    if (g.form !== "1042-S" && g.gross < threshold) continue;
-    const profile = await currentProfile(tx, g.person.id);
-    const pdf = await renderFilingDraft({ form: g.form, year, payer: { name: org.name, address: "On file" }, payee: { name: g.person.name, address: g.person.address, country: g.person.country, tinLast4: profile?.tinLast4 ?? undefined }, currency: "USD", grossMinor: g.gross.toString(), withholdingMinor: g.wh.toString(), box: g.form === "1099-MISC" ? "3" : g.form === "1099-NEC" ? "1" : "2", rule: g.rule, payments: g.payments });
-    const doc = await storeDocument(tx, { orgId: actor.orgId, personId: g.person.id, uploadedBy: actor.memberId, kind: "filing", name: `${g.form}-${year}-${g.person.name}.pdf`, mimeType: "application/pdf", bytes: pdf });
-    await tx.insert(s.filing).values({ id: newId("fil"), orgId: actor.orgId, personId: g.person.id, year, form: g.form, grossMinor: g.gross, withholdingMinor: g.wh, documentId: doc.id })
-      .onConflictDoUpdate({ target: [s.filing.orgId, s.filing.personId, s.filing.year, s.filing.form], set: { grossMinor: g.gross, withholdingMinor: g.wh, documentId: doc.id, status: "draft" } });
-    count++;
-  }
-  await recordDecision(tx, { orgId: actor.orgId, objectType: "filings", objectId: String(year), action: "filings.generate", summary: `Drafted ${count} filing(s) for ${year}. Drafts only; a controller signs.`, actor, status: "done", tool: "draftFilings" });
-  return ok(`Drafted ${count} filing(s) for ${year}.`, { count, year });
-}
 
 // ------------------------------------------------------------- agent/demo
 
