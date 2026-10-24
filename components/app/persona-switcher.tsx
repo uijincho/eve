@@ -62,7 +62,7 @@ export function PersonaSwitcher({ className }: { className?: string }) {
               if (!r.ok) return;
               const inPortal = pathname.startsWith("/portal");
               if (next.role === "attendee" && !inPortal) router.push("/portal");
-              if (next.role !== "attendee" && inPortal) router.push("/");
+              if (next.role !== "attendee" && inPortal) router.push("/overview");
             }}
             className="h-7 w-full rounded-md border border-border bg-rail px-1.5 text-small outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >

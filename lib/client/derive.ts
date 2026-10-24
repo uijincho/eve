@@ -12,6 +12,7 @@ import type {
   PortalRun,
   SponsorPacket,
 } from "@/lib/contracts";
+import { checkProjectSubmission } from "@/lib/engines/project-submission";
 
 export const big = (minor: string | undefined | null): bigint => {
   try {
@@ -169,7 +170,13 @@ export function isBeneficiary(actor: Actor, personId: string | undefined, s?: Pa
   return Boolean(person && normEmail(person.email) && normEmail(person.email) === normEmail(actor.email));
 }
 
-export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "personas"> & Partial<Pick<AppSnapshot, "decisions" | "org" | "people">>): Permission {
+export function projectStatusLabel(status: Person["projectStatus"] | undefined): string {
+  if (status === "submitted") return "Submitted";
+  if (status === "none") return "No project";
+  return "Not recorded";
+}
+
+export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "personas"> & Partial<Pick<AppSnapshot, "decisions" | "org" | "people" | "claims" | "event" | "now">>): Permission {
   if (s.org?.mode === "sponsor") return no(`${s.org.sponsorName || "The fiscal sponsor"} pays for this organization. Create a sponsor packet instead; a controller submits it.`);
   if (s.decisions && releaseInFlight({ decisions: s.decisions }, payout)) return no("Release accepted. Eve is sending it now; this updates on its own.");
   if (payout.status === "frozen") return no("Frozen until the bank change is confirmed through the original contact channel.");
@@ -181,6 +188,17 @@ export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "p
   if (payout.requestedBy === actor.id || payout.requestedBy === actor.name)
     return no("You requested this payout. A different controller must release it.");
   if (isBeneficiary(actor, payout.personId, s)) return no("This payout is to you. A different controller must release it.");
+  if (s.people && s.claims && s.event && payout.sourceType === "claim") {
+    const person = s.people.find((p) => p.id === payout.personId);
+    const claim = s.claims.find((c) => c.id === payout.sourceId);
+    if (person && claim?.type === "travel") {
+      const project = checkProjectSubmission({
+        role: person.role, name: person.name, projectStatus: person.projectStatus, projectUrl: person.projectUrl,
+        claimType: "travel", closingAt: s.event.closingAt, asOf: s.now ?? new Date().toISOString(),
+      });
+      if (project.applies && !project.check.passed) return no(project.check.detail);
+    }
+  }
   return ok;
 }
 
@@ -346,6 +364,7 @@ export function failedCheckText(c: Pick<Check, "code" | "label" | "detail">): st
     case "purchase_date":
     case "amount_valid":
     case "fx_converted":
+    case "project_submission":
       return d;
     default:
       return `${c.label} failed: ${d}`;
@@ -353,7 +372,7 @@ export function failedCheckText(c: Pick<Check, "code" | "label" | "detail">): st
 }
 
 /** Most decisive failures first, so a row title leads with what matters most. */
-const CHECK_PRIORITY = ["adult", "duplicate", "name_match", "evidence", "cap", "cabin", "booking_deadline", "travel_dates", "budget", "agent_limit", "fare_peer", "fare_market", "cap_hugging", "receipt"];
+const CHECK_PRIORITY = ["project_submission", "adult", "duplicate", "name_match", "evidence", "cap", "cabin", "booking_deadline", "travel_dates", "budget", "agent_limit", "fare_peer", "fare_market", "cap_hugging", "receipt"];
 
 export function failedChecks(c: Pick<Claim, "checks">): Check[] {
   const rank = (k: Check) => { const i = CHECK_PRIORITY.indexOf(k.code); return i === -1 ? CHECK_PRIORITY.length : i; };

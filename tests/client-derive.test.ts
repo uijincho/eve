@@ -65,6 +65,19 @@ describe("authority explanations", () => {
     expect(r.allowed ? "" : r.reason).toContain(controller.name);
   });
 
+  it("holds a hacker's travel payout with no project, and not an expense or a submitted project", () => {
+    const travel = { ...s.claims[0], id: "C-none", personId: s.people[0].id, type: "travel" as const };
+    const payout = { ...proposed, id: "PO-none", personId: s.people[0].id, sourceId: travel.id, status: "proposed" as const, requestedBy: "u-dana" };
+    const none = { ...s, claims: [...s.claims, travel] };
+    const held = canRelease(controller, payout, none);
+    expect(held.allowed).toBe(false);
+    if (!held.allowed) expect(held.reason).toContain("No project submission on record for Priya Raman");
+    const submitted = { ...none, people: none.people.map((p) => p.id === travel.personId ? { ...p, projectStatus: "submitted" as const } : p) };
+    expect(canRelease(controller, payout, submitted)).toEqual({ allowed: true });
+    const expense = { ...s.claims[1], id: "C-exp", personId: s.people[0].id, type: "expense" as const };
+    expect(canRelease(controller, { ...payout, sourceId: expense.id }, { ...s, claims: [...s.claims, expense] })).toEqual({ allowed: true });
+  });
+
   it("frozen payouts cannot be released by anyone", () => {
     const frozen = s.payouts.find((p) => p.status === "frozen")!;
     expect(canRelease(controller, frozen, s).allowed).toBe(false);

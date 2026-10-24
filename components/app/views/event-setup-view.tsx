@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResult, AppSnapshot } from "@/lib/contracts";
 import { big, canOrganize } from "@/lib/client/derive";
-import { parsePeopleCsv } from "@/lib/client/csv";
+import { parsePeopleCsv, parseSubmissionList } from "@/lib/client/csv";
 import { payloads, toMinor } from "@/lib/client/payloads";
 import { rovingKeyDown } from "@/lib/client/roving";
 import { useEve } from "@/lib/client/use-eve";
@@ -208,7 +208,7 @@ function ImportTab({ snapshot: s }: { snapshot: AppSnapshot }) {
   return (
     <div className="flex max-w-3xl flex-col gap-4">
       <p className="text-small text-muted-foreground">
-        Columns: name, email, country (two letters), dateOfBirth (YYYY-MM-DD), and optionally citizenship, address, role, payoutCurrency. People are matched by email. Anyone under 18 at the event start is stored but blocked from money.
+        Columns: name, email, country (two letters), dateOfBirth (YYYY-MM-DD), and optionally citizenship, address, role, payoutCurrency, project, projectUrl, submitted (yes, no, or unknown). People are matched by email. Anyone under 18 at the event start is stored but blocked from money. A project column does not clear a status already on file when the cell is empty.
       </p>
       <Field label="CSV file">
         {(p) => (
@@ -266,6 +266,65 @@ function ImportTab({ snapshot: s }: { snapshot: AppSnapshot }) {
       <p className="text-small text-muted-foreground">
         {s.people.length} people in the event now.
       </p>
+      <MarkSubmitted />
+    </div>
+  );
+}
+
+/** Paste a Devpost or judging export (emails or names) and mark those people submitted. */
+function MarkSubmitted() {
+  const { act, snapshot } = useEve();
+  const [text, setText] = useState("");
+  const [pending, setPending] = useState(false);
+  const [result, setResult] = useState<ActionResult | null>(null);
+  if (!snapshot) return null;
+  const parsed = text.trim() ? parseSubmissionList(text) : null;
+  const permission = canOrganize(snapshot.actor);
+  return (
+    <div className="mt-8 flex flex-col gap-4 border-t pt-6">
+      <h2 className="text-subheading">Mark projects submitted</h2>
+      <p className="text-small text-muted-foreground">
+        Paste a Devpost or judging export. A header with email or name works, or one email or name per line. Matches are marked submitted. Ambiguous names are skipped.
+      </p>
+      <Field label="Export">
+        {(p) => (
+          <textarea
+            {...p}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={5}
+            placeholder={"email,name,projectUrl\npriya@example.com,Priya Raman,https://devpost.com/example"}
+            className="w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 font-mono text-caption outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          />
+        )}
+      </Field>
+      {parsed ? (
+        <div className="flex flex-col gap-1 text-small" aria-live="polite">
+          <span>{parsed.entries.length} {parsed.entries.length === 1 ? "row" : "rows"} ready.</span>
+          {parsed.errors.slice(0, 5).map((e) => <span key={e} className="text-critical">{e}</span>)}
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-3">
+        {permission.allowed ? (
+          <Button
+            disabled={!parsed || !parsed.entries.length || parsed.errors.length > 0 || pending}
+            aria-busy={pending || undefined}
+            onClick={async () => {
+              if (!parsed) return;
+              setPending(true);
+              const r = await act(payloads.peopleMarkSubmitted(parsed.entries));
+              setPending(false);
+              setResult(r);
+              if (r.ok) setText("");
+            }}
+          >
+            {pending ? "Marking" : `Mark ${parsed?.entries.length ?? 0} submitted`}
+          </Button>
+        ) : (
+          <ActionButton label="Mark submitted" permission={permission} call={() => null} />
+        )}
+        <span role="status" aria-live="polite">{result ? <ResultText result={result} /> : null}</span>
+      </div>
     </div>
   );
 }

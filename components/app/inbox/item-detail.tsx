@@ -13,7 +13,7 @@ import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { Badge } from "@/components/ui/badge";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
-import { big, type InboxItem, payoutFees, payoutSource, providerLabel, isInKind, payoutValue, claimStatusLabel } from "@/lib/client/derive";
+import { big, type InboxItem, payoutFees, payoutSource, providerLabel, isInKind, payoutValue, claimStatusLabel, projectStatusLabel } from "@/lib/client/derive";
 import { useEve } from "@/lib/client/use-eve";
 import { documentUrl } from "@/lib/client/api";
 import { fmtDateTime } from "@/lib/client/format";
@@ -111,6 +111,12 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
             <dd className="text-right">
               <StatusBadge status={c.status} label={claimStatusLabel(c)} />
             </dd>
+            {c.type === "travel" ? (
+              <>
+                <dt className="text-muted-foreground">Project</dt>
+                <dd className="text-right">{projectStatusLabel(snapshot.people.find((p) => p.id === c.personId)?.projectStatus)}</dd>
+              </>
+            ) : null}
           </dl>
           <CheckList checks={c.checks} />
           {c.documentId ? (

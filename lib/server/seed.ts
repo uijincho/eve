@@ -118,8 +118,13 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   type P = PersonRow & { airport: string; form: "valid" | "missing" | "expired" | "w9foreign" | "treaty"; tin?: string };
   const people: P[] = [];
   const used = new Set<string>();
-  const add = (p: Omit<P, "orgId" | "eventId" | "adult" | "chaseCount" | "lastChasedAt" | "createdAt">) => {
-    const row: P = { ...p, orgId: ORG, eventId: DEMO_EVENT_ID, adult: isAdultAt(p.dateOfBirth, startsAt), chaseCount: 0, lastChasedAt: null, createdAt: D("2026-09-01T00:00:00Z") };
+  const add = (p: Omit<P, "orgId" | "eventId" | "adult" | "chaseCount" | "lastChasedAt" | "createdAt" | "projectStatus" | "projectUrl" | "projectSource" | "projectUpdatedAt">) => {
+    const hacker = p.role.trim().toLowerCase() === "hacker";
+    const row: P = {
+      ...p, orgId: ORG, eventId: DEMO_EVENT_ID, adult: isAdultAt(p.dateOfBirth, startsAt), chaseCount: 0, lastChasedAt: null, createdAt: D("2026-09-01T00:00:00Z"),
+      // Hackers are submitted so seeded travel claims keep today's outcomes. Mentors and judges are unknown; the check skips them.
+      projectStatus: hacker ? "submitted" : "unknown", projectUrl: null, projectSource: hacker ? "organizer" : null, projectUpdatedAt: hacker ? D("2026-09-01T00:00:00Z") : null,
+    };
     used.add(row.email);
     people.push(row);
     return row;
@@ -134,6 +139,14 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   const ana = character("per_demo_ana", "Ana Souza", "BR", "São Paulo", "GRU", "valid");
   const sam = character("per_demo_sam", "Sam Ortiz", "US", "Oakland, CA", "OAK", "valid");
   const wei = character("per_demo_wei", "Wei Zhang", "US", "Seattle, WA", "SEA", "valid");
+  // Priya is the attendee persona used to file a claim. She is kept out of the
+  // claim pool, so `none` demos the escalation without changing seeded claims.
+  // Her First Overall prize is an item, not a travel payout. Persona ids stay put.
+  priya.projectStatus = "none";
+  // Wei's only seeded claim is an expense, so unknown is visible and does not change a travel decision.
+  wei.projectStatus = "unknown";
+  wei.projectSource = null;
+  wei.projectUpdatedAt = null;
 
   for (const c of COUNTRIES) {
     const existing = people.filter((p) => p.country === c.code).length;

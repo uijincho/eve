@@ -25,6 +25,9 @@ export interface EventRecord {
 export interface Person {
   id: string; name: string; email: string; country: string; citizenship: string;
   dateOfBirth: string; address: string; role: string; adult: boolean;
+  /** Hackathon project. Unknown until an organizer or a CSV says otherwise. */
+  projectStatus: "unknown" | "submitted" | "none";
+  projectUrl?: string; projectSource?: "csv" | "organizer"; projectUpdatedAt?: string;
   taxForm: "W-9" | "W-8BEN" | "W-8BEN-E" | "Residency declaration";
   taxStatus: "missing" | "valid" | "expired" | "review";
   taxSignedAt?: string; taxExpiresAt?: string; taxLast4?: string;
@@ -104,7 +107,7 @@ export interface AppSnapshot {
   demo: boolean; now: string; integrationStatus: { name: string; mode: string; detail: string }[];
 }
 export type AppAction =
-  | "org.update" | "event.update" | "budget.update" | "people.import" | "person.update"
+  | "org.update" | "event.update" | "budget.update" | "people.import" | "person.update" | "person.setProject" | "people.markSubmitted"
   | "tax.submit" | "claim.submit" | "claim.review" | "claim.explain" | "award.create" | "award.choose"
   | "award.split" | "award.confirm" | "award.fulfill" | "payout.resolveRule" | "payout.propose" | "payout.release"
   | "payout.bankChange" | "payout.verify" | "payout.retry" | "sponsor.create"

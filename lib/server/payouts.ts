@@ -24,6 +24,7 @@ import type { TaxRule } from "@/lib/contracts";
 import type { Executor } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
+import { checkProjectSubmission } from "@/lib/engines/project-submission";
 import { postJournal, type JournalLineInput } from "@/lib/ledger";
 
 import { assertFits, claimBudgetRoom, ORG_BOOKED_FLIGHT, prizeBudgetRoom } from "./budget";
@@ -466,7 +467,7 @@ export async function prepareRelease(tx: Executor, actor: ActorContext, payoutId
   if (p.status === "processing") throw conflict(p.provider === SPONSOR_PROVIDER ? "Payout was already submitted to the sponsor." : "Payout is already in flight.");
   if (p.status !== "proposed" && p.status !== "approved") throw conflict(`Payout is ${p.status}: ${p.reason}`);
   if (opts.expectTerms && termsKey(p) !== opts.expectTerms) throw conflict("This payout was re-quoted after you reviewed it; review the new terms and release again.");
-  const { org } = await loadOrgEvent(tx, actor.orgId);
+  const { org, event } = await loadOrgEvent(tx, actor.orgId);
   const [packet] = await tx.select({ id: s.sponsorPacket.id, status: s.sponsorPacket.status }).from(s.sponsorPacket).where(eq(s.sponsorPacket.payoutId, p.id)).for("update");
   if (route === "direct") {
     if (org.mode === "sponsor") throw conflict("This organization pays through its fiscal sponsor. Draft and submit a sponsor packet instead of a direct release.");
@@ -482,6 +483,14 @@ export async function prepareRelease(tx: Executor, actor: ActorContext, payoutId
   }
   const loaded = await loadSource(tx, actor.orgId, { sourceType: p.sourceType, sourceId: (p.claimId ?? p.awardId)! }, p.id);
   if (loaded.blockers.length) throw conflict(loaded.blockers.join(" "));
+  if (loaded.claim?.type === "travel") {
+    // Status can change after approval (unknown before closing, none later). Hold here; do not reject the claim.
+    const project = checkProjectSubmission({
+      role: person.role, name: person.name, projectStatus: person.projectStatus, projectUrl: person.projectUrl,
+      claimType: "travel", closingAt: event.closingAt.toISOString(), asOf: new Date().toISOString(),
+    });
+    if (project.applies && !project.check.passed) throw conflict(project.check.detail);
+  }
   await assertBudget(tx, loaded, p.grossMinor, p.id, "Releasing");
   // Recompute tax and quote under the person lock with finalized YTD.
   const ctx = await loadPayoutContext(tx, actor.orgId, p.personId, p.id);

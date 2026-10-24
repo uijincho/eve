@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { EveMark } from "@/components/eve/logo";
 import { PersonaSwitcher } from "@/components/app/persona-switcher";
 import { Sheet } from "@/components/app/sheet";
 import { TruthLabel } from "@/components/eve/truth-label";
@@ -32,7 +33,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
       </a>
       <header className="sticky top-0 z-30 border-b bg-rail">
         <div className="mx-auto flex h-12 max-w-5xl items-center gap-3 px-4">
-          <Link href="/portal" className="rounded-md text-subheading">Eve</Link>
+          <Link href="/portal" className="flex items-center gap-2 rounded-md text-subheading font-semibold"><EveMark className="size-6" />Eve</Link>
           <span className="truncate text-small text-muted-foreground">{snapshot?.event.name ?? "Portal"}</span>
           {snapshot?.demo ? <TruthLabel kind="sample" className="max-sm:hidden" /> : null}
           <button

@@ -19,6 +19,7 @@ import type { Executor } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
 import { FARE_FLAG_CODES, fareQuestion, type MarketSnapshot } from "@/lib/engines/fare-anomaly";
+import { PROJECT_CHECK_CODE } from "@/lib/engines/project-submission";
 import { destinationFor } from "@/lib/flights";
 
 import {
@@ -222,6 +223,12 @@ async function applyEvaluation(tx: Executor, actor: ActorContext, claim: ClaimRo
     // The agent never buys tickets: an organizer approves every org booking.
     result.status = "escalated";
     result.reason = `Within policy (fare from server-verified offer ${(claim.extracted as Partial<ClaimEvidence> | null)?.offer?.id ?? ""}). An organizer must approve the booking; it is bought by the organization, never reimbursed to the attendee.`;
+  }
+  // A missing project escalates. It must never become an agent approval or a payout.
+  const projectFailed = result.checks.find((c) => c.code === PROJECT_CHECK_CODE && !c.passed);
+  if (projectFailed && result.status === "approved") {
+    result.status = "escalated";
+    result.reason = projectFailed.detail;
   }
   const [updated] = await tx.update(s.claim).set({
     status: result.status, checks: result.checks, reason: result.reason, reviewedBy: result.status === "approved" ? "agent" : null, budgetLineId: budget?.lineId ?? claim.budgetLineId,

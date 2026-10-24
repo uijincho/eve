@@ -4,6 +4,7 @@ import { LoaderCircleIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState } from "react";
 
+import { EveMark } from "@/components/eve/logo";
 import { Field, NativeSelect } from "@/components/app/field";
 import { LinkButton } from "@/components/app/link-button";
 import { ResultText } from "@/components/app/result-text";
@@ -53,7 +54,7 @@ export function OnboardingView() {
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-10 px-4 py-12 sm:py-16">
       <div className="flex flex-col gap-2">
-        <span className="text-heading">Eve</span>
+        <span className="flex items-center gap-2 text-heading"><EveMark />Eve</span>
         <h1 className="text-title">Set up your organization</h1>
         <p className="max-w-[60ch] text-small text-muted-foreground">
           Eve needs who pays, how money moves, and your first event. You can change all of it later in Settings and Event setup.
@@ -71,7 +72,7 @@ export function OnboardingView() {
               </p>
             </div>
           ) : null}
-          <SetupForm userName={me.user.name} onCreated={() => router.replace("/")} />
+          <SetupForm userName={me.user.name} onCreated={() => router.replace("/overview")} />
         </>
       ) : null}
     </main>

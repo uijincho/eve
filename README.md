@@ -18,7 +18,7 @@ pnpm dev
 
 Open <http://localhost:3000>. Migrations use the direct Postgres connection with TLS verification; normal traffic uses the pooled connection. The seed is a fictional 300-person event and can take about a minute across a remote database connection. It does not create real payments or send external notifications.
 
-With `EVE_DEMO_MODE=true`, `/login` offers sample organizer, controller, auditor and attendee personas. Anonymous demo visitors enter as the sample organizer. The attendee portal is `/portal`; the organizer inbox is `/`. Disable demo mode for a private installation. Real-account onboarding and invitation endpoint contracts are in [ONBOARDING.md](lib/server/ONBOARDING.md).
+With `EVE_DEMO_MODE=true`, `/login` offers sample organizer, controller, auditor and attendee personas. Anonymous demo visitors enter as the sample organizer. The attendee portal is `/portal`; the organizer home is `/overview` (`/` redirects there) and the inbox is `/inbox`. Disable demo mode for a private installation. Real-account onboarding and invitation endpoint contracts are in [ONBOARDING.md](lib/server/ONBOARDING.md).
 
 ## What to try
 

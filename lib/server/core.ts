@@ -36,7 +36,9 @@ export const ACTION_ROLES: Record<C.AppAction, Who[]> = {
   "event.update": ["organizer"],
   "budget.update": ["organizer"],
   "people.import": ["organizer"],
+  "people.markSubmitted": ["organizer"],
   "person.update": ["organizer", "self"],
+  "person.setProject": ["organizer"],
   "tax.submit": ["organizer", "self"],
   "claim.submit": ["organizer", "self"],
   "claim.review": ["organizer", "controller"],
@@ -196,6 +198,8 @@ export function toPerson(p: PersonRow, extra: {
     payoutCurrency: extra.method?.currency ?? p.payoutCurrency, payoutLast4: extra.method?.last4 ?? "",
     payoutChangedAt: iso(extra.method?.verifiedAt ?? extra.method?.createdAt),
     paidYtdMinor: str(extra.paidYtdMinor), outstandingMinor: str(extra.outstandingMinor), chaseCount: p.chaseCount,
+    projectStatus: p.projectStatus, projectUrl: p.projectUrl ?? undefined, projectSource: p.projectSource ?? undefined,
+    projectUpdatedAt: iso(p.projectUpdatedAt),
   };
 }
 

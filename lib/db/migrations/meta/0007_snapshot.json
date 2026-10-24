@@ -1,5 +1,5 @@
 {
-  "id": "014a975d-f94c-4bae-adf9-de03219381c8",
+  "id": "5542e49f-4648-4a06-8bc1-b29532b6e52a",
   "prevId": "2e54862f-c299-4a3f-acc8-a9b169cfef31",
   "version": "7",
   "dialect": "postgresql",
@@ -3696,6 +3696,31 @@
           "primaryKey": false,
           "notNull": false
         },
+        "project_status": {
+          "name": "project_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unknown'"
+        },
+        "project_url": {
+          "name": "project_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "project_source": {
+          "name": "project_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "project_updated_at": {
+          "name": "project_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -3773,237 +3798,16 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.portal_run": {
-      "name": "portal_run",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true
+      "checkConstraints": {
+        "person_project_status": {
+          "name": "person_project_status",
+          "value": "\"person\".\"project_status\" IN ('unknown', 'submitted', 'none')"
         },
-        "org_id": {
-          "name": "org_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "packet_id": {
-          "name": "packet_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "workflow_run_id": {
-          "name": "workflow_run_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'starting'"
-        },
-        "requested_by": {
-          "name": "requested_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sandbox_id": {
-          "name": "sandbox_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "stream_url": {
-          "name": "stream_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "page": {
-          "name": "page",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'other'"
-        },
-        "pages_visited": {
-          "name": "pages_visited",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "turns": {
-          "name": "turns",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "state": {
-          "name": "state",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "review_check": {
-          "name": "review_check",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "escalation": {
-          "name": "escalation",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "confirmation": {
-          "name": "confirmation",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "portal_record": {
-          "name": "portal_record",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approved_by": {
-          "name": "approved_by",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approved_by_name": {
-          "name": "approved_by_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "approved_at": {
-          "name": "approved_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "stop_requested": {
-          "name": "stop_requested",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "error": {
-          "name": "error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "usage": {
-          "name": "usage",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{\"inputTokens\":0,\"outputTokens\":0,\"cacheReadTokens\":0}'::jsonb"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+        "person_project_source": {
+          "name": "person_project_source",
+          "value": "\"person\".\"project_source\" IS NULL OR \"person\".\"project_source\" IN ('csv', 'organizer')"
         }
       },
-      "indexes": {
-        "portal_run_org_idx": {
-          "name": "portal_run_org_idx",
-          "columns": [
-            {
-              "expression": "org_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "portal_run_active_uq": {
-          "name": "portal_run_active_uq",
-          "columns": [
-            {
-              "expression": "packet_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"portal_run\".\"status\" in ('starting', 'filling', 'awaiting_approval', 'submitting')",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "portal_run_org_id_organization_id_fk": {
-          "name": "portal_run_org_id_organization_id_fk",
-          "tableFrom": "portal_run",
-          "tableTo": "organization",
-          "columnsFrom": [
-            "org_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "portal_run_packet_id_sponsor_packet_id_fk": {
-          "name": "portal_run_packet_id_sponsor_packet_id_fk",
-          "tableFrom": "portal_run",
-          "tableTo": "sponsor_packet",
-          "columnsFrom": [
-            "packet_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.scoreboard_run": {

@@ -44,7 +44,7 @@ import { Code, Section, Specimen } from "./_components/section";
 import { MobileIndex, SectionIndex, type IndexEntry } from "./_components/section-index";
 
 export const metadata: Metadata = {
-  title: "Blue Hour · Eve design system",
+  title: "Daylight · Eve design system",
   description: "Tokens, components, and patterns for Eve's interface.",
 };
 
@@ -116,13 +116,14 @@ export default function DesignPage() {
         <section id="overview" aria-labelledby="overview-title" className="scroll-mt-20 pb-16 lg:scroll-mt-6">
           <div className="flex items-start justify-between gap-6">
             <h1 id="overview-title" className="text-display">
-              Blue Hour
+              Daylight
             </h1>
             <TruthLabel kind="sample" className="mt-3" />
           </div>
           <p className="mt-4 max-w-[56ch] text-subheading font-normal text-muted-foreground">
-            Eve&apos;s interface is set at dusk. Indigo carries the structure, and
-            the dusk hues do one job: they tell you how soon something is due.
+            Eve&apos;s interface is set on warm paper with white cards. Lime and
+            apricot fill money in and money pending; the dusk hues still do one
+            job: they tell you how soon something is due.
           </p>
 
           <div className="mt-14">
@@ -163,7 +164,7 @@ export default function DesignPage() {
         <Section
           id="colour"
           title="Colour"
-          lede="Structure is quiet indigo that steps up in lightness. Hairlines separate surfaces; the page itself casts no shadows."
+          lede="Structure is warm paper under white cards. Hairlines separate surfaces; the page itself casts no shadows."
         >
           <Specimen title="Structure">
             <ColorTable tokens={STRUCTURE} contrast={(t) => (t.name === "--input" ? `${ratio(t.value, GROUND)} on ground` : null)} />
@@ -472,7 +473,7 @@ export default function DesignPage() {
 
         <footer className="mt-20 flex flex-wrap items-center justify-between gap-4 border-t pt-6 text-small text-muted-foreground">
           <p>Eve prepares and explains. A human controller signs.</p>
-          <p>Blue Hour · Oct 2026</p>
+          <p>Daylight · Oct 2026</p>
         </footer>
       </main>
     </div>

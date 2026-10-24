@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Person } from "@/lib/contracts";
 import { invitations, type CreatedInvite } from "@/lib/client/account";
 import { ApiError } from "@/lib/client/api";
-import { big, canOrganize, payoutSource, type Permission, payoutValue } from "@/lib/client/derive";
+import { big, canOrganize, payoutSource, type Permission, payoutValue, projectStatusLabel } from "@/lib/client/derive";
 import { fmtDate, fmtDateTime } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -54,6 +54,7 @@ export function PeopleView() {
         const columns: Column<Person>[] = [
           { key: "name", header: "Person", stack: "title", sort: (p) => p.name, cell: (p) => p.name },
           { key: "role", header: "Role", stack: "meta", sort: (p) => p.role, cell: (p) => `${p.role} · ${p.country}${p.citizenship !== p.country ? ` (citizen ${p.citizenship})` : ""}` },
+          { key: "project", header: "Project", stack: "meta", sort: (p) => p.projectStatus ?? "unknown", cell: (p) => <span className={p.projectStatus === "none" ? "text-critical" : undefined}>{projectStatusLabel(p.projectStatus)}</span> },
           { key: "form", header: "Tax form", stack: "end", sort: (p) => p.taxStatus, cell: (p) => <span className="inline-flex items-center gap-2">{p.taxForm} <StatusBadge status={p.taxStatus} /></span> },
           { key: "chase", header: "Chases", align: "end", stack: "hide", sort: (p) => p.chaseCount, cell: (p) => <span className="tabular-nums">{p.chaseCount}</span> },
           { key: "ytd", header: "Paid YTD", align: "end", stack: "hide", sort: (p) => big(p.paidYtdMinor), cell: (p) => <Money amountMinor={big(p.paidYtdMinor)} /> },
@@ -91,7 +92,7 @@ export function PeopleView() {
               empty={<EmptyState title="No one matches">Change the filter or import attendees from a CSV in event setup.</EmptyState>}
             />
             <Sheet open={selected !== undefined} onOpenChange={(o) => !o && setOpenId(null)} title={selected?.name ?? "Person"} description={selected ? `${selected.role} · ${selected.email}` : undefined}>
-              {selected ? <PersonDetail person={selected} snapshot={s} /> : null}
+              {selected ? <PersonDetail key={selected.id} person={selected} snapshot={s} /> : null}
             </Sheet>
           </>
         );
@@ -114,6 +115,11 @@ function PersonDetail({ person: p, snapshot: s }: { person: Person; snapshot: Ap
         <dd>{p.citizenship}</dd>
         <dt className="text-muted-foreground">Age check</dt>
         <dd>{p.adult ? "18 or older at event start" : <span className="text-critical">Under 18: blocked</span>}</dd>
+        <dt className="text-muted-foreground">Project</dt>
+        <dd className={p.projectStatus === "none" ? "text-critical" : undefined}>
+          {projectStatusLabel(p.projectStatus)}{p.projectUrl ? ` · ${p.projectUrl}` : ""}
+          {p.projectUpdatedAt ? <span className="text-muted-foreground"> · {fmtDateTime(p.projectUpdatedAt)}</span> : null}
+        </dd>
         <dt className="text-muted-foreground">Tax form</dt>
         <dd className="flex flex-wrap items-center gap-2">
           {p.taxForm} <StatusBadge status={p.taxStatus} />
@@ -130,6 +136,8 @@ function PersonDetail({ person: p, snapshot: s }: { person: Person; snapshot: Ap
         <dt className="text-muted-foreground">Chases</dt>
         <dd className="tabular-nums">{p.chaseCount}</dd>
       </dl>
+
+      <ProjectStatus person={p} snapshot={s} />
 
       <PortalInvite person={p} snapshot={s} />
 
@@ -192,6 +200,44 @@ function PersonDetail({ person: p, snapshot: s }: { person: Person; snapshot: Ap
         />
       </section>
     </div>
+  );
+}
+
+/** Organizers record a hackathon project. Attendees cannot set their own status. */
+function ProjectStatus({ person: p, snapshot: s }: { person: Person; snapshot: AppSnapshot }) {
+  const [status, setStatus] = useState<Person["projectStatus"]>(p.projectStatus);
+  const [url, setUrl] = useState(p.projectUrl ?? "");
+  const permission = canOrganize(s.actor);
+  if (!permission.allowed) return null;
+  return (
+    <section className="flex flex-col gap-3">
+      <h3 className="font-semibold">Set project submission</h3>
+      <p className="text-small text-muted-foreground">
+        Travel claims from hackers with no project are sent to you. They are not rejected, and Eve will not pay them.
+      </p>
+      <div className="grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)]">
+        <Field label="Status">
+          {(f) => (
+            <NativeSelect {...f} value={status} onChange={(e) => setStatus(e.target.value as Person["projectStatus"])}>
+              <option value="unknown">Not recorded</option>
+              <option value="submitted">Submitted</option>
+              <option value="none">No project</option>
+            </NativeSelect>
+          )}
+        </Field>
+        <Field label="Project URL">
+          {(f) => <Input {...f} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://" />}
+        </Field>
+      </div>
+      <ActionButton
+        className="self-start"
+        size="sm"
+        label="Save project status"
+        pendingLabel="Saving"
+        permission={permission}
+        call={() => payloads.personSetProject(p.id, status, url)}
+      />
+    </section>
   );
 }
 

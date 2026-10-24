@@ -164,10 +164,18 @@ export const person = pgTable("person", {
   payoutCurrency: text("payout_currency").notNull().default("USD"),
   chaseCount: integer("chase_count").notNull().default(0),
   lastChasedAt: ts("last_chased_at"),
+  /** Hackathon project: unknown until an import or an organizer records it. */
+  projectStatus: text("project_status", { enum: ["unknown", "submitted", "none"] }).notNull().default("unknown"),
+  projectUrl: text("project_url"),
+  /** "csv" from people.import, "organizer" from person.setProject or people.markSubmitted. */
+  projectSource: text("project_source", { enum: ["csv", "organizer"] }),
+  projectUpdatedAt: ts("project_updated_at"),
   createdAt: createdAt(),
 }, (t) => [
   uniqueIndex("person_org_email_uq").on(t.orgId, t.email),
   index("person_org_idx").on(t.orgId),
+  check("person_project_status", sql`${t.projectStatus} IN ('unknown', 'submitted', 'none')`),
+  check("person_project_source", sql`${t.projectSource} IS NULL OR ${t.projectSource} IN ('csv', 'organizer')`),
 ]);
 
 export const orgMember = pgTable("org_member", {
