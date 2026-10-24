@@ -113,7 +113,7 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
     personas,
     org: toOrg(org),
     event: toEvent(event),
-    people: people.map((p) => toPerson(p, { profile: profileBy.get(p.id), method: methodBy.get(p.id), paidYtdMinor: paidYtd.get(p.id) ?? 0n, outstandingMinor: outstanding.get(p.id) ?? 0n, now })),
+    people: people.map((p) => toPerson(p, { profile: profileBy.get(p.id), method: methodBy.get(p.id), paidYtdMinor: paidYtd.get(p.id) ?? 0n, outstandingMinor: outstanding.get(p.id) ?? 0n, now, payerCountry: org.country })),
     claims: claims.map((c) => toClaim(c, names.get(c.personId) ?? "")),
     awards: awards.map((a) => toAward(a, names.get(a.personId) ?? "")),
     payouts: payouts.map((p) => toPayout(p, names.get(p.personId) ?? "")),

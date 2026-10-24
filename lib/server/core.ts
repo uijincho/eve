@@ -179,12 +179,15 @@ export function profileValidFor(profile: ProfileRow | undefined, person: Pick<Pe
 }
 
 export function toPerson(p: PersonRow, extra: {
-  profile?: ProfileRow; method?: MethodRow; paidYtdMinor: bigint; outstandingMinor: bigint; now: Date;
+  profile?: ProfileRow; method?: MethodRow; paidYtdMinor: bigint; outstandingMinor: bigint; now: Date; payerCountry?: string;
 }): C.Person {
+  const payerCountry = extra.payerCountry ?? "US";
+  const accepted = extra.profile && acceptedForms(payerCountry, p).includes(extra.profile.form);
+  const status = effectiveTaxStatus(extra.profile, extra.now);
   return {
     id: p.id, name: p.name, email: p.email, country: p.country, citizenship: p.citizenship, dateOfBirth: p.dateOfBirth,
-    address: p.address, role: p.role, adult: p.adult, taxForm: extra.profile?.form ?? expectedForm(p),
-    taxStatus: effectiveTaxStatus(extra.profile, extra.now), taxSignedAt: iso(extra.profile?.signedAt),
+    address: p.address, role: p.role, adult: p.adult, taxForm: accepted ? extra.profile!.form : expectedForm(p, payerCountry),
+    taxStatus: status === "valid" && !profileValidFor(extra.profile, p, payerCountry, extra.now) ? "review" : status, taxSignedAt: iso(extra.profile?.signedAt),
     taxExpiresAt: iso(extra.profile?.expiresAt), taxLast4: extra.profile?.tinLast4 ?? undefined,
     payoutCurrency: extra.method?.currency ?? p.payoutCurrency, payoutLast4: extra.method?.last4 ?? "",
     payoutChangedAt: iso(extra.method?.verifiedAt ?? extra.method?.createdAt),

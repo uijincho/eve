@@ -52,6 +52,7 @@ describe.skipIf(!hasDatabase)("CAD reports and USD functional books", { timeout:
     const snapshot = await buildSnapshot(actor);
     expect(snapshot.org.currency).toBe("CAD");
     expect(snapshot.org.booksCurrency).toBe("USD");
+    expect(snapshot.people.every((p) => p.taxForm === "Residency declaration" && p.taxStatus === "missing")).toBe(true);
     expect(snapshot.budgets[0]).toMatchObject({ currency: "USD", capMinor: "145752", spentMinor: "72878", committedMinor: "72876", enteredCurrency: "CAD", enteredCapMinor: "200000" });
     expect(snapshot.filings.map((f) => f.currency)).toEqual(["CAD", "CAD"]);
     expect(snapshot.people.find((p) => p.id.endsWith("_resident"))?.paidYtdMinor).toBe("72877");
