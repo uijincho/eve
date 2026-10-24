@@ -43,6 +43,12 @@ export async function loadApprovalTarget(orgId: string, payoutId: string): Promi
 /** Re-check validity before every reminder so stale workflows stop after bank changes or manual action. */
 export async function recordApprovalWait(target: ApprovalTarget, runId: string, stage: number): Promise<boolean> {
   return getDb().transaction(async (tx) => {
+    // Financial mutations take the org lock before the person and payout.
+    // A reminder must use the same order: inserting its person-linked notice
+    // while holding only the payout lock can otherwise deadlock a release.
+    const [org] = await tx.select({ id: s.organization.id }).from(s.organization)
+      .where(eq(s.organization.id, target.orgId)).for("no key update");
+    if (!org) return false;
     const [payout] = await tx.select().from(s.payout).where(and(eq(s.payout.id, target.payoutId), eq(s.payout.orgId, target.orgId))).for("update");
     if (!payout) return false;
     if (!["proposed", "approved"].includes(payout.status) || payoutQuoteFingerprint(payout) !== target.quoteFingerprint) {

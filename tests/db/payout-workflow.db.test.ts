@@ -5,7 +5,7 @@ import { getDb } from "../../lib/db";
 import * as s from "../../lib/db/schema";
 import { newId } from "../../lib/db/ids";
 import { buildPayout, loadPayoutContext, sourceFromAward } from "../../lib/server/payouts";
-import { executeControllerApproval, payoutQuoteFingerprint } from "../../lib/agent/payout-approval";
+import { executeControllerApproval, payoutQuoteFingerprint, recordApprovalWait } from "../../lib/agent/payout-approval";
 import { startingRules } from "../../lib/engines";
 
 describe.skipIf(!hasDatabase)("durable controller release against Postgres", { timeout: 60_000 }, () => {
@@ -37,8 +37,13 @@ describe.skipIf(!hasDatabase)("durable controller release against Postgres", { t
 
   it("serializes concurrent deliveries into one release, approval and pair of journals", async () => {
     const { payout, target, approval } = await proposed();
-    const results = await Promise.all([executeControllerApproval(target, approval, "wf-test-release"), executeControllerApproval(target, approval, "wf-test-release")]);
-    expect(results.map((result) => result.replayed).sort()).toEqual([false, true]);
+    const [first, replay, reminder] = await Promise.all([
+      executeControllerApproval(target, approval, "wf-test-release"),
+      executeControllerApproval(target, approval, "wf-test-release"),
+      recordApprovalWait(target, "wf-test-release", 1),
+    ]);
+    expect([first.replayed, replay.replayed].sort()).toEqual([false, true]);
+    expect(typeof reminder).toBe("boolean"); // Either reminder-first or release-first is valid.
     const approvals = await db.select().from(s.approval).where(eq(s.approval.objectId, payout.id));
     const journals = await db.select().from(s.journalEntry).where(and(eq(s.journalEntry.orgId, orgId), eq(s.journalEntry.sourceId, payout.id)));
     expect(approvals).toHaveLength(1);

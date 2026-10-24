@@ -64,7 +64,29 @@ describe.skipIf(!hasDatabase)("ledger against real Postgres", { timeout: 60_000 
     expect(await failure(db.update(s.journalLine).set({ debitMinor: 1n }).where(eq(s.journalLine.entryId, entryId)))).toMatch(/immutable/);
     expect(await failure(db.delete(s.journalLine).where(eq(s.journalLine.entryId, entryId)))).toMatch(/cannot be deleted/);
     expect(await failure(db.delete(s.journalEntry).where(eq(s.journalEntry.id, entryId)))).toMatch(/cannot be deleted/);
-    expect(await failure(db.execute(sql`truncate journal_line`))).toMatch(/cannot be truncated/);
+    // Verify both real tables have the enabled BEFORE TRUNCATE guard, then
+    // exercise that same database function on a transaction-local table.
+    // TRUNCATE on the shared ledger takes an ACCESS EXCLUSIVE lock before
+    // its guard runs, which can stall unrelated tenants and test workers.
+    const guards = await db.execute(sql`
+      select c.relname, t.tgenabled, pg_get_triggerdef(t.oid) as definition
+      from pg_trigger t join pg_class c on c.oid = t.tgrelid
+      where c.oid in ('journal_entry'::regclass, 'journal_line'::regclass)
+        and t.tgname in ('journal_entry_no_truncate', 'journal_line_no_truncate')
+    `);
+    expect(guards.rows).toHaveLength(2);
+    for (const guard of guards.rows) {
+      expect(guard.tgenabled).toBe("O");
+      expect(guard.definition).toMatch(/BEFORE TRUNCATE .*eve_no_truncate\(\)/);
+    }
+    expect(await failure(db.transaction(async (tx) => {
+      await tx.execute(sql`set local lock_timeout = '2s'`);
+      await tx.execute(sql`create temporary table eve_truncate_guard_probe (id integer) on commit drop`);
+      await tx.execute(sql`create trigger eve_probe_no_truncate before truncate on eve_truncate_guard_probe for each statement execute function eve_no_truncate()`);
+      await tx.execute(sql`truncate eve_truncate_guard_probe`);
+      // Even a broken guard must roll back the probe transaction.
+      throw new Error("The truncate guard did not reject the operation");
+    }))).toMatch(/cannot be truncated/);
   });
 
   it("forbids adding lines to an entry from a later transaction", async () => {
