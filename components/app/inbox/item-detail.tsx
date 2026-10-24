@@ -187,6 +187,8 @@ export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payo
                 <Money amountMinor={big(p.destinationNetMinor)} currency={p.destinationCurrency} estimate={p.status !== "paid"} />
               </Evidence>
             </dd>
+            <dt className="text-muted-foreground">Destination rate</dt>
+            <dd className="max-w-48 text-right tabular-nums">1 {p.currency} = {p.fxRate} {p.destinationCurrency}</dd>
           </>
         ) : null}
         <dt className="text-muted-foreground">Rule</dt>
@@ -200,6 +202,12 @@ export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payo
           </>
         ) : null}
       </dl>
+      {!isInKind(p) && p.provider === "mock_wire" && p.destinationCurrency !== p.currency ? (
+        <p className="text-small text-muted-foreground">Simulated wire uses USD books, even for a CAD prize paid to a CAD account. The simulator schedule includes a 2% FX spread and a wire fee. The books conversion and destination quote can use different dated reference rates; domestic payment routing is not modeled.</p>
+      ) : null}
+      {fees.recipient > 0n && fees.recipient * 10n >= big(p.grossMinor) ? (
+        <p className="text-small">Transfer fees consume at least 10% of this payment. Review the net amount before release; the organizer can choose to cover fees in Settings.</p>
+      ) : null}
     </div>
   );
 }

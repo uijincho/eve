@@ -242,6 +242,9 @@ export function buildPayout(ctx: PayoutContext, source: PayoutSource, requestedB
   let status: PayoutRow["status"] = holds.length ? "held" : "proposed";
   let frozenFrom: PayoutRow["status"] | null = null;
   let reason = `${holds.length ? holds.join(" ") : tax.reason}${source.note ? ` ${source.note}` : ""}`;
+  if (destinationCurrency !== "USD" && "fxDate" in quote) {
+    reason += ` Destination quote: 1 USD = ${quote.fxRate} ${destinationCurrency}, including ${quote.fxSpreadBps / 100}% FX spread (${quote.fxSource}, ${quote.fxDate}).`;
+  }
   if (pending) {
     frozenFrom = status;
     status = "frozen";

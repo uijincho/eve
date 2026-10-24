@@ -100,7 +100,7 @@ export function recommendFulfillment(
   const tooCostly = value > 0n && shipping * 10_000n > value * BigInt(policy.maxLandedCostBps);
   if (shipBlocked) reasons.push(`No carrier takes battery electronics to ${country}.`);
   if (tooSlow) reasons.push(`Transit about ${row.transitDays} days.`);
-  if (tooCostly) reasons.push(`Estimated shipping plus duty is ${formatMoney(shipping)} on a ${formatMoney(value)} item, over ${policy.maxLandedCostBps / 100}% of its value.`);
+  if (tooCostly) reasons.push(`Estimated shipping plus duty is ${formatMoney(shipping, "USD", { explicitUsd: true })} on a ${formatMoney(value, "USD", { explicitUsd: true })} item, over ${policy.maxLandedCostBps / 100}% of its value.`);
 
   const localOk = local !== null && local * 10_000n <= value * BigInt(policy.maxLocalPremiumBps);
   let choice: FulfillmentResult["choice"];

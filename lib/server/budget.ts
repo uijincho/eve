@@ -75,7 +75,7 @@ export async function capInBooks(tx: Executor, capMinor: bigint, orgCurrency: st
 
 export function overBudgetMessage(room: BudgetRoom, amountMinor: bigint, verb: string): string {
   const left = room.remainingMinor > 0n ? room.remainingMinor : 0n;
-  return `${verb} ${usd(amountMinor)} would exceed the ${room.name} budget: ${usd(room.capMinor)} cap, ${usd(room.usedMinor)} already spent or committed, ${usd(left)} left${room.note ? ` (${room.note})` : ""}. Raise the ${room.name} line in Budget or reduce the amount first.`;
+  return `${verb} ${usd(amountMinor)} would exceed the ${room.name} budget (USD books): ${usd(room.capMinor)} cap, ${usd(room.usedMinor)} already spent or committed, ${usd(left)} left${room.note ? ` (${room.note})` : ""}. Raise the ${room.name} line in Budget or reduce the amount first.`;
 }
 
 /** Throws a 409 with the line's numbers when `amountMinor` does not fit. */

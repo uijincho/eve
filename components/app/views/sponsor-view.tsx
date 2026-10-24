@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { ActionButton } from "@/components/app/action-button";
 import { DataTable, type Column } from "@/components/app/data-table";
+import { Field } from "@/components/app/field";
 import { LinkButton } from "@/components/app/link-button";
 import { PageFrame } from "@/components/app/page-frame";
 import { Section } from "@/components/app/page-header";
@@ -15,11 +16,12 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { DueChip } from "@/components/eve/due-chip";
 import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
+import { Input } from "@/components/ui/input";
 import type { AppSnapshot, SponsorPacket } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
 import { big, canControl, canManage, payoutSource } from "@/lib/client/derive";
 import { fmtDate } from "@/lib/client/format";
-import { payloads } from "@/lib/client/payloads";
+import { payloads, toMinor } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
 
 export function SponsorView() {
@@ -42,7 +44,7 @@ export function SponsorView() {
           } },
           { key: "sub", header: "Submitted", stack: "meta", sort: (k) => k.submittedAt ?? "", cell: (k) => (k.submittedAt ? `Submitted ${fmtDate(k.submittedAt)}` : "Not submitted") },
           { key: "status", header: "Status", stack: "end", sort: (k) => k.status, cell: (k) => <StatusBadge status={k.status} /> },
-          { key: "req", header: "Requested", align: "end", stack: "hide", sort: (k) => big(k.requestedMinor), cell: (k) => <Money amountMinor={big(k.requestedMinor)} /> },
+          { key: "req", header: "Requested", align: "end", stack: "meta", sort: (k) => big(k.requestedMinor), cell: (k) => <><span className="md:hidden">Requested </span><Money amountMinor={big(k.requestedMinor)} /></> },
           { key: "paid", header: "Remitted", align: "end", stack: "end", sort: (k) => big(k.paidMinor), cell: (k) => <Money amountMinor={big(k.paidMinor)} className={big(k.paidMinor) !== big(k.requestedMinor) && k.status !== "draft" && k.status !== "submitted" ? "font-semibold text-critical" : "font-semibold"} /> },
           { key: "due", header: "Aging", align: "end", stack: "hide", sort: (k) => k.dueAt, cell: (k) => <DueChip due={k.dueAt} now={s.now} align="end" /> },
         ];
@@ -64,7 +66,7 @@ export function SponsorView() {
                       </span>
                       <span className="flex items-center gap-3">
                         <Money amountMinor={big(p.grossMinor)} currency={p.currency} className="font-semibold" />
-                        <ActionButton label="Create packet" pendingLabel="Creating" permission={canManage(s.actor)} call={payloads.sponsorCreate(p.id)} />
+                        <ActionButton label="Create packet" pendingLabel="Creating" permission={s.actor.role === "organizer" ? { allowed: true } : { allowed: false, reason: "Only an organizer can prepare a sponsor packet. A controller authorizes its submission." }} call={payloads.sponsorCreate(p.id)} />
                       </span>
                     </li>
                   ))}
@@ -117,6 +119,7 @@ function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snaps
         </LinkButton>
       </div>
       <div className="flex flex-col gap-2 border-t pt-4">
+        {["submitted", "exception", "questioned"].includes(k.status) ? <RecordRemittance key={`${k.id}:${k.status}`} packet={k} snapshot={s} /> : null}
         {k.status === "draft" ? (
           <>
             <ActionButton wide size="default" variant="default" label="Authorize and submit to sponsor" pendingLabel="Submitting" permission={control} call={payloads.sponsorSubmit(k.id)} />
@@ -133,6 +136,24 @@ function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snaps
           </>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function RecordRemittance({ packet, snapshot }: { packet: SponsorPacket; snapshot: AppSnapshot }) {
+  const [amount, setAmount] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="mb-3 flex flex-col gap-3">
+      <Field label="Amount remitted (USD)" help="Enter the total received for this packet, including any earlier partial payment. A difference stays open for review." error={error}>
+        {(props) => <Input {...props} inputMode="decimal" placeholder="0.00" value={amount} onChange={(e) => { setAmount(e.target.value); setError(null); }} />}
+      </Field>
+      <ActionButton wide size="default" variant={packet.status === "submitted" ? "default" : "secondary"} label="Record remittance" pendingLabel="Reconciling" permission={canManage(snapshot.actor)} call={() => {
+        const paidMinor = toMinor(amount);
+        if (paidMinor === null) { setError("Enter an amount of zero or more, with up to two decimal places."); return null; }
+        setError(null);
+        return payloads.sponsorReconcile(packet.id, { paidMinor });
+      }} />
     </div>
   );
 }

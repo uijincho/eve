@@ -31,6 +31,9 @@ describe.skipIf(!hasDatabase)("durable controller release against Postgres", { t
     const { row } = buildPayout(context, sourceFromAward(award), requestedBy);
     const [payout] = await db.insert(s.payout).values(row).returning();
     expect(payout.status).toBe("proposed");
+    expect(payout.reason).toContain(`Destination quote: 1 USD = ${Number(payout.fxRate)} CAD`);
+    expect(payout.reason).toContain("including 2% FX spread");
+    expect(payout.reason).toContain("2026-10-23");
     const target = { orgId, payoutId: payout.id, quoteFingerprint: payoutQuoteFingerprint(payout) };
     return { payout, target, approval: { memberId, quoteFingerprint: target.quoteFingerprint } };
   }
