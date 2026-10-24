@@ -109,7 +109,7 @@ function TryReceipt({ snapshot: s }: { snapshot: AppSnapshot }) {
       </p>
       {canManage(s.actor).allowed || s.actor.role === "attendee" ? (
         <>
-          <ClaimForm people={forOthers ? s.people : undefined} defaultType="expense" submitLabel="Run Eve on this receipt" onSubmitted={setClaimId} />
+          <ClaimForm people={forOthers ? s.people : undefined} defaultType="expense" submitLabel="Run Eve on this receipt" submitVariant="secondary" onSubmitted={setClaimId} />
           {claimId ? <ClaimOutcome claimId={claimId} /> : null}
         </>
       ) : (

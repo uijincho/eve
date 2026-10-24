@@ -64,7 +64,7 @@ export function PersonaSwitcher({ className }: { className?: string }) {
           >
             {personas.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} · {ROLE_LABEL[p.role]}
+                {ROLE_LABEL[p.role]} · {p.name}
               </option>
             ))}
           </select>

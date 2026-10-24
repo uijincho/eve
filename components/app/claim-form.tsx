@@ -27,12 +27,15 @@ export function ClaimForm({
   people,
   defaultType = "travel",
   submitLabel = "Submit claim",
+  submitVariant = "default",
   onSubmitted,
 }: {
   /** Organizers submit for someone; attendees omit this and claim for themselves. */
   people?: Person[];
   defaultType?: "travel" | "expense";
   submitLabel?: string;
+  /** Secondary where the page already has its one primary. */
+  submitVariant?: "default" | "secondary";
   onSubmitted?: (claimId: string | null) => void;
 }) {
   const { act } = useEve();
@@ -218,7 +221,7 @@ export function ClaimForm({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" aria-busy={busy || undefined} disabled={busy}>
+        <Button type="submit" variant={submitVariant} aria-busy={busy || undefined} disabled={busy}>
           {busy ? <LoaderCircleIcon aria-hidden className="animate-spin" /> : null}
           {phase === "uploading" ? "Uploading receipt" : phase === "submitting" ? "Submitting" : submitLabel}
         </Button>

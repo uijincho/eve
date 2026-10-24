@@ -39,7 +39,7 @@ export function ItemActions({
   const { actor } = snapshot;
   const pane = layout === "pane";
   const first = pane ? ("default" as const) : ("secondary" as const);
-  const wrap = cn("flex flex-wrap items-center gap-2", pane && "flex-col items-stretch");
+  const wrap = cn("flex flex-wrap items-center gap-2", pane && "flex-col items-start");
   const evidence = (
     <Button size="sm" variant="ghost" onClick={onEvidence}>
       View evidence
