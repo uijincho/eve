@@ -49,6 +49,7 @@ interface DuffelOffer {
   id: string;
   total_amount: string;
   total_currency: string;
+  expires_at?: string;
   owner?: { name?: string };
   slices: { segments: DuffelSegment[]; fare_brand_name?: string }[];
   passengers?: { cabin_class?: string }[];
@@ -87,6 +88,7 @@ export function normalizeDuffelOffer(o: DuffelOffer, cabinRequested: FlightOffer
     totalMinor: decimalToMinor(o.total_amount, o.total_currency === "JPY" ? 0 : 2),
     currency: o.total_currency,
     source: "duffel_test",
+    expiresAt: o.expires_at,
   };
 }
 

@@ -23,6 +23,8 @@ export interface FlightOffer {
   totalMinor: string;
   currency: string;
   source: "duffel_test" | "fixture";
+  /** When the provider stops honouring this price (Duffel offers expire). */
+  expiresAt?: string;
 }
 
 export interface RankedOffer extends FlightOffer {
