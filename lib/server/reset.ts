@@ -12,7 +12,8 @@ import * as s from "@/lib/db/schema";
 export class ResetError extends Error {}
 
 export async function purgeOrg(tx: Executor, orgId: string, opts: { deleteOrg?: boolean } = {}) {
-  const [org] = await tx.select({ id: s.organization.id, isDemo: s.organization.isDemo }).from(s.organization).where(eq(s.organization.id, orgId));
+  // Same first lock as every money path (FOR UPDATE: the org row itself is deleted below).
+  const [org] = await tx.select({ id: s.organization.id, isDemo: s.organization.isDemo }).from(s.organization).where(eq(s.organization.id, orgId)).for("update");
   if (!org) return;
   if (!org.isDemo) throw new ResetError("Only demo organizations can be reset.");
   await tx.execute(sql`select set_config('eve.demo_reset_org', ${orgId}, true)`);
