@@ -1,0 +1,9 @@
+.env
+.env.*
+.agents
+.impeccable
+.git
+node_modules
+.next
+coverage
+*.tsbuildinfo

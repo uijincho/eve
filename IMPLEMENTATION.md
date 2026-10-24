@@ -35,3 +35,4 @@ Workers use isolated worktrees and commit small milestones. The coordinator inte
 ## Progress
 
 - Planning baseline: 16 tests pass; lint and typecheck pass. Postgres is reachable and empty; direct connection needs the libpq `sslrootcert=system` option normalized for node-postgres while retaining certificate verification. Vercel is authenticated. Runtime Anthropic credentials pass a read-only authentication check.
+- 02:28 Pacific: shared contracts pushed to main; three isolated Opus 5.5 workers running. Vercel project `eve-calhacks` created; preview secrets configured. GitHub auto-connection unavailable, so deployment uses the CLI. Receipt extraction implemented through Claude Sonnet 5.5 with typed output, content validation and exact decimal parsing; live synthetic PDF smoke test passes. Unit suite now 18 passing; lint and typecheck pass.
