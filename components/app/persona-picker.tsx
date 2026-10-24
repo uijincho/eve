@@ -34,7 +34,7 @@ export function PersonaPicker() {
     const r = await setPersona(p.id);
     setPending(null);
     if (!r.ok) return setResult(r);
-    router.push(p.role === "attendee" ? "/portal" : "/");
+    router.push(p.role === "attendee" ? "/portal" : "/overview");
   };
 
   const afterSignIn = async () => {
@@ -46,7 +46,7 @@ export function PersonaPicker() {
       if (me.needsSetup && !me.memberships.length) return router.replace("/onboarding");
       router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : homeFor(me.memberships[0]?.role));
     } catch {
-      router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
+      router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/overview");
     }
   };
 

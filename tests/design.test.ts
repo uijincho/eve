@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { formatMoney, minorToDecimalString } from "@/lib/design/money";
-import { DUSK, GROUND, RAISED, STATE, STRUCTURE, TEXT, contrastRatio } from "@/lib/design/tokens";
+import { DUSK, FILL, GROUND, RAISED, STATE, STRUCTURE, TEXT, contrastRatio } from "@/lib/design/tokens";
 import { describeDue, duskBand, formatDue, horizonX } from "@/lib/design/urgency";
 
 const NOW = new Date("2026-10-25T13:42:00-07:00");
@@ -68,7 +68,7 @@ describe("tokens", () => {
   const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
 
   it("match app/globals.css", () => {
-    for (const token of [...STRUCTURE, ...TEXT, ...DUSK, ...STATE]) {
+    for (const token of [...STRUCTURE, ...TEXT, ...DUSK, ...STATE, ...FILL]) {
       expect(css, token.name).toContain(`${token.name}: ${token.value};`);
     }
   });
@@ -78,6 +78,6 @@ describe("tokens", () => {
       expect(contrastRatio(token.value, GROUND), token.name).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(token.value, RAISED), token.name).toBeGreaterThanOrEqual(4.5);
     }
-    expect(contrastRatio("#8b91be", GROUND)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(TEXT.find((t) => t.name === "--faint")!.value, GROUND)).toBeGreaterThanOrEqual(4.5);
   });
 });

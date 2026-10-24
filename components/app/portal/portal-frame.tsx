@@ -31,7 +31,7 @@ export function PortalFrame({
           <p className="max-w-[56ch] text-small text-muted-foreground">
             You are signed in as {snapshot.actor.name}, {snapshot.actor.role}. Switch to an attendee persona from the menu at the top right to see their portal, or go back to the organizer inbox.
           </p>
-          <LinkButton href="/" size="sm" variant="secondary">Open the inbox</LinkButton>
+          <LinkButton href="/inbox" size="sm" variant="secondary">Open the inbox</LinkButton>
         </div>
       ) : (
         children(snapshot, me)

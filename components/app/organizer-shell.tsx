@@ -8,17 +8,19 @@ import { useMemo, useState } from "react";
 
 import { PersonaSwitcher } from "@/components/app/persona-switcher";
 import { Sheet } from "@/components/app/sheet";
+import { EveMark } from "@/components/eve/logo";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { Button } from "@/components/ui/button";
 import { buildInbox } from "@/lib/client/derive";
-import { fmtDate } from "@/lib/client/format";
+import { fmtDate, fmtTime } from "@/lib/client/format";
 import { useEve } from "@/lib/client/use-eve";
 
 type NavItem = { href: string; label: string; count?: (n: Counts) => number };
 type Counts = { inbox: number; claims: number; payouts: number; prizes: number; sponsor: number };
 
 const PRIMARY: NavItem[] = [
-  { href: "/", label: "Inbox", count: (n) => n.inbox },
+  { href: "/overview", label: "Overview" },
+  { href: "/inbox", label: "Inbox", count: (n) => n.inbox },
   { href: "/claims", label: "Claims", count: (n) => n.claims },
   { href: "/prizes", label: "Prizes", count: (n) => n.prizes },
   { href: "/payouts", label: "Payouts", count: (n) => n.payouts },
@@ -73,19 +75,22 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
   );
 
   const eventCard = snapshot ? (
-    <div className="flex flex-col rounded-lg border bg-background px-2.5 py-2">
+    <div className="flex flex-col gap-0.5 rounded-xl border bg-background px-3 py-2.5">
       <span className="text-small font-semibold">{snapshot.event.name}</span>
       <span className="text-caption text-muted-foreground">
-        {fmtDate(snapshot.event.startsAt)} to {fmtDate(snapshot.event.endsAt, true)}
+        {fmtDate(snapshot.event.startsAt)} to {fmtDate(snapshot.event.endsAt, true)} · {snapshot.event.venue}
       </span>
-      <span className="text-caption text-muted-foreground">{snapshot.event.venue}</span>
+      <span className="mt-1.5 text-caption text-muted-foreground">Closing ceremony</span>
+      <span className="text-small font-semibold tabular-nums">
+        {fmtDate(snapshot.event.closingAt)}, {fmtTime(snapshot.event.closingAt)}
+      </span>
     </div>
   ) : (
-    <div aria-hidden className="h-[4.25rem] animate-pulse rounded-lg bg-surface" />
+    <div aria-hidden className="h-[6.5rem] animate-pulse rounded-xl bg-surface-hover" />
   );
 
   return (
-    <div className="flex min-h-dvh flex-col xl:grid xl:grid-cols-[11rem_minmax(0,1fr)]">
+    <div className="flex min-h-dvh flex-col xl:grid xl:grid-cols-[15rem_minmax(0,1fr)]">
       <a
         href="#main"
         className="sr-only z-50 rounded-md bg-foreground px-3 py-2 text-background focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
@@ -94,12 +99,14 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
       </a>
 
       {/* Wide: the rail. */}
-      <aside className="sticky top-0 hidden h-dvh flex-col gap-4 overflow-y-auto border-r bg-rail px-3 pt-4 pb-3 xl:flex">
+      <aside className="sticky top-0 hidden h-dvh p-3 pr-0 xl:flex">
+        <div className="flex w-full flex-col gap-4 overflow-y-auto rounded-2xl border bg-rail px-3 pt-4 pb-3">
         <Brand demo={snapshot?.demo} />
         {eventCard}
         {nav()}
         <div className="mt-auto border-t pt-3">
           <PersonaSwitcher />
+        </div>
         </div>
       </aside>
 
@@ -111,9 +118,9 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
         <Brand demo={snapshot?.demo} compact />
         <span aria-hidden className="text-border">/</span>
         <span className="truncate text-small font-medium">{current?.label ?? ""}</span>
-        {counts && current?.href !== "/" && counts.inbox ? (
+        {counts && current?.href !== "/inbox" && counts.inbox ? (
           <Link
-            href="/"
+            href="/inbox"
             className="ml-auto rounded-md px-2 py-1 text-small text-muted-foreground hover:text-foreground"
           >
             Inbox <span className="tabular-nums text-foreground">{counts.inbox}</span>
@@ -147,7 +154,11 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
 function Brand({ demo, compact }: { demo?: boolean; compact?: boolean }) {
   return (
     <div className={cn("flex items-center justify-between gap-2", !compact && "px-1")}>
-      <Link href="/" className={cn("rounded-md font-semibold tracking-[-0.01em]", compact ? "text-subheading" : "text-heading")}>
+      <Link
+        href="/overview"
+        className={cn("flex items-center gap-2 rounded-md font-semibold tracking-[-0.02em]", compact ? "text-subheading" : "text-heading")}
+      >
+        <EveMark className={compact ? "size-6" : "size-7"} />
         Eve
       </Link>
       {demo && !compact ? <TruthLabel kind="sample" /> : null}
@@ -156,7 +167,7 @@ function Brand({ demo, compact }: { demo?: boolean; compact?: boolean }) {
 }
 
 function isCurrent(pathname: string, href: string) {
-  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
 function NavLink({
@@ -178,12 +189,21 @@ function NavLink({
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "flex min-h-8 items-center justify-between rounded-md px-2 py-1.5 text-small transition-colors duration-150 hover:text-foreground",
-        active ? "bg-surface font-medium text-foreground" : "text-muted-foreground",
+        "flex min-h-9 items-center justify-between rounded-lg px-2.5 py-1.5 text-body transition-colors duration-150",
+        active ? "bg-foreground font-semibold text-primary-foreground" : "text-muted-foreground hover:bg-surface-hover hover:text-foreground",
       )}
     >
       {item.label}
-      {n ? <span className="text-caption tabular-nums text-muted-foreground">{n}</span> : null}
+      {n ? (
+        <span
+          className={cn(
+            "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-caption font-semibold tabular-nums",
+            active ? "bg-money text-foreground" : "bg-surface-hover text-muted-foreground",
+          )}
+        >
+          {n}
+        </span>
+      ) : null}
     </Link>
   );
 }
