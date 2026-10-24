@@ -454,7 +454,7 @@ function Guardrails({ state }: { state: LabState | null }) {
     },
     {
       name: "No internet",
-      how: "The sandbox has no outbound network, and Chrome's managed policy blocks every address except the portal.",
+      how: "The sandbox has no outbound network, checked by a probe when it boots. Chrome's managed policy blocks every other address, even local ones.",
       badge: !state?.sandboxId ? armed : state.offline ? { label: "Enforced", variant: "positive" } : { label: "Internet on", variant: "critical" },
     },
   ];

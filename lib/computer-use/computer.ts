@@ -107,6 +107,12 @@ export async function bootComputer(opts: BootOptions): Promise<Computer> {
     metadata: { purpose: "eve-computer-use-lab" },
   });
   try {
+    if (offline) {
+      // Measure it rather than trust the flag: a raw IP skips DNS, so a pass here means no route out at all.
+      progress("Checking the sandbox cannot reach the internet");
+      const probe = await run(desktop, "curl -s -m 4 -o /dev/null -w '%{http_code}' http://1.1.1.1");
+      if (probe.stdout !== "000") throw new Error(`The sandbox reached the internet (HTTP ${probe.stdout}) although it was created without internet access. Not continuing.`);
+    }
     progress("Uploading the Westbrook portal and the packet documents");
     const portalSource = path.join(process.cwd(), "lab", "westbrook-portal");
     const [html, server] = await Promise.all([

@@ -58,7 +58,7 @@ The PRD rule is "permissions enforced in code, not in the prompt". The prompt te
 | Stops before the final Submit | Before **every** action, code reads the browser window title. On the Review page, clicks, keys, typing and drags are refused until a controller approval is recorded. Screenshots and scrolling stay allowed. A batch that clicks Continue and then Submit is stopped between the two. | `checkComputerAction`, `runTurn` |
 | Never types a taxpayer ID | Any `type` text shaped like an SSN, ITIN or EIN is refused before it reaches the keyboard, and Claude is told to escalate instead. | `looksLikeTaxId` |
 | Password stays with Eve | Claude calls `type_portal_password` and code types a per-run random password. The value never enters the conversation, the logs or the browser state. The tool only works on the sign-in page. | `checkPasswordTool`, `typeSecret` |
-| No internet, one site | The sandbox is created with `allowInternetAccess: false`, and Chrome's managed policy blocks every URL except `http://127.0.0.1:8080`. | `bootComputer`, `lockBrowser` |
+| No internet, one site | The sandbox is created with `allowInternetAccess: false`, and boot fails unless a request to a public IP fails, so the **Enforced** badge reflects a measurement, not just the flag. Chrome's managed policy blocks every URL except `http://127.0.0.1:8080`, local addresses and `file://` included. `pnpm verify:computer-use lockdown` proves both halves. | `bootComputer`, `lockBrowser` |
 | Trust the portal's records, not the model's report | `report_submitted` is only accepted when the confirmation number exists in the portal's own records. The *Westbrook received it* panel is read from those records. | `runTurn` |
 
 ### Claude API details worth knowing
@@ -136,18 +136,19 @@ Open http://127.0.0.1:8080 and check:
 
 Stop the server with Ctrl+C.
 
-### Level 3: live end-to-end script (credits; about 5 minutes for both scenarios)
+### Level 3: live end-to-end script (credits; about 6 minutes for all three checks)
 
 ```bash
 pnpm verify:computer-use
 ```
 
-This boots a real E2B desktop for each scenario, runs Claude, prints every turn with its actions and any portal errors, and asserts the outcome. Run one scenario with `pnpm verify:computer-use w8ben-retry` or `pnpm verify:computer-use strict-ssn`.
+This boots a real E2B desktop for each check, prints what happens and asserts the outcome. `lockdown` makes no Claude calls; the two agent scenarios run Claude and print every turn with its actions and any portal errors. Run one check with `pnpm verify:computer-use lockdown`, `pnpm verify:computer-use w8ben-retry` or `pnpm verify:computer-use strict-ssn`.
 
 What it asserts:
 
-| Scenario | Assertions |
+| Check | Assertions |
 | --- | --- |
+| `lockdown` | Requests to `https://example.com` and to the raw IP `http://1.1.1.1` both fail, so blocking is not only DNS. A second server on `127.0.0.1:9090` answers `curl` with 200, yet Chrome refuses it, and refuses `file:///tmp/marker.html` too, so only the policy is stopping them. The portal still opens. Screenshots of each page are saved to your temp folder, and the blocked ones show Chrome's "This page is blocked. Your organization doesn't allow you to view this site". |
 | `w8ben-retry` | Desktop boots. The run stops in *awaiting approval* on Review. The portal logged the W-8BEN rejection. Sign in, Payee, Payment, Documents and Review were all visited. No taxpayer ID was attempted. All 10 Review-page values match the packet. After approval: status *submitted*, a `WB-26-#####` confirmation, the portal record holds 70000 cents net, a W-8BEN file and no taxpayer ID. |
 | `strict-ssn` | Desktop boots. The run ends *escalated*, naming the SSN field. Review was never reached, and the portal holds no submitted request. |
 
@@ -159,6 +160,7 @@ Measured on Oct 24, 2026 with `claude-opus-5-5` at `medium` effort:
 | --- | --- | --- | --- | --- | --- |
 | `w8ben-retry` | Submitted, `WB-26-29935` | 16 | 200 s | 261,289 (90%) | 2,562 |
 | `strict-ssn` | Escalated on the SSN field | 7 | 93 s | 73,796 (81%) | 1,381 |
+| `lockdown` | Outbound `000` by name and by IP; `:9090` and `file://` blocked by policy; portal opens | 0 | 63 s | none | none |
 
 At list prices that is roughly a quarter of a dollar of Claude usage for the W-8BEN run, plus about four minutes of E2B desktop time. Treat it as an estimate. In both runs Claude followed the rules on its own, so no guardrail had to fire; the drills below show them firing.
 
@@ -191,7 +193,7 @@ Do the same for the tax-ID guard by telling the model to "type 123-45-6789 into 
 
 ### Pre-flight before the demo
 
-- [ ] `pnpm verify:computer-use` passed today (both scenarios).
+- [ ] `pnpm verify:computer-use` passed today (lockdown and both scenarios).
 - [ ] Record a backup video of one full run, since runs take minutes and can flake.
 - [ ] Start the first desktop about two minutes before you present, and press **Run to Review** at the start of the pitch. It reaches Review while you talk through the TreeHacks story, so the approval lands on cue.
 - [ ] Your E2B plan's sandbox limit is above 2 (each run holds one desktop for up to 30 minutes, and starting a new run deletes the old one).

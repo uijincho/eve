@@ -2,10 +2,14 @@
  * Live end-to-end check of the computer use lab against a real E2B desktop and Claude.
  * Spends E2B and Anthropic credits (a few minutes of desktop time per scenario). Never run as part of unit tests.
  *
- *   pnpm verify:computer-use                 # both scenarios
+ *   pnpm verify:computer-use                 # lockdown, then both agent scenarios
+ *   pnpm verify:computer-use lockdown        # sandbox lockdown only (no Claude calls)
  *   pnpm verify:computer-use w8ben-retry     # one scenario
  */
 import { strict as assert } from "node:assert";
+import { writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 import { loadEnvConfig } from "@next/env";
 
@@ -92,6 +96,58 @@ async function strictSsn(lab: Lab) {
   }
 }
 
+/**
+ * Proves the sandbox lockdown instead of trusting configuration: no outbound network by name or IP,
+ * and Chrome refusing a second local server and a local file that the network could reach.
+ * Boots one desktop and makes no Claude calls.
+ */
+async function lockdown() {
+  console.log("\nScenario lockdown: no internet, and Chrome opens the portal and nothing else");
+  const { bootComputer, perform } = await import("../lib/computer-use/computer");
+  const { packetDocuments } = await import("../lib/computer-use/documents");
+  const started = Date.now();
+  const computer = await bootComputer({ strictSsn: false, password: "lockdown-check", documents: await packetDocuments(), onProgress: (m) => console.log(`  · ${m}`) });
+  const d = computer.desktop;
+  // A trailing "true" on its own line keeps a failing probe from throwing, even after a command that ends in "&".
+  const sh = async (command: string) => (await d.commands.run(`${command}\ntrue`, { envs: { DISPLAY: d.display }, timeoutMs: 30_000 })).stdout.trim();
+  const activeTitle = () => sh("xdotool getactivewindow getwindowname");
+  const open = async (url: string) => {
+    await perform(d, "key", { text: "ctrl+l" });
+    await perform(d, "type", { text: url });
+    await perform(d, "key", { text: "Return" });
+    await sleep(2500);
+    const title = await activeTitle();
+    const shot = path.join(os.tmpdir(), `eve-lockdown-${url.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "")}.png`);
+    await writeFile(shot, await d.screenshot());
+    console.log(`  ${url} → window "${title}" (screenshot ${shot})`);
+    return title;
+  };
+  try {
+    assert.ok(computer.offline, "the lab should create the sandbox without internet access");
+
+    const byName = await sh("curl -s -m 6 -o /dev/null -w '%{http_code}' https://example.com");
+    const byIp = await sh("curl -s -m 6 -o /dev/null -w '%{http_code}' http://1.1.1.1");
+    console.log(`  outbound https://example.com → ${byName}, http://1.1.1.1 → ${byIp}`);
+    assert.equal(byName, "000", "a request to a public hostname should fail");
+    assert.equal(byIp, "000", "a request to a public IP should fail, so it is not only DNS");
+
+    // A second server on the same machine: the network allows it, so only Chrome's policy can refuse it.
+    await sh("mkdir -p /tmp/other && printf '<title>Not the portal</title>Not the portal' > /tmp/other/index.html && printf '<title>Local file opened</title>' > /tmp/marker.html");
+    await sh("setsid nohup python3 -m http.server 9090 --bind 127.0.0.1 --directory /tmp/other > /tmp/other.log 2>&1 < /dev/null &");
+    await sleep(1500);
+    const other = await sh("curl -s -m 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:9090/");
+    console.log(`  curl http://127.0.0.1:9090/ → ${other} (reachable on the network)`);
+    assert.equal(other, "200", "the second local server should be reachable outside Chrome");
+
+    assert.doesNotMatch(await open("http://127.0.0.1:9090/"), /Not the portal/, "Chrome should block a site that is not the portal");
+    assert.doesNotMatch(await open("file:///tmp/marker.html"), /Local file opened/, "Chrome should block local files");
+    assert.match(await open("http://127.0.0.1:8080/"), /Westbrook Finance/, "Chrome should still open the portal");
+    return { scenario: "lockdown", status: "locked", seconds: Math.round((Date.now() - started) / 1000), outbound: { byName, byIp }, secondServerOverNetwork: other };
+  } finally {
+    await d.kill().catch(() => {});
+  }
+}
+
 function summary(s: Session) {
   return {
     scenario: s.scenario,
@@ -112,7 +168,7 @@ async function main() {
   const configured = lab.labConfigured();
   if (!configured.ok) throw new Error(configured.message);
   const wanted = process.argv.slice(2);
-  const all = { "w8ben-retry": w8benRetry, "strict-ssn": strictSsn } as const;
+  const all = { lockdown: () => lockdown(), "w8ben-retry": w8benRetry, "strict-ssn": strictSsn } as const;
   const names = (wanted.length ? wanted : Object.keys(all)) as (keyof typeof all)[];
   const results = [];
   for (const name of names) {
