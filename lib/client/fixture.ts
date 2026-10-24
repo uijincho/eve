@@ -44,6 +44,7 @@ export function fixtureSnapshot(): AppSnapshot {
       { id: "u-dana", name: "Dana Whitfield", email: "dana@example.test", role: "organizer" },
       { id: "u-ari", name: "Ari Novak", email: "ari@example.test", role: "controller" },
       { id: "u-priya", name: "Priya Raman", email: "priya@example.test", role: "attendee", personId: "p-priya" },
+      { id: "u-marcus", name: "Marcus Lee", email: "marcus@example.test", role: "attendee", personId: "p-marcus" },
       { id: "u-june", name: "June Park", email: "june@example.test", role: "auditor" },
   ];
   const fromUrl = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("fixturePersona") : null;
@@ -72,13 +73,17 @@ export function fixtureSnapshot(): AppSnapshot {
       { id: "p-sam", name: "Sam Ortiz", email: "sam@example.test", country: "US", citizenship: "US", dateOfBirth: "2002-11-30", address: "Oakland, CA", role: "Hacker", adult: true, taxForm: "W-9", taxStatus: "valid", taxLast4: "5521", payoutCurrency: "USD", payoutLast4: "7710", paidYtdMinor: "3820", outstandingMinor: "3820", chaseCount: 0 },
     ],
     claims: [
-      { id: "C-2241", personId: "p-marcus", personName: "Marcus Lee", type: "travel", merchant: "Air Canada", description: "YYZ to SFO round trip", category: "Travel", amountMinor: "67940", currency: "CAD", usdMinor: "49512", fxRate: "0.72876", fxSource: "ECB, Oct 3", purchasedAt: at(-60 * 24 * 21), travelDate: at(-60 * 28), cabin: "economy", origin: "YYZ", receiptName: "aircanada.pdf", status: "escalated", checks: [
+      { id: "C-2241", personId: "p-marcus", personName: "Marcus Lee", type: "travel", merchant: "Air Canada", description: "YYZ to SFO round trip", category: "Travel", amountMinor: "67940", currency: "CAD", usdMinor: "49512", fxRate: "0.72876", fxSource: "ECB, Oct 3", purchasedAt: at(-60 * 24 * 21), travelDate: at(-60 * 28), cabin: "economy", origin: "YYZ", receiptName: "aircanada.pdf", status: "needs_info", checks: [
         { code: "name", label: "Name matches profile", passed: true, detail: "Marcus Lee" },
         { code: "dates", label: "Dates fit the event", passed: true, detail: "Oct 23 to Oct 27" },
         { code: "cabin", label: "Economy", passed: true, detail: "Fare class L" },
         { code: "cap", label: "Under the $500 cap", passed: true, detail: "$495.12 after FX" },
         { code: "limit", label: "Under the $300 auto-approve limit", passed: false, detail: "$495.12 is above $300.00" },
-      ], reason: "Above the $300 auto-approve limit. Within 1% of the cap.", dueAt: at(60 * 24 * 2), createdAt: at(-60 * 5), requestedBy: "p-marcus" },
+        { code: "fare_peer", label: "Fare in line with peers", passed: false, detail: "$495.12 is 59% above the YYZ peer 75th percentile ($310.00; median $300.00, 9 other attendees). Flag for review; there may be a good reason." },
+      ], fareReview: {
+        question: "Your YYZ → SFO fare ($495.12) is about $185 above what most attendees on that route paid (up to $310.00). Anything we should know? A late acceptance, a nonstop or a checked bag are all fine reasons.",
+        askedAt: at(-60 * 5), route: "YYZ → SFO", peerCount: 9, medianMinor: "30000", percentileMinor: "31000",
+      }, reason: "The fare looks high, so Eve asked Marcus about it before a person decides.", dueAt: at(60 * 24 * 2), createdAt: at(-60 * 5), requestedBy: "p-marcus" },
       { id: "C-2240", personId: "p-sam", personName: "Sam Ortiz", type: "expense", merchant: "Lyft", description: "Ride to venue", category: "Ground transport", amountMinor: "3820", currency: "USD", usdMinor: "3820", fxRate: "1", fxSource: "USD", purchasedAt: at(-60 * 30), status: "needs_info", checks: [{ code: "dup", label: "No duplicate", passed: false, detail: "Matches C-2231" }], reason: "Same receipt as C-2231. Eve asked Sam whether this is a second ride.", dueAt: at(60 * 24 * 7), createdAt: at(-60 * 3), requestedBy: "p-sam" },
       { id: "C-2231", personId: "p-sam", personName: "Sam Ortiz", type: "expense", merchant: "Lyft", description: "Ride to venue", category: "Ground transport", amountMinor: "3820", currency: "USD", usdMinor: "3820", fxRate: "1", fxSource: "USD", purchasedAt: at(-60 * 30), status: "approved", checks: [{ code: "cap", label: "Within policy", passed: true, detail: "Under $300" }], reason: "Auto-approved within policy.", dueAt: at(60 * 24 * 7), createdAt: at(-60 * 6), requestedBy: "p-sam" },
     ],

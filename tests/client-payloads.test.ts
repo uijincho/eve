@@ -6,6 +6,7 @@ import { payloads, type ActionCall } from "@/lib/client/payloads";
 // Every payload builder the UI uses, with representative input.
 const calls: ActionCall[] = [
   payloads.claimReview("C-1", "reject", "Business class is outside policy"),
+  payloads.claimExplain("C-1", "I was accepted off the waitlist a week before the event."),
   payloads.claimSubmit({ type: "travel", documentId: "doc_1", origin: "YYZ", amountMinor: "67940", currency: "CAD", purchasedAt: "2026-10-03", idempotencyKey: "claim-key-123456" }),
   payloads.awardCreate({ personId: "p1", track: "First Overall", title: "MacBook Air", kind: "item", amountMinor: "129900", currency: "USD" }),
   payloads.awardCreate({ teamPersonIds: ["p1", "p2"], track: "Best Hardware", title: "Cash", kind: "cash", amountMinor: "300000" }),

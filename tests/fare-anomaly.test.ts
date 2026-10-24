@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import type { Claim, EventRecord, Organization, Person } from "@/lib/contracts";
-import { checkClaim, checkFarePeers, farePeers, isEconomyCabin, percentileMinor } from "@/lib/engines";
+import { failedCheckText } from "@/lib/client/derive";
+import { checkClaim, checkFarePeers, fareQuestion, farePeers, isEconomyCabin, percentileMinor } from "@/lib/engines";
 
 const org: Organization = {
   id: "org", name: "Cal Hacks", country: "US", mode: "direct", agentLimitMinor: "60000",
@@ -106,5 +107,22 @@ describe("peer fare check", () => {
     expect(out.check?.passed).toBe(false);
     expect(out.evidence).toEqual({ origin: "YYZ", peerCount: 6, medianMinor: "30000", percentileMinor: "31000", deltaMinor: "2000", flagged: true });
     expect(checkFarePeers({ usdMinor: 99999n, origin: "YYZ", peers: sorted, policy: { minPeers: 7 } })).toEqual({});
+  });
+});
+
+describe("fare question and wording", () => {
+  it("asks about the gap to peers, rounded to whole dollars", () => {
+    const out = checkFarePeers({ usdMinor: 49512n, origin: "YYZ", peers: peerFares.map(BigInt) });
+    const q = fareQuestion({ usdMinor: 49512n, capMinor: 50000n, route: "YYZ → SFO", evidence: out.evidence });
+    expect(q).toBe("Your YYZ → SFO fare ($495.12) is about $185 above what most attendees on that route paid (up to $310.00). Anything we should know? A late acceptance, a nonstop or a checked bag are all fine reasons.");
+  });
+
+  it("falls back to the cap when only cap-hugging fired", () => {
+    expect(fareQuestion({ usdMinor: 48900n, capMinor: 50000n, route: "JFK → SFO" })).toMatch(/^Your JFK → SFO fare \(\$489\.00\) is close to the \$500\.00 travel cap\./);
+  });
+
+  it("says a failed peer check as a failure", () => {
+    const check = fare(run({ usdMinor: "49512", amountMinor: "49512" }))!;
+    expect(failedCheckText(check)).toBe("High for the route: $495.12 is 59% above the YYZ peer 75th percentile ($310.00; median $300.00, 6 other attendees)");
   });
 });

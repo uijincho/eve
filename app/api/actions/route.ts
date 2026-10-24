@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       catch { console.warn("[bank-verification] Delivery remains pending; the scheduled sweep will retry."); }
     });
   }
-  if (result.ok && (["people.import", "person.update", "award.create", "award.choose", "award.confirm", "award.split", "award.fulfill", "tax.submit", "claim.submit", "claim.review", "payout.resolveRule", "payout.propose", "payout.verify", "payout.retry", "sponsor.submit", "sponsor.reconcile"].includes(action)
+  if (result.ok && (["people.import", "person.update", "award.create", "award.choose", "award.confirm", "award.split", "award.fulfill", "tax.submit", "claim.submit", "claim.review", "claim.explain", "payout.resolveRule", "payout.propose", "payout.verify", "payout.retry", "sponsor.submit", "sponsor.reconcile"].includes(action)
     || (action === "payout.bankChange" && result.data?.enrolled === true))) {
     // The business transaction already committed. Cron retries missed starts; hooks deduplicate active runs.
     after(async () => {

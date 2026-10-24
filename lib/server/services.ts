@@ -25,7 +25,7 @@ import { convertMinor as convertFx } from "@/lib/engines/money";
 import { renderPayoutPacket, renderTaxFormReceipt } from "@/lib/pdf";
 
 import { actionSchemas } from "./action-schemas";
-import { prepareClaim, processClaim, reviewClaim, submitClaim, type ClaimEvidence } from "./claims";
+import { explainClaim, prepareClaim, processClaim, reviewClaim, submitClaim, type ClaimEvidence } from "./claims";
 import {
   acceptedForms, ActionError, BOOKS_CURRENCY, fromUsd, money, toUsd, agentActor, assertMayInvoke, assertSelfOrStaff, conflict, currentProfile, effectiveTaxStatus, expectedForm, forbidden,
   isUsPerson, profileValidFor, taxPayeeCountry,
@@ -789,6 +789,7 @@ const handlers: Record<AppAction, Handler> = {
     return ok(replayed ? "Claim already submitted." : claim.status === "approved" ? "Claim approved and queued for payout." : `Claim ${claim.status}: ${claim.reason}`, { claimId: claim.id, status: claim.status });
   }) as Handler,
   "claim.review": (async (tx, actor, p) => ok("Claim reviewed.", await reviewClaim(tx, actor, p))) as Handler,
+  "claim.explain": (async (tx, actor, p) => ok("Thanks. Your answer went to the organizers with your claim.", await explainClaim(tx, actor, p))) as Handler,
   "award.create": awardCreate as Handler,
   "award.choose": awardChoose as Handler,
   "award.split": awardSplit as Handler,

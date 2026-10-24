@@ -5,10 +5,12 @@ import { useState } from "react";
 import { ClaimForm, ClaimOutcome } from "@/components/app/claim-form";
 import { CheckList } from "@/components/app/evidence-sheet";
 import { Section } from "@/components/app/page-header";
+import { ReasonAction } from "@/components/app/reason-action";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Money } from "@/components/eve/money";
 import { big, claimStatusLabel, claimReasonText } from "@/lib/client/derive";
 import { fmtDay, humanize } from "@/lib/client/format";
+import { payloads } from "@/lib/client/payloads";
 
 import { PortalFrame } from "./portal-frame";
 
@@ -43,7 +45,24 @@ export function PortalClaims() {
                         <div className="flex flex-col gap-3 px-4 pb-4">
                           {c.reason ? <p className="text-small">{claimReasonText(c)}</p> : null}
                           <CheckList checks={c.checks} />
-                          {c.status === "needs_info" ? (
+                          {c.fareReview ? (
+                            <div className="flex flex-col gap-2 rounded-lg border bg-surface p-3 text-small">
+                              <p><span className="font-medium">Eve asked:</span> {c.fareReview.question}</p>
+                              {c.fareReview.explanation ? (
+                                <p><span className="font-medium">You answered:</span> {c.fareReview.explanation} <span className="text-muted-foreground">An organizer will review it.</span></p>
+                              ) : c.status === "needs_info" ? (
+                                <ReasonAction
+                                  primary
+                                  label="Answer Eve"
+                                  submitLabel="Send answer"
+                                  pendingLabel="Sending"
+                                  prompt="Tell the organizers why this fare was higher than usual."
+                                  placeholder="e.g. I was accepted off the waitlist a week before the event."
+                                  build={(r) => payloads.claimExplain(c.id, r)}
+                                />
+                              ) : null}
+                            </div>
+                          ) : c.status === "needs_info" ? (
                             <p className="text-small text-muted-foreground">Reply to the email Eve sent, or upload a corrected receipt as a new claim.</p>
                           ) : null}
                         </div>

@@ -33,6 +33,9 @@ export interface FareEvidence {
   flagged: boolean;
 }
 
+/** Checks that say a fare looks high. When they are the only problems, the attendee is asked before a person decides. */
+export const FARE_FLAG_CODES: ReadonlySet<string> = new Set(["fare_peer", "fare_market", "cap_hugging"]);
+
 const norm = (code: string | undefined) => code?.trim().toUpperCase() ?? "";
 
 /** Nearest-rank percentile of an ascending list. */
@@ -90,4 +93,16 @@ export function checkFare(input: { claim: Claim; usdMinor: bigint; candidates: r
   const origin = norm(input.claim.origin);
   if (!origin) return {};
   return checkFarePeers({ usdMinor: input.usdMinor, origin, peers: farePeers(input.claim, input.candidates, input.isEconomy), policy: input.policy });
+}
+
+/** The one question the agent asks an attendee about a flagged fare. */
+export function fareQuestion(input: { usdMinor: bigint; capMinor: bigint; route: string; evidence?: FareEvidence }): string {
+  const paid = formatMoney(input.usdMinor);
+  const reasons = "A late acceptance, a nonstop or a checked bag are all fine reasons.";
+  const delta = input.evidence?.flagged ? BigInt(input.evidence.deltaMinor) : 0n;
+  if (delta > 0n) {
+    const about = formatMoney(((delta + 50n) / 100n) * 100n).replace(/\.00$/, "");
+    return `Your ${input.route} fare (${paid}) is about ${about} above what most attendees on that route paid (up to ${formatMoney(BigInt(input.evidence!.percentileMinor))}). Anything we should know? ${reasons}`;
+  }
+  return `Your ${input.route} fare (${paid}) is close to the ${formatMoney(input.capMinor)} travel cap. Anything we should know? ${reasons}`;
 }

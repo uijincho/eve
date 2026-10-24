@@ -4,7 +4,7 @@
 import type { Check, Claim, EventRecord, Organization, Person } from "@/lib/contracts";
 import { formatMoney } from "@/lib/design/money";
 
-import { checkFare, type FarePolicy } from "./fare-anomaly";
+import { checkFare, type FareEvidence, type FarePolicy } from "./fare-anomaly";
 import { EngineError, convertMinor, currencyExponent, parseMinor, parseRate } from "./money";
 
 export interface ClaimPolicy {
@@ -50,6 +50,8 @@ export interface CheckClaimResult {
   reason: string;
   /** USD amount the engine recomputed from amount × fxRate (USD per one unit of claim.currency), used for cap and limit checks. */
   usdMinor: string;
+  /** Peer comparison behind the fare_peer check, when it ran. */
+  fare?: FareEvidence;
 }
 
 const DAY = 86_400_000;
@@ -185,6 +187,7 @@ export function checkClaim(input: CheckClaimInput): CheckClaimResult {
   const checks: Check[] = [];
   const add = (code: string, label: string, passed: boolean, detail: string) =>
     checks.push({ code, label, passed, detail });
+  let fareEvidence: FareEvidence | undefined;
 
   // Amount and FX. Malformed money fails the check rather than throwing, so a
   // bad extraction lands in front of a person instead of crashing the run.
@@ -310,6 +313,7 @@ export function checkClaim(input: CheckClaimInput): CheckClaimResult {
     if (usd !== undefined && input.fareCandidates && claim.cabin && isEconomyCabin(claim.cabin)) {
       const fare = checkFare({ claim, usdMinor: usd, candidates: input.fareCandidates, isEconomy: isEconomyCabin, policy: input.farePolicy });
       if (fare.check) checks.push(fare.check);
+      fareEvidence = fare.evidence;
     }
   }
 
@@ -333,5 +337,5 @@ export function checkClaim(input: CheckClaimInput): CheckClaimResult {
     ? "Every policy check passed and the amount is within the agent's limit."
     : failed.map((c) => `${c.label}: ${c.detail}`).join(" ");
 
-  return { checks, status, reason, usdMinor: usd === undefined ? "0" : usd.toString() };
+  return { checks, status, reason, usdMinor: usd === undefined ? "0" : usd.toString(), ...(fareEvidence ? { fare: fareEvidence } : {}) };
 }

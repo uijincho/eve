@@ -58,6 +58,7 @@ export const actionSchemas = {
     documentId: id.optional(), idempotencyKey,
   }),
   "claim.review": z.strictObject({ id, decision: z.enum(["approve", "reject", "needs_info"]), reason: text(500).min(1) }),
+  "claim.explain": z.strictObject({ id, explanation: text(1000).min(3) }),
   "award.create": z.strictObject({
     personId: id.optional(), teamPersonIds: z.array(id).min(2).max(12).optional(), track: text(120).min(1), title: text(160).min(1),
     kind: z.enum(["cash", "item"]), amountMinor: positiveMinor, currency: currency.optional(), dueAt: isoDateTime.optional(),

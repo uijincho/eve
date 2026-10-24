@@ -42,10 +42,11 @@ This records the implemented scope against `PRD.md` and `PRODUCT.md`. It is a de
 - Files and money use exact minor units. Canadian filing worksheets use CAD, while internal financial books use USD; both currencies are labeled explicitly.
 - External integrations use the fallbacks the user authorized. Platform credential authentication alone is not described as an end-to-end Stripe payout.
 
-## Fare anomaly check (stretch, phase 1)
+## Fare anomaly check (stretch)
 
 - Travel claims are compared with other attendees' economy fares from the same origin for the same event (`fare_peer`, `lib/engines/fare-anomaly.ts`). A fare more than 20% above the peer 75th percentile is flagged for a person; it is never rejected. Routes with fewer than 5 peer fares are not checked, and org bookings priced by a verified offer are skipped.
 - Seeded plants: Marcus's $495.12 YYZ → SFO (also cap-hugging) and a $285 SEA → SFO fare that is under the cap and the auto-approve limit.
+- When the only problems are fare flags (`fare_peer`, `cap_hugging`) plus checks that need a person anyway (agent limit, budget, hand-entered receipt), the claim goes to `needs_info` and Eve asks the attendee one question (portal notice). The attendee answers with `claim.explain`; the claim moves to `escalated` with the answer, and organizers see the peer median, 75th percentile, question and answer in the claim detail.
 
 ## Deferred stretch and presentation work
 

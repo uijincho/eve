@@ -182,6 +182,35 @@ function ChecksSummary({ claim }: { claim: Claim }) {
   return <span className="text-critical">Flagged: {failed.map((k) => k.label.toLowerCase()).join(", ")}</span>;
 }
 
+/** Why the fare was flagged, what Eve asked, and the attendee's answer. */
+function FareReviewPanel({ claim: c }: { claim: Claim }) {
+  const r = c.fareReview!;
+  const first = c.personName.split(" ")[0];
+  return (
+    <section aria-label="Fare check" className="flex flex-col gap-3 rounded-lg border bg-surface p-3 text-small">
+      <h3 className="font-medium">Fare check · {r.route}</h3>
+      <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5">
+        <dt className="text-muted-foreground">Paid</dt>
+        <dd className="text-right font-semibold"><Money amountMinor={big(c.usdMinor)} /></dd>
+        {r.peerCount ? (
+          <>
+            <dt className="text-muted-foreground">Other attendees, median ({r.peerCount})</dt>
+            <dd className="text-right"><Money amountMinor={big(r.medianMinor ?? "0")} /></dd>
+            <dt className="text-muted-foreground">Other attendees, 75th percentile</dt>
+            <dd className="text-right"><Money amountMinor={big(r.percentileMinor ?? "0")} /></dd>
+          </>
+        ) : null}
+      </dl>
+      <p><span className="font-medium">Eve asked {first}:</span> {r.question}</p>
+      {r.explanation ? (
+        <p><span className="font-medium">{first} answered:</span> {r.explanation}</p>
+      ) : (
+        <p className="text-muted-foreground">Waiting for {first}&apos;s answer. You can still decide now.</p>
+      )}
+    </section>
+  );
+}
+
 export function ClaimDetail({ claim: c, snapshot, onEvidence }: { claim: Claim; snapshot: AppSnapshot; onEvidence: () => void }) {
   const perm = canReview(snapshot.actor, c, snapshot);
   const open = c.status === "escalated" || c.status === "needs_info" || c.status === "submitted";
@@ -218,6 +247,7 @@ export function ClaimDetail({ claim: c, snapshot, onEvidence }: { claim: Claim; 
         <dt className="text-muted-foreground">Category</dt>
         <dd className="text-right">{humanize(c.category)}</dd>
       </dl>
+      {c.fareReview ? <FareReviewPanel claim={c} /> : null}
       <CheckList checks={c.checks} />
       <div className="flex flex-wrap gap-2">
         {c.documentId ? (

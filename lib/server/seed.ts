@@ -308,6 +308,7 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   for (const c of claims) if (c.type === "travel" && c.origin) travelByOrigin.set(c.origin, [...(travelByOrigin.get(c.origin) ?? []), c]);
   const decisions: (typeof s.decisionLog.$inferInsert)[] = [];
   const approvals: (typeof s.approval.$inferInsert)[] = [];
+  const fareNotices: (typeof s.notice.$inferInsert)[] = [];
   const agent = agentActor(ORG);
   const seedRun = "run_demo_seed";
   for (const c of ordered) {
@@ -315,8 +316,12 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
     const farePeers = c.type === "travel" ? travelByOrigin.get(c.origin ?? "") : undefined;
     const r = evaluate({ claim: c, person: personById.get(c.personId)!, org, event, existing: processed, personNames: names, farePeers });
     c.status = r.status; c.checks = r.checks; c.reason = r.reason; c.reviewedBy = r.status === "approved" ? "agent" : null;
+    if (r.fareReview) {
+      c.extracted = { ...(c.extracted ?? {}), fareReview: r.fareReview };
+      fareNotices.push({ id: newId("ntc"), orgId: ORG, personId: c.personId, channel: "portal", title: `A question about your ${r.fareReview.route} fare`, body: `${r.fareReview.question} Answer on your claim in the portal.`, status: "simulated" });
+    }
     processed.push(c);
-    decisions.push(decisionRow({ orgId: ORG, runId: seedRun, objectType: "claim", objectId: c.id, personId: c.personId, personName: names.get(c.personId), action: "claim.check", summary: r.status === "approved" ? "Auto-approved: all checks passed within the agent limit." : `${r.status === "needs_info" ? "Asked for info" : "Escalated"}: ${r.reason}`, actor: agent, status: r.status === "approved" ? "done" : "escalated", tool: "checkPolicy", checks: r.checks, facts: { usdMinor: c.usdMinor.toString(), fxRate: c.fxRate, fxSource: c.fxSource } }));
+    decisions.push(decisionRow({ orgId: ORG, runId: seedRun, objectType: "claim", objectId: c.id, personId: c.personId, personName: names.get(c.personId), action: "claim.check", summary: r.status === "approved" ? "Auto-approved: all checks passed within the agent limit." : r.fareReview ? `Asked about the fare: ${r.fareReview.question}` : `${r.status === "needs_info" ? "Asked for info" : "Escalated"}: ${r.reason}`, actor: agent, status: r.status === "approved" ? "done" : "escalated", tool: "checkPolicy", checks: r.checks, facts: { usdMinor: c.usdMinor.toString(), fxRate: c.fxRate, fxSource: c.fxSource } }));
     if (r.status === "approved") approvals.push({ id: newId("apr"), orgId: ORG, objectType: "claim", objectId: c.id, requestedBy: c.requestedBy, approverId: "agent", approverRole: "agent", decision: "approved", reason: "Within policy and the agent limit" });
   }
   for (let i = 0; i < claims.length; i += 100) await tx.insert(s.claim).values(claims.slice(i, i + 100));
@@ -331,6 +336,7 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   if (payoutRows.length) await tx.insert(s.payout).values(payoutRows);
   for (let i = 0; i < decisions.length; i += 100) await tx.insert(s.decisionLog).values(decisions.slice(i, i + 100));
   if (approvals.length) await tx.insert(s.approval).values(approvals);
+  if (fareNotices.length) await tx.insert(s.notice).values(fareNotices);
 
   // ---- awards (25)
   const dana: ActorContext = { memberId: "mem_demo_dana", orgId: ORG, role: "organizer", name: "Dana Whitfield", email: "dana@bayview.example", personId: null, demo: true, userId: null };

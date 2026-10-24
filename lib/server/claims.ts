@@ -14,10 +14,12 @@ import { postJournal } from "@/lib/ledger";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 
 import type { ActorContext } from "@/lib/auth/session";
-import type { Check } from "@/lib/contracts";
+import type { Check, FareReview } from "@/lib/contracts";
 import type { Executor } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
+import { FARE_FLAG_CODES, fareQuestion } from "@/lib/engines/fare-anomaly";
+import { destinationFor } from "@/lib/flights";
 
 import {
   ActionError, agentActor, assertSelfOrStaff, limitsInBooks, money, conflict, forbidden, invalid, loadOrgEvent, loadPerson, notFound, recordDecision, recordNotice,
@@ -46,6 +48,8 @@ export interface ClaimEvidence {
   /** Of those, the ones the submitter typed in (kept, never treated as verified). */
   manualFields?: string[];
   /** Org booking requests: the server-verified offer the fare came from. */
+  /** Set when the agent asked the attendee about a high fare; holds their answer once given. */
+  fareReview?: FareReview;
   offer?: { id: string; carrier: string; flightNumber: string; origin: string; destination: string; departAt: string; cabin: string; totalMinor: string; currency: string; source: string; truth: string; policyOk: boolean; policyReason: string };
 }
 
@@ -101,6 +105,9 @@ function mergeDraft(draft: ClaimDraft, ev: ClaimEvidence): ClaimDraft {
   };
 }
 
+/** Checks that send a claim to a person without saying anything is wrong with it. */
+const NEEDS_A_PERSON = new Set(["agent_limit", "evidence", "budget"]);
+
 /** Engine checks plus Eve's evidence rule. Pure. */
 export function evaluate(input: {
   claim: ClaimRow; person: PersonRow; org: OrgRow; event: EventRow; existing: ClaimRow[]; personNames: Map<string, string>;
@@ -108,7 +115,7 @@ export function evaluate(input: {
   budget?: { name: string; remainingMinor: bigint };
   /** Travel claims from the same event and origin, for the peer fare check. Omitted, the check does not run. */
   farePeers?: ClaimRow[];
-}): { checks: Check[]; status: ClaimRow["status"]; reason: string } {
+}): { checks: Check[]; status: ClaimRow["status"]; reason: string; fareReview?: FareReview } {
   const { claim, person, org, event } = input;
   const ev = (claim.extracted ?? {}) as Partial<ClaimEvidence>;
   const contractClaim = toClaim(claim, person.name);
@@ -149,6 +156,20 @@ export function evaluate(input: {
     status = "escalated";
     reason = `All checks passed; ${usd(claim.usdMinor)} is above the ${usd(org.agentLimitMinor)} auto-approve limit.`;
   }
+  // A fare that only looks high: ask the attendee once, then a person decides with their answer. Never a rejection.
+  // Limit, budget and hand-entered-receipt checks need a person anyway; they do not stop the question.
+  const fareOnly = failed.some((c) => FARE_FLAG_CODES.has(c.code)) && failed.every((c) => FARE_FLAG_CODES.has(c.code) || NEEDS_A_PERSON.has(c.code));
+  if (fareOnly && !ev.fareReview && status === "escalated") {
+    const route = claim.origin ? `${claim.origin.trim().toUpperCase()} → ${destinationFor(event.venue).airport}` : "flight";
+    const fare = result.fare;
+    const fareReview: FareReview = {
+      question: fareQuestion({ usdMinor: claim.usdMinor, capMinor: event.travelCapMinor, route, evidence: fare }),
+      askedAt: claim.createdAt.toISOString(), route,
+      ...(fare ? { peerCount: fare.peerCount, medianMinor: fare.medianMinor, percentileMinor: fare.percentileMinor } : {}),
+    };
+    const first = person.name.split(" ")[0];
+    return { checks, status: "needs_info", reason: `The fare looks high, so Eve asked ${first} about it before a person decides. ${failed.filter((c) => FARE_FLAG_CODES.has(c.code)).map((c) => c.detail).join(" ")}`, fareReview };
+  }
   return { checks, status, reason };
 }
 
@@ -182,12 +203,17 @@ async function applyEvaluation(tx: Executor, actor: ActorContext, claim: ClaimRo
     result.status = "escalated";
     result.reason = `Within policy (fare from server-verified offer ${(claim.extracted as Partial<ClaimEvidence> | null)?.offer?.id ?? ""}). An organizer must approve the booking; it is bought by the organization, never reimbursed to the attendee.`;
   }
-  const [updated] = await tx.update(s.claim).set({ status: result.status, checks: result.checks, reason: result.reason, reviewedBy: result.status === "approved" ? "agent" : null, budgetLineId: budget?.lineId ?? claim.budgetLineId })
-    .where(eq(s.claim.id, claim.id)).returning();
+  const [updated] = await tx.update(s.claim).set({
+    status: result.status, checks: result.checks, reason: result.reason, reviewedBy: result.status === "approved" ? "agent" : null, budgetLineId: budget?.lineId ?? claim.budgetLineId,
+    ...(result.fareReview ? { extracted: { ...(claim.extracted ?? {}), fareReview: result.fareReview } } : {}),
+  }).where(eq(s.claim.id, claim.id)).returning();
+  if (result.fareReview) {
+    await recordNotice(tx, { orgId: org.id, personId: person.id, channel: "portal", title: `A question about your ${result.fareReview.route} fare`, body: `${result.fareReview.question} Answer on your claim in the portal.` });
+  }
   const agent = agentActor(org.id);
   await recordDecision(tx, {
     orgId: org.id, runId, objectType: "claim", objectId: claim.id, personId: person.id, personName: person.name, action: "claim.check",
-    summary: result.status === "approved" ? `Auto-approved ${usd(claim.usdMinor)}: all checks passed within the agent limit.` : `${result.status === "needs_info" ? "Asked for info" : "Escalated"}: ${result.reason}`,
+    summary: result.status === "approved" ? `Auto-approved ${usd(claim.usdMinor)}: all checks passed within the agent limit.` : result.fareReview ? `Asked ${person.name} about the fare: ${result.fareReview.question}` : `${result.status === "needs_info" ? "Asked for info" : "Escalated"}: ${result.reason}`,
     actor: agent, status: result.status === "approved" ? "done" : "escalated", tool: "checkPolicy", checks: result.checks,
     documentId: claim.documentId, facts: { usdMinor: claim.usdMinor.toString(), fxRate: claim.fxRate, fxSource: claim.fxSource, evidence: claim.extracted ?? null, submittedBy: actor.name },
   });
@@ -245,6 +271,27 @@ export async function processClaim(tx: Executor, actor: ActorContext, claimId: s
   const { org, event } = await loadOrgEvent(tx, actor.orgId);
   const person = await loadPerson(tx, actor.orgId, claim.personId);
   return applyEvaluation(tx, actor, claim, person, org, event, runId);
+}
+
+/** claim.explain: the attendee answers the agent's fare question; the claim goes to a person with the answer. */
+export async function explainClaim(tx: Executor, actor: ActorContext, input: { id: string; explanation: string }) {
+  const [claim] = await tx.select().from(s.claim).where(and(eq(s.claim.id, input.id), eq(s.claim.orgId, actor.orgId))).for("update");
+  if (!claim) throw notFound("Claim not found.");
+  assertSelfOrStaff(actor, claim.personId);
+  const review = (claim.extracted as Partial<ClaimEvidence> | null)?.fareReview;
+  if (!review) throw conflict("Eve has not asked about this claim's fare.");
+  if (review.explanation) throw conflict("You already answered; an organizer will review it.");
+  if (claim.status !== "needs_info") throw conflict(`Claim is already ${claim.status}.`);
+  const person = await loadPerson(tx, actor.orgId, claim.personId);
+  const answered: FareReview = { ...review, explanation: input.explanation, explainedAt: new Date().toISOString() };
+  const reason = `${person.name.split(" ")[0]} explained the fare: "${input.explanation}" A person decides with the evidence.`;
+  const [updated] = await tx.update(s.claim).set({ status: "escalated", reason, extracted: { ...(claim.extracted ?? {}), fareReview: answered } }).where(eq(s.claim.id, claim.id)).returning();
+  await recordDecision(tx, {
+    orgId: actor.orgId, objectType: "claim", objectId: claim.id, personId: person.id, personName: person.name, action: "claim.explain",
+    summary: `${person.name} explained the ${review.route} fare (${usd(claim.usdMinor)}); routed to an organizer.`,
+    actor, status: "escalated", tool: "review", checks: claim.checks, facts: { fareReview: answered },
+  });
+  return { status: updated.status };
 }
 
 /** claim.review by an organizer (within their limit) or a controller. */

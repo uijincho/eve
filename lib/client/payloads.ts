@@ -26,6 +26,7 @@ export type PersonInput = {
 export const payloads = {
   claimReview: (id: string, decision: ReviewDecision, reason: string) =>
     call("claim.review", { id, decision, reason }),
+  claimExplain: (id: string, explanation: string) => call("claim.explain", { id, explanation }),
   claimSubmit: (fields: {
     type: "travel" | "expense";
     documentId?: string;

@@ -32,6 +32,12 @@ export interface Person {
   paidYtdMinor: Minor; outstandingMinor: Minor; chaseCount: number;
 }
 export interface Check { code: string; label: string; passed: boolean; detail: string }
+/** A flagged fare: the question the agent asked the attendee, the peer evidence, and their answer. */
+export interface FareReview {
+  question: string; askedAt: string; route: string;
+  peerCount?: number; medianMinor?: Minor; percentileMinor?: Minor;
+  explanation?: string; explainedAt?: string;
+}
 export interface Claim {
   id: string; personId: string; personName: string; type: "travel" | "expense";
   merchant: string; description: string; category: string; amountMinor: Minor;
@@ -40,6 +46,7 @@ export interface Claim {
   receiptName?: string; documentId?: string; receiptHash?: string;
   status: "submitted" | "processing" | "approved" | "escalated" | "rejected" | "needs_info" | "paid";
   checks: Check[]; reason: string; dueAt: string; createdAt: string; requestedBy: string;
+  fareReview?: FareReview;
 }
 export interface Award {
   id: string; personId: string; personName: string; track: string; title: string;
@@ -84,7 +91,7 @@ export interface AppSnapshot {
 }
 export type AppAction =
   | "org.update" | "event.update" | "budget.update" | "people.import" | "person.update"
-  | "tax.submit" | "claim.submit" | "claim.review" | "award.create" | "award.choose"
+  | "tax.submit" | "claim.submit" | "claim.review" | "claim.explain" | "award.create" | "award.choose"
   | "award.split" | "award.confirm" | "award.fulfill" | "payout.resolveRule" | "payout.propose" | "payout.release"
   | "payout.bankChange" | "payout.verify" | "payout.retry" | "sponsor.create"
   | "sponsor.submit" | "sponsor.reconcile" | "period.lock" | "filings.generate"

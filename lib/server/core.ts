@@ -40,6 +40,7 @@ export const ACTION_ROLES: Record<C.AppAction, Who[]> = {
   "tax.submit": ["organizer", "self"],
   "claim.submit": ["organizer", "self"],
   "claim.review": ["organizer", "controller"],
+  "claim.explain": ["self"],
   "award.create": ["organizer"],
   "award.choose": ["organizer", "self"],
   "award.split": ["organizer", "self"],
@@ -203,6 +204,7 @@ export function toClaim(c: ClaimRow, personName: string): C.Claim {
     cabin: c.cabin ?? undefined, origin: c.origin ?? undefined, receiptName: c.receiptName ?? undefined,
     documentId: c.documentId ?? undefined, receiptHash: c.receiptHash ?? undefined, status: c.status, checks: c.checks,
     reason: c.reason, dueAt: c.dueAt.toISOString(), createdAt: c.createdAt.toISOString(), requestedBy: c.requestedBy,
+    ...((c.extracted as { fareReview?: C.FareReview } | null)?.fareReview ? { fareReview: (c.extracted as { fareReview: C.FareReview }).fareReview } : {}),
   };
 }
 
