@@ -19,7 +19,7 @@ import { TruthLabel } from "@/components/eve/truth-label";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, SponsorPacket } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
-import { big, canControl, canManage, payoutSource } from "@/lib/client/derive";
+import { big, canControl, canManage, canOrganize, payoutSource } from "@/lib/client/derive";
 import { fmtDate } from "@/lib/client/format";
 import { payloads, toMinor } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -66,7 +66,7 @@ export function SponsorView() {
                       </span>
                       <span className="flex items-center gap-3">
                         <Money amountMinor={big(p.grossMinor)} currency={p.currency} className="font-semibold" />
-                        <ActionButton label="Create packet" pendingLabel="Creating" permission={s.actor.role === "organizer" ? { allowed: true } : { allowed: false, reason: "Only an organizer can prepare a sponsor packet. A controller authorizes its submission." }} call={payloads.sponsorCreate(p.id)} />
+                        <ActionButton label="Create packet" pendingLabel="Creating" permission={canOrganize(s.actor)} call={payloads.sponsorCreate(p.id)} />
                       </span>
                     </li>
                   ))}
