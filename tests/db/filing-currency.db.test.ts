@@ -8,10 +8,11 @@ import { generateFilings } from "@/lib/server/filings";
 import type { ActorContext } from "@/lib/auth/session";
 
 describe.skipIf(!hasDatabase)("CAD reports and USD functional books", { timeout: 90_000 }, () => {
-  const db = getDb();
+  let db: ReturnType<typeof getDb>;
   let orgId = "";
   let actor: ActorContext;
   beforeAll(async () => {
+    db = getDb();
     orgId = await createTestOrg("cad-report");
     await db.update(s.organization).set({ country: "CA", currency: "CAD" }).where(eq(s.organization.id, orgId));
     const eventId = `${orgId}_event`;
