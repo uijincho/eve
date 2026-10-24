@@ -66,7 +66,8 @@ const COUNTRY_CURRENCY: Record<string, string> = {
 
 function PayoutMethod({ me }: { me: Person }) {
   const [last4, setLast4] = useState("");
-  const [currency, setCurrency] = useState(me.payoutCurrency || COUNTRY_CURRENCY[me.country] || "USD");
+  // Before a first account exists, the person's own currency is a better guess than an import default.
+  const [currency, setCurrency] = useState((me.payoutLast4 ? me.payoutCurrency : COUNTRY_CURRENCY[me.country]) || me.payoutCurrency || "USD");
   const [error, setError] = useState<string | null>(null);
   return (
     <Section title="Payout account">
