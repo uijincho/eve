@@ -24,13 +24,14 @@ The benchmark records the last evaluated run. Your actions change the sample sta
 ## Validation evidence
 
 - [Fresh demo benchmark](demo-benchmark.json): **40/40 planted cases caught, zero false positives and zero wrongful payouts**, through HTTP, Postgres and Workflow execution, in 404 seconds. Source `680aeca`.
-- Combined suite: **238 tests passed across 32 files**, including real Postgres tests. Typecheck and lint passed. The preview production build passed at source `1e36ec1`.
+- [Final validation](final-validation.md): **245 tests passed across 34 files**, including real Postgres tests. The final rail-copy follow-ups separately passed 30 tests. Typecheck, lint and the final preview production build passed.
 - [Deployed account acceptance](preview-account-acceptance.md): 56 HTTPS checks against the earlier `8d8ec80` preview.
 - [Deployed Workflow acceptance](preview-workflow-acceptance.md): 21 HTTPS checks proving automatic proposal, controller release, settlement and idempotent replay against that earlier preview.
 - [Current preview financial acceptance](preview-financial-acceptance.md): 31 checks over 34 HTTPS requests at `1e36ec1`. Two $1,500 prizes for a December 2025 event were paid under 2026 rules, withholding $0 and $360, with a $3,000 / $360 1099-MISC draft and four balanced journals.
 - [Independent financial review, round 3](review-financial-r3.md): no high or medium findings on `81c4d73`. The two low Canadian threshold findings were fixed in `852be62`, with engine and real Postgres boundary tests.
 - [Final deployment check](final-deployment.md): the `da167e0` preview built successfully; five desktop/mobile views loaded with no browser errors or horizontal overflow, and its protected API returned the settled 40/40 demo.
 - [Final visual verdict](../.impeccable/review/eve-finish-review-r3.md): **`fix`**, with seven of eight assigned findings resolved. One closed-release status still truncates in the activity rail; its full text is available when expanded. This is a verdict on the listed fixes, not whole-surface approval. The two unattended correction batches are complete.
+- [Design documentation](../.impeccable/review/eve-design-documentation.md): the Blue Hour system is preserved; pre-existing context drift and component documentation debt are recorded.
 - [Implementation record](../IMPLEMENTATION.md) tracks later independent reviews and deployment validation. [Requirement coverage](requirement-coverage.md) records the implemented scope and remaining work.
 
 ## Boundaries to keep visible
