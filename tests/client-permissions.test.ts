@@ -4,10 +4,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { AppAction, AppSnapshot } from "@/lib/contracts";
 import { fixtureSnapshot } from "@/lib/client/fixture";
-import { canManage, canOrganize, type Permission } from "@/lib/client/derive";
+import { canManage, canOrganize, isStipendTrack, type Permission } from "@/lib/client/derive";
 
 type Actor = AppSnapshot["actor"];
 import { ACTION_ROLES } from "@/lib/server/core";
+import { paymentTypeFor } from "@/lib/server/engines";
 
 const state = vi.hoisted(() => ({ snapshot: null as AppSnapshot | null, search: "" }));
 vi.mock("@/lib/client/use-eve", () => ({
@@ -87,5 +88,13 @@ describe("event setup tab deep link", () => {
     state.snapshot = fixtureSnapshot();
     state.search = "tab=nope";
     expect(renderToStaticMarkup(createElement(EventSetupView))).toMatch(/id="tab-basics"[^>]*aria-selected="true"/);
+  });
+});
+
+describe("judge stipend choice", () => {
+  it("classifies tracks the same way the server taxes them", () => {
+    for (const track of ["Judge stipend", "Mentor stipend", "Speaker honorarium", "First Overall", "Best Hardware Hack"]) {
+      expect(isStipendTrack(track), track).toBe(paymentTypeFor({ kind: "award", awardKind: "cash", track, fulfillment: "cash" }) === "stipend");
+    }
   });
 });

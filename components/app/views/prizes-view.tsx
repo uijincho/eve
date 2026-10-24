@@ -18,7 +18,7 @@ import { Money } from "@/components/eve/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResult, AppSnapshot, Award } from "@/lib/contracts";
-import { awardName, big, canOrganize, FULFILLMENT_LABEL, prizeOptions } from "@/lib/client/derive";
+import { awardName, big, canOrganize, FULFILLMENT_LABEL, isStipendTrack, prizeOptions } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 import { payloads, toMinor } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -246,7 +246,8 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
   const [personId, setPersonId] = useState("");
   const [track, setTrack] = useState("");
   const [title, setTitle] = useState("");
-  const [kind, setKind] = useState<Award["kind"]>("item");
+  // "stipend" is a cash award; the server pays and taxes it as a stipend when the track says so.
+  const [kind, setKind] = useState<Award["kind"] | "stipend">("item");
   const [currency, setCurrency] = useState(s.org.currency);
   const [amount, setAmount] = useState("");
   const [team, setTeam] = useState<string[]>([]);
@@ -263,7 +264,9 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
         e.preventDefault();
         const minor = toMinor(amount);
         const next: Record<string, string> = {};
-        if (!personId && team.length < 2) next.person = team.length === 1 ? "A team needs at least two members, or choose one winner." : "Choose the winner.";
+        const stipend = kind === "stipend";
+        if (stipend && !isStipendTrack(track)) next.track = "Keep “stipend” in the track, like Judge stipend, so Eve taxes it as a stipend.";
+        if (!personId && (stipend || team.length < 2)) next.person = stipend ? "Choose the judge." : team.length === 1 ? "A team needs at least two members, or choose one winner." : "Choose the winner.";
         if (!track.trim()) next.track = "Name the track, like First Overall.";
         if (!title.trim()) next.title = kind === "item" ? "Name the item, like MacBook Air." : "Name the prize.";
         if (!minor || minor === "0") next.amount = kind === "item" ? `Enter the item's fair market value in ${currency}.` : `Enter the cash amount in ${currency}.`;
@@ -272,10 +275,10 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
         setPending(true);
         const r = await act(
           payloads.awardCreate({
-            ...(team.length >= 2 ? { teamPersonIds: team } : { personId }),
+            ...(!stipend && team.length >= 2 ? { teamPersonIds: team } : { personId }),
             track: track.trim(),
             title: title.trim(),
-            kind,
+            kind: stipend ? "cash" : kind,
             amountMinor: minor!,
             currency,
           }),
@@ -285,9 +288,9 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
         if (r.ok) onCreated(typeof r.data?.id === "string" ? r.data.id : null);
       }}
     >
-      <Field label={team.length >= 2 ? "Winner (team selected below)" : "Winner"} error={errors.person} help={person ? `${person.country} resident · ${person.taxForm} ${person.taxStatus}` : "Winners are linked to their tax profile."}>
+      <Field label={kind === "stipend" ? "Judge" : team.length >= 2 ? "Winner (team selected below)" : "Winner"} error={errors.person} help={person ? `${person.country} resident · ${person.taxForm} ${person.taxStatus}` : "Winners are linked to their tax profile."}>
         {(p) => (
-          <NativeSelect {...p} value={personId} disabled={team.length >= 2} onChange={(e) => setPersonId(e.target.value)}>
+          <NativeSelect {...p} value={personId} disabled={kind !== "stipend" && team.length >= 2} onChange={(e) => setPersonId(e.target.value)}>
             <option value="">Choose a person</option>
             {s.people.filter((x) => x.adult).map((x) => (
               <option key={x.id} value={x.id}>
@@ -304,11 +307,23 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
         <Field label="Prize" error={errors.title}>
           {(p) => <Input {...p} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="MacBook Air" />}
         </Field>
-        <Field label="Kind">
+        <Field label="Kind" help={kind === "stipend" ? "Paid in cash and reported as a stipend, not a prize." : undefined}>
           {(p) => (
-            <NativeSelect {...p} value={kind} onChange={(e) => setKind(e.target.value as Award["kind"])}>
+            <NativeSelect
+              {...p}
+              value={kind}
+              onChange={(e) => {
+                const next = e.target.value as Award["kind"] | "stipend";
+                setKind(next);
+                if (next === "stipend") {
+                  if (!track.trim()) setTrack("Judge stipend");
+                  if (!title.trim()) setTitle("Judge stipend");
+                }
+              }}
+            >
               <option value="item">Physical item</option>
               <option value="cash">Cash</option>
+              <option value="stipend">Judge stipend</option>
             </NativeSelect>
           )}
         </Field>
@@ -325,7 +340,7 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
           </Field>
         </div>
       </div>
-      <fieldset className="flex flex-col gap-1.5">
+      {kind === "stipend" ? null : <fieldset className="flex flex-col gap-1.5">
         <legend className="text-small font-medium">Team prize (optional)</legend>
         <p className="text-small text-muted-foreground">
           Choose every member to split it evenly; each member confirms. Leave empty for a single winner.
@@ -343,7 +358,7 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
             </label>
           ))}
         </div>
-      </fieldset>
+      </fieldset>}
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" aria-busy={pending || undefined} disabled={pending}>
           {pending ? "Saving winner" : "Save winner"}

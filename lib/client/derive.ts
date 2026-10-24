@@ -79,6 +79,11 @@ export function objectLabel(d: { objectType: string; personName?: string; object
 }
 
 /** A flight the organization books for the attendee: never paid out to them. */
+/** A cash award on such a track is paid and taxed as a stipend. Mirrors paymentTypeFor on the server. */
+export function isStipendTrack(track: string): boolean {
+  return /stipend|judge|mentor|speaker/i.test(track);
+}
+
 export function isOrgBookedFlight(c: Pick<Claim, "category">): boolean {
   return c.category === "org_booked_flight";
 }
