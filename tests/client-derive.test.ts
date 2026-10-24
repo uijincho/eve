@@ -224,3 +224,18 @@ describe("release outcomes", () => {
     expect(releaseStopped({ decisions: [quote, stopped, requote] }, p)).toBeUndefined();
   });
 });
+
+describe("self-beneficiary", () => {
+  it("disables release, fulfillment and review for the recipient matched by email when no personId is linked", async () => {
+    const { canRelease, canFulfill, canReview } = await import("@/lib/client/derive");
+    const me = { ...s.people[0], id: "per_me", email: "Casey@Example.test ", adult: true, taxStatus: "valid" as const };
+    const ctrl = { id: "mem_casey", name: "Casey Controller", email: "casey@example.test", role: "controller" as const };
+    const snap = { ...s, org: { ...s.org, mode: "direct" as const }, people: [...s.people, me], decisions: [], payouts: [] };
+    const payout = { ...s.payouts[1], id: "pay_me", personId: "per_me", status: "proposed" as const, requestedBy: "u-dana" };
+    expect(canRelease(ctrl, payout, snap)).toEqual({ allowed: false, reason: "This payout is to you. A different controller must release it." });
+    const award = { ...s.awards[0], id: "awd_me", personId: "per_me", kind: "item" as const, fulfillment: "local" as const, status: "ready" as const, requestedBy: "u-dana", teamId: undefined };
+    expect(canFulfill(ctrl, award, { ...snap, awards: [award] }).allowed).toBe(false);
+    expect(canReview(ctrl, { requestedBy: "u-dana", personId: "per_me" }, snap).allowed).toBe(false);
+    expect(canRelease(ctrl, { ...payout, personId: s.people[1].id }, snap).allowed).toBe(true);
+  });
+});

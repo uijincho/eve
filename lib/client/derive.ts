@@ -149,7 +149,20 @@ export function releaseStopped(s: Pick<AppSnapshot, "decisions">, payout: Pick<P
   );
 }
 
-export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "personas"> & Partial<Pick<AppSnapshot, "decisions" | "org">>): Permission {
+const normEmail = (e?: string) => (e ?? "").trim().toLowerCase();
+
+/**
+ * Whether the signed-in person is the recipient. Real staff memberships often
+ * have no personId, so the server also matches the person's email; mirror it.
+ */
+export function isBeneficiary(actor: Actor, personId: string | undefined, s?: Partial<Pick<AppSnapshot, "people">>): boolean {
+  if (!personId) return false;
+  if (actor.personId && actor.personId === personId) return true;
+  const person = s?.people?.find((p) => p.id === personId);
+  return Boolean(person && normEmail(person.email) && normEmail(person.email) === normEmail(actor.email));
+}
+
+export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "personas"> & Partial<Pick<AppSnapshot, "decisions" | "org" | "people">>): Permission {
   if (s.org?.mode === "sponsor") return no(`${s.org.sponsorName || "The fiscal sponsor"} pays for this organization. Create a sponsor packet instead; a controller submits it.`);
   if (s.decisions && releaseInFlight({ decisions: s.decisions }, payout)) return no("Release accepted. Eve is sending it now; this updates on its own.");
   if (payout.status === "frozen") return no("Frozen until the bank change is confirmed through the original contact channel.");
@@ -160,6 +173,7 @@ export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "p
     return no(`Only a controller releases money.${controllerNote(s)}`);
   if (payout.requestedBy === actor.id || payout.requestedBy === actor.name)
     return no("You requested this payout. A different controller must release it.");
+  if (isBeneficiary(actor, payout.personId, s)) return no("This payout is to you. A different controller must release it.");
   return ok;
 }
 
@@ -175,7 +189,7 @@ export function canFulfill(actor: Actor, award: Award, s: Pick<AppSnapshot, "per
   if (actor.role !== "controller") return no(`A controller confirms delivery.${controllerNote(s)}`);
   if (award.requestedBy === actor.id || award.requestedBy === actor.name) return no("You entered this prize, so another controller must confirm its delivery.");
   const person = s.people.find((p) => p.id === award.personId);
-  if (person && actor.personId === person.id) return no("You cannot confirm your own prize.");
+  if (isBeneficiary(actor, award.personId, s)) return no("This prize is yours. A different controller must confirm its delivery.");
   if (person && !person.adult) return no("Eve does not deliver prizes to anyone under 18.");
   if (person && person.taxStatus !== "valid") return no(`Held until ${person.name.split(" ")[0]} signs a valid ${person.taxForm}. The item's value is reportable income.`);
   if (s.payouts.some((p) => p.sourceType === "award" && p.sourceId === award.id && !["failed", "returned"].includes(p.status))) return no("A payout already exists for this prize, so its terms are locked.");
@@ -184,10 +198,10 @@ export function canFulfill(actor: Actor, award: Award, s: Pick<AppSnapshot, "per
   return ok;
 }
 
-export function canReview(actor: Actor, item: { requestedBy: string; personId?: string }): Permission {
+export function canReview(actor: Actor, item: { requestedBy: string; personId?: string }, s?: Partial<Pick<AppSnapshot, "people">>): Permission {
   if (actor.role === "auditor") return no("Auditors have read-only access.");
   if (actor.role === "attendee") return no("Organizers review claims. Attendees can only see their own.");
-  if (item.requestedBy === actor.id || item.requestedBy === actor.name || (actor.personId && item.personId === actor.personId))
+  if (item.requestedBy === actor.id || item.requestedBy === actor.name || isBeneficiary(actor, item.personId, s))
     return no("You cannot approve your own request. Another organizer or the controller must decide.");
   return ok;
 }

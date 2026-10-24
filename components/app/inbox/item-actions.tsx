@@ -122,7 +122,7 @@ export function ItemActions({
     }
     case "claim": {
       const c = ref.claim;
-      const perm = canReview(actor, c);
+      const perm = canReview(actor, c, snapshot);
       return (
         <div className={wrap}>
           <ActionButton

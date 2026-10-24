@@ -183,7 +183,7 @@ function ChecksSummary({ claim }: { claim: Claim }) {
 }
 
 export function ClaimDetail({ claim: c, snapshot, onEvidence }: { claim: Claim; snapshot: AppSnapshot; onEvidence: () => void }) {
-  const perm = canReview(snapshot.actor, c);
+  const perm = canReview(snapshot.actor, c, snapshot);
   const open = c.status === "escalated" || c.status === "needs_info" || c.status === "submitted";
   return (
     <div className="flex flex-col gap-6">

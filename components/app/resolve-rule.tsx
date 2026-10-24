@@ -6,7 +6,7 @@ import { ActionButton } from "@/components/app/action-button";
 import { Field, TextArea } from "@/components/app/field";
 import { TruthLabel } from "@/components/eve/truth-label";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
-import { canControl, ruleLabel, type Permission } from "@/lib/client/derive";
+import { canControl, isBeneficiary, ruleLabel, type Permission } from "@/lib/client/derive";
 import { fmtRate } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 
@@ -62,8 +62,8 @@ export function ResolveRule({
     ? control
     : requestedBy && (requestedBy === s.actor.id || requestedBy === s.actor.name)
       ? { allowed: false, reason: "You requested this payment, so another controller must resolve its tax hold." }
-      : s.actor.personId && s.actor.personId === personId
-        ? { allowed: false, reason: "You cannot resolve a tax hold on your own payment." }
+      : isBeneficiary(s.actor, personId, s)
+        ? { allowed: false, reason: "This payment is to you. A different controller must resolve its tax hold." }
         : { allowed: true };
 
   return (
