@@ -150,7 +150,7 @@ export function AwardDetail({ award: a, snapshot: s, onEvidence }: { award: Awar
               <ActionButton
                 key={f}
                 label={f === o.recommended && a.fulfillment === "undecided" ? `${FULFILLMENT_LABEL[f]} (recommended)` : FULFILLMENT_LABEL[f]}
-                variant={a.fulfillment === f ? "secondary" : "ghost"}
+                variant={a.fulfillment === f ? "secondary" : "outline"}
                 pendingLabel="Saving"
                 permission={manage}
                 quietSuccess

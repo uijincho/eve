@@ -12,6 +12,14 @@ export function fixtureAction(action: AppAction): ActionResult {
   return { ok: false, message: `Fixture mode: ${action} was not sent to a server.` };
 }
 
+const PERSONA_KEY = "eve-fixture-persona";
+
+/** Fixture-only persona switch, kept in this tab. */
+export function fixtureSetPersona(id: string): ActionResult {
+  sessionStorage.setItem(PERSONA_KEY, id);
+  return { ok: true, message: "Fixture persona switched in this tab only." };
+}
+
 const at = (mins: number) => new Date(Date.now() + mins * 60_000).toISOString();
 
 export function fixtureSnapshot(): AppSnapshot {
@@ -32,16 +40,20 @@ export function fixtureSnapshot(): AppSnapshot {
     facts: {},
     ...over,
   });
-  return {
-    demo: true,
-    now,
-    actor: { id: "u-dana", name: "Dana Whitfield", email: "dana@example.test", role: "organizer" },
-    personas: [
+  const personas: AppSnapshot["personas"] = [
       { id: "u-dana", name: "Dana Whitfield", email: "dana@example.test", role: "organizer" },
       { id: "u-ari", name: "Ari Novak", email: "ari@example.test", role: "controller" },
       { id: "u-priya", name: "Priya Raman", email: "priya@example.test", role: "attendee", personId: "p-priya" },
       { id: "u-june", name: "June Park", email: "june@example.test", role: "auditor" },
-    ],
+  ];
+  const fromUrl = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("fixturePersona") : null;
+  if (fromUrl) sessionStorage.setItem(PERSONA_KEY, fromUrl);
+  const chosen = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(PERSONA_KEY) : null;
+  return {
+    demo: true,
+    now,
+    actor: personas.find((p) => p.id === chosen) ?? personas[0],
+    personas,
     org: {
       id: "org", name: "Cal Hacks", country: "US", mode: "hybrid", agentLimitMinor: "30000",
       organizerLimitMinor: "150000", currency: "USD", sponsorName: "Bayview Community Foundation",

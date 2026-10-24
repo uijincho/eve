@@ -6,7 +6,7 @@ import type {
   AppSnapshot,
 } from "@/lib/contracts";
 
-import { fixtureAction, fixtureEnabled, fixtureSnapshot } from "./fixture";
+import { fixtureAction, fixtureEnabled, fixtureSetPersona, fixtureSnapshot } from "./fixture";
 
 export class ApiError extends Error {
   constructor(
@@ -61,7 +61,7 @@ export async function runAction(
 
 /** Switches the sample persona. Demo only: the server decides what it may do. */
 export async function switchPersona(personaId: string): Promise<ActionResult> {
-  if (fixtureEnabled()) return fixtureAction("demo.reset");
+  if (fixtureEnabled()) return fixtureSetPersona(personaId);
   const res = await fetch("/api/demo/session", {
     method: "POST",
     credentials: "same-origin",
