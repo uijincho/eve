@@ -105,6 +105,17 @@ export function formFamily(reportingForm: string): string {
 }
 
 /**
+ * Whether a year's same-form total reaches a reporting threshold, as each
+ * form's source words it. US 1099 boxes say "$2,000 or more" (>=). CRA's T4A
+ * page says "more than $500" (>), so exactly $500 does not need a slip. The
+ * CRA rules stay unverified; this only follows their documented wording.
+ * Zero thresholds (any amount) are handled by the caller.
+ */
+export function thresholdReached(reportingForm: string, totalMinor: bigint, thresholdMinor: bigint): boolean {
+  return formFamily(reportingForm) === "T4A" ? totalMinor > thresholdMinor : totalMinor >= thresholdMinor;
+}
+
+/**
  * Smallest gross G such that G − round(G × rate) ≥ net. Used when tax must
  * be paid on top of a non-cash prize or when the org promises a net amount.
  */
@@ -152,7 +163,7 @@ export function computeTax(input: ComputeTaxInput): ComputeTaxResult {
 
   const threshold = parseNonNegativeMinor(rule.thresholdMinor, `${rule.id}.thresholdMinor`);
   const aggregate = ytd + gross;
-  const reportable = !/^None/i.test(rule.reportingForm) && (threshold === 0n ? aggregate > 0n : aggregate >= threshold);
+  const reportable = !/^None/i.test(rule.reportingForm) && (threshold === 0n ? aggregate > 0n : thresholdReached(rule.reportingForm, aggregate, threshold));
 
   // Backup withholding: a US payee with a W-9 but no TIN, on a reportable payment.
   if (input.payeeCountry === "US" && !input.hasTin && paymentType !== "reimbursement" && rateBps === 0) {

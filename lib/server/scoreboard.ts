@@ -18,7 +18,10 @@ import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
 
 import { usd } from "./core";
+import { thresholdReached } from "@/lib/tax";
+
 import { formFamily } from "./engines";
+import { filingCurrency } from "./filing-currency";
 
 const MOVED = new Set(["processing", "paid"]);
 /** Checks that reflect limits, not errors; failing them is not a false positive. */
@@ -108,6 +111,10 @@ export async function computeScoreboard(db: Executor, orgId: string): Promise<Sc
       const raised = evidence.some((d) => d.objectId === k.objectId && d.action === "sponsor.reconcile" && d.status === "escalated");
       passed = pk?.status === "exception" || (pk?.status === "paid" && raised);
       actual = pk ? `${pk.status}${pk.status === "paid" && raised ? " (after a recorded exception)" : ""}` : "packet missing";
+    } else if ((k.expected === "reportable" || (k.expected === "clean" && k.objectType === "person")) && filingCurrency(formFamily(k.expectedCode ?? "1099-MISC")) !== "USD") {
+      // CRA worksheets are CAD while payouts are USD books; comparing them here would mix currencies.
+      // Never scored as caught: a person checks the unverified T4A/NR4 draft.
+      actual = `not evaluated: ${formFamily(k.expectedCode!)} amounts are CAD (unverified CRA draft); this check compares USD 1099 totals only`;
     } else if (k.expected === "reportable" || (k.expected === "clean" && k.objectType === "person")) {
       // Threshold truth comes from what was actually paid and filed, never from a proposal's flag:
       // reportable = a drafted filing for this form and year whose gross equals the paid same-form
@@ -121,8 +128,9 @@ export async function computeScoreboard(db: Executor, orgId: string): Promise<Sc
       }, 0n);
       const filed = filings.filter((f) => f.personId === k.objectId && f.year === year && f.form === form);
       const filedGross = filed.reduce((sum, f) => sum + f.grossMinor, 0n);
-      if (k.expected === "reportable") passed = paid.length > 0 && paidTotal >= threshold && filed.length === 1 && filedGross === paidTotal;
-      else passed = paid.length > 0 && paidTotal < threshold && filed.length === 0;
+      const reached = thresholdReached(form, paidTotal, threshold);
+      if (k.expected === "reportable") passed = paid.length > 0 && reached && filed.length === 1 && filedGross === paidTotal;
+      else passed = paid.length > 0 && !reached && filed.length === 0;
       actual = `${paid.length ? `paid ${usd(paidTotal)} on ${form} in ${year} (threshold ${usd(threshold)})` : `nothing paid on ${form} in ${year} yet`}; ${filed.length ? `${form} drafted for ${usd(filedGross)}` : `no ${form} drafted`}`;
     }
     results.push({ id: k.id, scenario: k.scenario, expected: k.expected + (k.expectedCode ? `:${k.expectedCode}` : ""), actual, passed });

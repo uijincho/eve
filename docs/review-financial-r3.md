@@ -62,3 +62,12 @@ Reviewed commit: `81c4d73` (root `main`, 2026-10-24, "R2: payment-year tax, pack
 
 - Both disposable orgs (`orgtest_*` with labels `r3us` and `r3cad`, plus the orgs from root's suites) were purged by `dropTestOrg` in `afterAll`. A follow-up query (`slug LIKE 'r3us-%' OR 'r3cad-%'`) returned 0 rows.
 - I deleted the repro file, and removed the `node_modules` and `.env` symlinks and the `/tmp/r3review` logs. No shared demo data, auth users or global tables were touched.
+
+## Follow-up: L1 and L2 fixed (implementation, not a new review)
+
+Applied on top of `eb9768b`.
+
+- **L1:** `thresholdReached(reportingForm, total, threshold)` in `lib/tax/index.ts` applies CRA's "more than" (strict `>`) to the T4A family and keeps "or more" (`>=`) for every other form. `computeTax` (payout `reportable`) and `generateFilings` (whether a draft is made) both use it. Zero-threshold forms (1042-S, NR4: any amount) and the withholding-forces-a-form rule are unchanged, and so are the US backup-withholding thresholds. The CRA rules stay `verified: false` and their drafts stay unverified.
+- **L2:** a scoreboard `reportable` or `clean` key for a CAD form (T4A/NR4) now returns `passed: false` with "not evaluated: T4A amounts are CAD (unverified CRA draft); this check compares USD 1099 totals only". USD book totals are never compared with CAD worksheets. US keys use the same `thresholdReached` helper, so their behaviour is unchanged.
+- **Tests:** `tests/cra-threshold.test.ts` (engine: CAD 500.00 vs 500.01, the same-form YTD split, stipend and item, US `>=` and NR4 any-amount unchanged) and `tests/db/cra-threshold.db.test.ts` (real Postgres: propose, resolve and release CAD 500.00 and 500.01 → `reportable` false/true; filings draft count 1, T4A CAD 500.01 only; T4A answer keys not evaluated and not passed; 0 wrongful payouts).
+- **Residual (label only, existing USD-books design):** the payout's `reportable` flag compares USD books with a CRA threshold converted at the same rate (`loadPayoutContext`). At some FX rates CAD 500.01 and 500.00 round to the same USD cent, so the label can say "below" while the CAD filing generator, which is authoritative and compares in CAD, still drafts the T4A. Fixing that would mean comparing in CAD in `payouts.ts`, which is outside this change.

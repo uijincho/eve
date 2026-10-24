@@ -5,6 +5,7 @@ import type { Executor } from "@/lib/db";
 import * as s from "@/lib/db/schema";
 import { newId } from "@/lib/db/ids";
 import { renderFilingDraft } from "@/lib/pdf";
+import { thresholdReached } from "@/lib/tax";
 import { currentProfile, fromUsd, loadOrgEvent, recordDecision, storeDocument } from "./core";
 import { filingCurrency } from "./filing-currency";
 
@@ -58,7 +59,8 @@ export async function generateFilings(tx: Executor, actor: ActorContext, input: 
   }
   let count = 0;
   for (const g of groups.values()) {
-    if (!["1042-S", "NR4"].includes(g.form) && g.gross < g.threshold && g.wh === 0n) continue;
+    // 1042-S and NR4 have no threshold; T4A needs "more than" CAD 500 (strict), 1099s "or more". Any withholding needs a form.
+    if (!["1042-S", "NR4"].includes(g.form) && !thresholdReached(g.form, g.gross, g.threshold) && g.wh === 0n) continue;
     const profile = await currentProfile(tx, g.person.id);
     const pdf = await renderFilingDraft({
       form: g.form, year, payer: { name: org.name, address: "On file" },
