@@ -17,12 +17,13 @@ import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
 import type { AppSnapshot, SponsorPacket } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
-import { big, canManage, payoutSource } from "@/lib/client/derive";
+import { big, canControl, canManage, payoutSource } from "@/lib/client/derive";
 import { fmtDate } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
+import { initialParam } from "@/lib/client/url-param";
 
 export function SponsorView() {
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(() => initialParam("packet"));
   return (
     <PageFrame
       title="Sponsor"
@@ -82,6 +83,7 @@ export function SponsorView() {
 
 function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snapshot: AppSnapshot }) {
   const manage = canManage(s.actor);
+  const control = canControl(s.actor, s);
   const diff = big(k.paidMinor) - big(k.requestedMinor);
   return (
     <div className="flex flex-col gap-6">
@@ -116,10 +118,17 @@ function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snaps
       </div>
       <div className="flex flex-col gap-2 border-t pt-4">
         {k.status === "draft" ? (
-          <ActionButton wide size="default" variant="default" label="Submit to sponsor" pendingLabel="Submitting" permission={manage} call={payloads.sponsorSubmit(k.id)} />
+          <>
+            <ActionButton wide size="default" variant="default" label="Authorize and submit to sponsor" pendingLabel="Submitting" permission={control} call={payloads.sponsorSubmit(k.id)} />
+            <p className="text-small text-muted-foreground">Submitting is the release: the sponsor pays from this packet. Organizers prepare packets; a controller submits them.</p>
+          </>
         ) : k.status === "exception" || k.status === "questioned" ? (
           <>
-            <ActionButton wide size="default" variant="default" label="Accept with fee" pendingLabel="Reconciling" permission={manage} call={payloads.sponsorReconcile(k.id, { acceptShortfall: true, note: "Shortfall accepted as the sponsor wire fee" })} />
+            {control.allowed ? (
+              <ReasonAction label="Accept shortfall as a fee" variant="secondary" submitLabel="Accept and close" pendingLabel="Reconciling" prompt="Why is the short payment acceptable? This note stays on the ledger entry." build={(r) => payloads.sponsorReconcile(k.id, { acceptShortfall: true, note: r })} />
+            ) : (
+              <ActionButton wide size="default" label="Accept shortfall as a fee" permission={control} call={() => null} />
+            )}
             {manage.allowed ? <ReasonAction label="Add a note" submitLabel="Save note" pendingLabel="Saving" prompt="Note for the reconciliation record (the exception stays open)" build={(r) => payloads.sponsorReconcile(k.id, { note: r })} /> : null}
           </>
         ) : null}

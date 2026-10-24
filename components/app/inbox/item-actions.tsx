@@ -179,21 +179,24 @@ export function ItemActions({
     }
     case "packet": {
       const k = ref.packet;
-      const manage = canManage(actor);
+      const control = canControl(actor, snapshot);
       return (
         <div className={wrap}>
-          <ActionButton
-            variant={first}
-            size={pane ? "default" : "sm"}
-            wide={pane}
-            label="Accept with fee"
-            pendingLabel="Reconciling"
-            permission={manage}
-            call={payloads.sponsorReconcile(k.id, { acceptShortfall: true, note: "Shortfall accepted as the sponsor wire fee" })}
-          />
-          {manage.allowed ? (
-            <ReasonAction label="Add a note" submitLabel="Save note" pendingLabel="Saving" prompt="Note for the reconciliation record (the exception stays open)" build={(r) => payloads.sponsorReconcile(k.id, { note: r })} />
-          ) : null}
+          {control.allowed ? (
+            <ReasonAction
+              label="Accept shortfall as a fee"
+              variant="secondary"
+              submitLabel="Accept and close"
+              pendingLabel="Reconciling"
+              prompt="Why is the short payment acceptable? This note stays on the ledger entry."
+              build={(r) => payloads.sponsorReconcile(k.id, { acceptShortfall: true, note: r })}
+            />
+          ) : (
+            <ActionButton variant={first} size={pane ? "default" : "sm"} wide={pane} label="Accept shortfall as a fee" permission={control} call={() => null} />
+          )}
+          <LinkButton href={`/sponsor?packet=${encodeURIComponent(k.id)}`} size="sm" variant="ghost">
+            Open packet
+          </LinkButton>
         </div>
       );
     }
