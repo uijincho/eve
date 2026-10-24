@@ -8,6 +8,13 @@ export interface Organization {
   agentLimitMinor: Minor; organizerLimitMinor: Minor; currency: string;
   sponsorName: string; sponsorTurnaroundDays: number; feesPaidBy: "org" | "recipient";
   notificationChannel?: string; policyNotes?: string;
+  /**
+   * Functional currency of the books (always "USD" today; absent means USD). Ledger, payout gross/withholding/fee/net,
+   * Claim.usdMinor, BudgetLine amounts, Person.paidYtdMinor/outstandingMinor and Filing amounts are in it.
+   * `currency` is what the org enters policy limits, the travel cap and budget caps in; Award.amountMinor
+   * is in Award.currency; Payout.destination* is in the recipient's currency.
+   */
+  booksCurrency?: string;
 }
 export interface EventRecord {
   id: string; name: string; startsAt: string; endsAt: string; venue: string;
@@ -77,7 +84,7 @@ export interface AppSnapshot {
 export type AppAction =
   | "org.update" | "event.update" | "budget.update" | "people.import" | "person.update"
   | "tax.submit" | "claim.submit" | "claim.review" | "award.create" | "award.choose"
-  | "award.split" | "award.confirm" | "award.fulfill" | "payout.propose" | "payout.release"
+  | "award.split" | "award.confirm" | "award.fulfill" | "payout.resolveRule" | "payout.propose" | "payout.release"
   | "payout.bankChange" | "payout.verify" | "payout.retry" | "sponsor.create"
   | "sponsor.submit" | "sponsor.reconcile" | "period.lock" | "filings.generate"
   | "demo.reset" | "demo.run" | "agent.run" | "flight.search" | "flight.request";

@@ -70,6 +70,8 @@ export const actionSchemas = {
   /** Controller confirms an item prize was shipped or bought locally (simulated); records FMV as reportable income. */
   "award.fulfill": z.strictObject({ id }),
   "payout.propose": z.strictObject({ sourceId: id, sourceType: z.enum(["claim", "award"]) }),
+  /** Controller resolves an unverified-rule hold for one source: verified default rule, or accept the rule as stated. */
+  "payout.resolveRule": z.strictObject({ sourceType: z.enum(["claim", "award"]), sourceId: id, use: z.enum(["default", "rule"]), reason: text(500).min(10) }),
   "payout.release": z.union([z.strictObject({ id }), z.strictObject({ ids: z.array(id).min(1).max(200) })]),
   "payout.bankChange": z.strictObject({
     personId: id, last4: z.string().regex(/^\d{4}$/), currency,

@@ -105,6 +105,38 @@ export const startingRules: TaxRule[] = [
     sourceUrl: CRA_NR, effectiveFrom: "2026-01-01",
     explanation: "Unresolved. Part XIII or Regulation 105 withholding may apply to payments to non-residents; no rate is assumed. Hold for review.",
   },
+  // Canadian payer: every rule below is unverified and holds until a controller resolves it
+  // (payout.resolveRule) or an advisor verifies it. No rate is assumed beyond what CRA pages state.
+  {
+    id: "ca-any-reimbursement", version: 1, payerCountry: "CA", payeeCountry: "*", paymentType: "reimbursement",
+    rateBps: 0, thresholdMinor: "0", form: "Residency declaration", reportingForm: "None (advisor review)", verified: false,
+    sourceUrl: CRA_T4A, effectiveFrom: "2026-01-01",
+    explanation: "Unverified default, mirroring any-reimbursement: a Canadian payer repays substantiated travel costs without withholding or a slip. Whether a T4A applies to reimbursements paid to non-employees needs a Canadian advisor. Not held for this alone.",
+  },
+  {
+    id: "ca-ca-stipend", version: 1, payerCountry: "CA", payeeCountry: "CA", paymentType: "stipend",
+    rateBps: 0, thresholdMinor: "50000", form: "SIN (token)", reportingForm: "T4A (box to verify)", verified: false,
+    sourceUrl: CRA_T4A, effectiveFrom: "2026-01-01",
+    explanation: "Unresolved. Fees for services paid to a Canadian resident may be reported on a T4A when the year's total is more than $500 or tax was deducted (CRA T4A slip page); the box and whether the judge or mentor is self-employed need review. Hold for review.",
+  },
+  {
+    id: "ca-nonca-stipend", version: 1, payerCountry: "CA", payeeCountry: "NONCA", paymentType: "stipend",
+    rateBps: 0, thresholdMinor: "0", form: "Residency declaration", reportingForm: "NR4 (to verify)", verified: false,
+    sourceUrl: CRA_NR, effectiveFrom: "2026-01-01",
+    explanation: "Unresolved. Services rendered in Canada by a non-resident can fall under Regulation 105 withholding; CRA's non-resident payments page lists it, but no rate is assumed here. Hold for review.",
+  },
+  {
+    id: "ca-ca-item-prize", version: 1, payerCountry: "CA", payeeCountry: "CA", paymentType: "item_prize",
+    rateBps: 0, thresholdMinor: "50000", form: "SIN (token)", reportingForm: "T4A (box to verify)", verified: false,
+    sourceUrl: CRA_T4A, effectiveFrom: "2026-01-01",
+    explanation: "Unresolved, same as ca-ca-prize for a non-cash prize at fair market value. Hold for review.",
+  },
+  {
+    id: "ca-nonca-item-prize", version: 1, payerCountry: "CA", payeeCountry: "NONCA", paymentType: "item_prize",
+    rateBps: 0, thresholdMinor: "0", form: "Residency declaration", reportingForm: "NR4 (to verify)", verified: false,
+    sourceUrl: CRA_NR, effectiveFrom: "2026-01-01",
+    explanation: "Unresolved, same as ca-nonca-prize for a non-cash prize at fair market value. Hold for review.",
+  },
 ];
 
 export const SOURCE_URLS = { I1099, P1099, P515, I1042S, CA_TREATY, FTB_NR, CRA_T4A, CRA_NR } as const;

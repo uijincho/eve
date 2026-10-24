@@ -20,7 +20,7 @@ import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
 
 import {
-  ActionError, agentActor, assertSelfOrStaff, conflict, forbidden, invalid, loadOrgEvent, loadPerson, notFound, recordDecision, recordNotice,
+  ActionError, agentActor, assertSelfOrStaff, limitsInBooks, money, conflict, forbidden, invalid, loadOrgEvent, loadPerson, notFound, recordDecision, recordNotice,
   toClaim, toEvent, toOrg, toPerson, toUsd, usd, type ClaimRow, type EventRow, type OrgRow, type PersonRow,
 } from "./core";
 import { claimBudgetRoom, ORG_BOOKED_FLIGHT, overBudgetMessage } from "./budget";
@@ -162,7 +162,9 @@ async function applyEvaluation(tx: Executor, actor: ActorContext, claim: ClaimRo
   // The org finance lock serializes budget room across concurrent approvals.
   await lockOrgFinance(tx, org.id);
   const budget = await claimBudgetRoom(tx, claim);
-  const result = evaluate({ claim, person, org, event, existing: rows, personNames: names, budget: budget ? { name: budget.name, remainingMinor: budget.remainingMinor } : undefined });
+  // Claims are in USD books; a non-USD org's limits and travel cap are converted, never compared raw.
+  const books = await limitsInBooks(tx, org, event);
+  const result = evaluate({ claim, person, org: books.org, event: books.event, existing: rows, personNames: names, budget: budget ? { name: budget.name, remainingMinor: budget.remainingMinor } : undefined });
   if (claim.category === ORG_BOOKED_FLIGHT && result.status === "approved") {
     // The agent never buys tickets: an organizer approves every org booking.
     result.status = "escalated";
@@ -242,8 +244,10 @@ export async function reviewClaim(tx: Executor, actor: ActorContext, input: { id
   assertNotBeneficiary(actor, await loadPerson(tx, actor.orgId, claim.personId), "review");
   if (!["escalated", "needs_info", "submitted", "processing"].includes(claim.status)) throw conflict(`Claim is already ${claim.status}.`);
   const { org } = await loadOrgEvent(tx, actor.orgId);
-  if (input.decision === "approve" && actor.role === "organizer" && claim.usdMinor > org.organizerLimitMinor) {
-    throw forbidden(`Claims above ${usd(org.organizerLimitMinor)} need a controller.`);
+  const { event } = await loadOrgEvent(tx, actor.orgId);
+  const books = await limitsInBooks(tx, org, event);
+  if (input.decision === "approve" && actor.role === "organizer" && claim.usdMinor > books.org.organizerLimitMinor) {
+    throw forbidden(`Claims above ${usd(books.org.organizerLimitMinor)}${books.note ? ` (${money(org.organizerLimitMinor, org.currency)}; ${books.note})` : ""} need a controller.`);
   }
   const person = await loadPerson(tx, actor.orgId, claim.personId);
   if (input.decision === "approve" && !person.adult) throw conflict("Recipient is under 18; claim cannot be approved.");

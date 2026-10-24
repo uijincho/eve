@@ -441,6 +441,39 @@ export const approval = pgTable("approval", {
   check("approval_not_agent", sql`${t.approverRole} <> 'agent' OR ${t.objectType} = 'claim'`),
 ]);
 
+/**
+ * A controller's recorded resolution of an unverified-rule hold for one payout
+ * source (award or claim): apply the verified default rule, or accept the
+ * unverified rule as stated. It never edits a rule. It applies only while the
+ * tax profile, the source amount, the payment type and the selected rule
+ * version are unchanged. A separate controller release is still required.
+ */
+export const taxRuleOverride = pgTable("tax_rule_override", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  sourceType: sourceTypeEnum("source_type").notNull(),
+  sourceId: text("source_id").notNull(),
+  personId: text("person_id").notNull().references(() => person.id, { onDelete: "cascade" }),
+  taxProfileId: text("tax_profile_id").notNull().references(() => taxProfile.id, { onDelete: "cascade" }),
+  paymentType: text("payment_type").notNull(),
+  amountMinor: money("amount_minor").notNull(),
+  currency: text("currency").notNull(),
+  /** The unverified rule whose hold was resolved. */
+  ruleId: text("rule_id").notNull(),
+  ruleVersion: integer("rule_version").notNull(),
+  decision: text("decision", { enum: ["default", "rule"] }).notNull(),
+  appliedRuleId: text("applied_rule_id").notNull(),
+  appliedRuleVersion: integer("applied_rule_version").notNull(),
+  reason: text("reason").notNull(),
+  approvedBy: text("approved_by").notNull(),
+  createdAt: createdAt(),
+  revokedAt: ts("revoked_at"),
+}, (t) => [
+  uniqueIndex("tax_rule_override_live_uq").on(t.sourceType, t.sourceId).where(sql`${t.revokedAt} IS NULL`),
+  index("tax_rule_override_org_idx").on(t.orgId),
+  check("tax_rule_override_reason", sql`length(trim(${t.reason})) >= 10`),
+]);
+
 export const sponsorPacket = pgTable("sponsor_packet", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),

@@ -26,14 +26,15 @@ import { renderFilingDraft, renderPayoutPacket, renderTaxFormReceipt } from "@/l
 import { actionSchemas } from "./action-schemas";
 import { prepareClaim, processClaim, reviewClaim, submitClaim, type ClaimEvidence } from "./claims";
 import {
-  ActionError, agentActor, assertMayInvoke, assertSelfOrStaff, conflict, currentProfile, effectiveTaxStatus, expectedForm, forbidden,
+  acceptedForms, ActionError, BOOKS_CURRENCY, fromUsd, money, toUsd, agentActor, assertMayInvoke, assertSelfOrStaff, conflict, currentProfile, effectiveTaxStatus, expectedForm, forbidden,
+  isUsPerson, profileValidFor, taxPayeeCountry,
   invalid, isAdultAt, loadOrgEvent, loadPerson, maskEmail, methodsFor, normName, notFound, recordDecision, recordNotice, storeDocument,
   toAward, toEvent, toPerson, usd,
 } from "./core";
 import { assertFits, ORG_BOOKED_FLIGHT, prizeBudgetRoom } from "./budget";
-import { computeTax, grossUp, recommendFulfillment, splitAward, w8ExpiresAt } from "./engines";
+import { computeTax, grossUp, recommendFulfillment, selectRule, splitAward, w8ExpiresAt } from "./engines";
 import {
-  assertNotBeneficiary, changeBankDetails, IN_KIND_PROVIDER, loadPayoutContext, lockOrgFinance, lockPayee, payoutCategory, postAccrual, prepareRelease,
+  assertNotBeneficiary, changeBankDetails, IN_KIND_PROVIDER, liveOverride, loadSource, requote, loadPayoutContext, lockOrgFinance, lockPayee, payoutCategory, postAccrual, prepareRelease,
   proposePayout, reevaluatePerson, releasePayout, requoteSiblings, retryPayout, SPONSOR_PROVIDER, taxFor, termsKey, verifyBankChange,
 } from "./payouts";
 import { computeScoreboard, saveScoreboard } from "./scoreboard";
@@ -88,8 +89,25 @@ async function budgetUpdate(tx: Executor, actor: ActorContext, p: { id?: string;
 
 type PersonInput = { name: string; email: string; country: string; citizenship?: string; dateOfBirth: string; address?: string; role?: string; payoutCurrency?: string };
 
+/**
+ * A signed form certifies the name, residence and citizenship on file at signing.
+ * When any of them change, the form no longer evidences the person: it goes to
+ * review and every unpaid payout is re-quoted (held until a new form is signed).
+ */
+async function staleProfileAfterChange(tx: Executor, actor: ActorContext, before: typeof s.person.$inferSelect, after: Pick<typeof s.person.$inferSelect, "name" | "country" | "citizenship" | "adult">) {
+  const changed = (["name", "country", "citizenship"] as const).filter((k) => before[k] !== after[k]);
+  if (changed.length) {
+    await tx.update(s.taxProfile).set({ status: "review", statusReason: `The profile's ${changed.join(", ")} changed after signing; a new form is required.` })
+      .where(and(eq(s.taxProfile.personId, before.id), sql`${s.taxProfile.supersededAt} IS NULL`, eq(s.taxProfile.status, "valid")));
+  }
+  if (changed.length || before.adult !== after.adult) await reevaluatePerson(tx, actor.orgId, before.id, actor);
+  return changed;
+}
+
 async function peopleImport(tx: Executor, actor: ActorContext, p: { people: PersonInput[] }) {
   const { event } = await loadOrgEvent(tx, actor.orgId);
+  const emails = p.people.map((x) => x.email.toLowerCase());
+  const before = emails.length ? await tx.select().from(s.person).where(and(eq(s.person.orgId, actor.orgId), inArray(s.person.email, emails))) : [];
   const rows = p.people.map((x) => ({
     id: newId("per"), orgId: actor.orgId, eventId: event.id, name: x.name, email: x.email.toLowerCase(), country: x.country,
     citizenship: x.citizenship ?? x.country, dateOfBirth: x.dateOfBirth, address: x.address ?? "", role: x.role ?? "hacker",
@@ -101,7 +119,13 @@ async function peopleImport(tx: Executor, actor: ActorContext, p: { people: Pers
       set: { name: sql`excluded.name`, country: sql`excluded.country`, citizenship: sql`excluded.citizenship`, dateOfBirth: sql`excluded.date_of_birth`, address: sql`excluded.address`, role: sql`excluded.role`, adult: sql`excluded.adult` },
     });
   }
+  let invalidated = 0;
+  for (const old of before) {
+    const next = rows.find((r) => r.email === old.email)!;
+    if ((await staleProfileAfterChange(tx, actor, old, next)).length) invalidated++;
+  }
   const minors = rows.filter((r) => !r.adult).length;
+  if (invalidated) await recordDecision(tx, { orgId: actor.orgId, objectType: "people", objectId: event.id, action: "tax.invalidate", summary: `${invalidated} existing tax form(s) moved to review because the imported name, residence or citizenship changed.`, actor, status: "escalated", tool: "validateTaxForm" });
   await recordDecision(tx, { orgId: actor.orgId, objectType: "people", objectId: event.id, action: "people.import", summary: `Imported ${rows.length} people${minors ? `; ${minors} under 18 blocked from payments` : ""}.`, actor, status: minors ? "escalated" : "done", tool: "importPeople", facts: { count: rows.length, minors } });
   return ok(`Imported ${rows.length} people.`, { imported: rows.length, minors });
 }
@@ -109,29 +133,33 @@ async function peopleImport(tx: Executor, actor: ActorContext, p: { people: Pers
 async function personUpdate(tx: Executor, actor: ActorContext, p: { id: string } & Partial<PersonInput>) {
   assertSelfOrStaff(actor, p.id);
   const { event } = await loadOrgEvent(tx, actor.orgId);
-  await loadPerson(tx, actor.orgId, p.id);
+  const before = await lockPayee(tx, actor.orgId, p.id);
   const set: Partial<typeof s.person.$inferInsert> = {};
   for (const k of ["name", "country", "citizenship", "dateOfBirth", "address", "role", "payoutCurrency"] as const) if (p[k] !== undefined) (set as Record<string, unknown>)[k] = p[k];
   if (actor.role === "attendee") delete set.role;
   if (set.dateOfBirth) set.adult = isAdultAt(set.dateOfBirth, event.startsAt);
   if (Object.keys(set).length === 0) throw invalid("Nothing to update.");
-  await tx.update(s.person).set(set).where(eq(s.person.id, p.id));
-  await recordDecision(tx, { orgId: actor.orgId, objectType: "person", objectId: p.id, personId: p.id, action: "person.update", summary: `Profile updated: ${Object.keys(set).join(", ")}.`, actor, status: set.adult === false ? "escalated" : "done", tool: "profile" });
-  return ok("Profile updated.");
+  const [after] = await tx.update(s.person).set(set).where(eq(s.person.id, p.id)).returning();
+  const stale = await staleProfileAfterChange(tx, actor, before, after);
+  await recordDecision(tx, { orgId: actor.orgId, objectType: "person", objectId: p.id, personId: p.id, action: "person.update", summary: `Profile updated: ${Object.keys(set).join(", ")}.${stale.length ? ` The signed tax form no longer matches (${stale.join(", ")}); a new form is required before payment.` : ""}`, actor, status: set.adult === false || stale.length ? "escalated" : "done", tool: "profile" });
+  return ok(stale.length ? "Profile updated. Please sign a new tax form; payments are held until then." : "Profile updated.");
 }
 
 // --------------------------------------------------------------------- tax
 
 async function taxSubmit(tx: Executor, actor: ActorContext, p: { personId: string; form: "W-9" | "W-8BEN" | "W-8BEN-E" | "Residency declaration"; signature: string; tin?: string; treatyCountry?: string; treatyArticle?: string }) {
   assertSelfOrStaff(actor, p.personId);
-  const person = await loadPerson(tx, actor.orgId, p.personId, true);
+  const person = await lockPayee(tx, actor.orgId, p.personId);
   if (!person.adult) throw conflict("Eve cannot onboard anyone under 18 at the event start date.");
+  const { org } = await loadOrgEvent(tx, actor.orgId);
   const now = new Date();
   const problems: string[] = [];
   if (normName(p.signature) !== normName(person.name)) problems.push("Signature does not match the legal name on the profile.");
-  const usPerson = person.country === "US" || person.citizenship === "US";
+  const usPerson = isUsPerson(person);
+  const accepted = acceptedForms(org.country, person);
   if (p.form === "W-9" && !usPerson) problems.push("A W-9 was submitted by someone with a non-US address and citizenship; a W-8BEN is expected.");
-  if (p.form.startsWith("W-8") && usPerson) problems.push("A US person must submit a W-9, not a W-8.");
+  else if (p.form.startsWith("W-8") && usPerson) problems.push("A US person must submit a W-9, not a W-8.");
+  else if (!accepted.includes(p.form)) problems.push(`A ${p.form} is not accepted by a ${org.country} payer for this person; ${accepted.join(" or ")} is expected.`);
   if (p.form === "W-9" && !p.tin) problems.push("No TIN provided; backup withholding may apply.");
   const blocking = problems.filter((x) => !x.startsWith("No TIN"));
   const status = blocking.length ? "review" : "valid";
@@ -155,7 +183,7 @@ async function taxSubmit(tx: Executor, actor: ActorContext, p: { personId: strin
     orgId: actor.orgId, objectType: "person", objectId: person.id, personId: person.id, personName: person.name, action: "tax.submit",
     summary: status === "valid" ? `${p.form} signed and valid${expiresAt ? ` until ${expiresAt.toISOString().slice(0, 10)}` : ""}. ${re.requoted} unpaid payout(s) re-quoted.` : `${p.form} needs review: ${blocking.join(" ")}`,
     actor, status: status === "valid" ? "done" : "escalated", tool: "validateTaxForm", documentId: doc.id,
-    facts: { form: p.form, expected: expectedForm(person), tinLast4: tin?.last4 ?? null, problems },
+    facts: { form: p.form, expected: expectedForm(person, org.country), tinLast4: tin?.last4 ?? null, problems },
   });
   return ok(status === "valid" ? `${p.form} saved.` : `${p.form} saved for review: ${blocking.join(" ")}`, { status, documentId: doc.id });
 }
@@ -163,7 +191,10 @@ async function taxSubmit(tx: Executor, actor: ActorContext, p: { personId: strin
 // ------------------------------------------------------------------ awards
 
 async function awardCreate(tx: Executor, actor: ActorContext, p: { personId?: string; teamPersonIds?: string[]; track: string; title: string; kind: "cash" | "item"; amountMinor: bigint; currency?: string; dueAt?: string }) {
-  const { event } = await loadOrgEvent(tx, actor.orgId);
+  const { org, event } = await loadOrgEvent(tx, actor.orgId);
+  // Prizes are entered in the org's currency (or USD); payouts convert to the USD books at the payment date.
+  const currency = p.currency ?? org.currency;
+  if (currency !== org.currency && currency !== BOOKS_CURRENCY) throw invalid(`Enter prizes in ${org.currency}${org.currency !== BOOKS_CURRENCY ? " or USD" : ""}; Eve converts the payout to the winner's currency.`);
   const ids = p.teamPersonIds ?? [p.personId!];
   const people = await tx.select().from(s.person).where(and(eq(s.person.orgId, actor.orgId), inArray(s.person.id, ids)));
   if (people.length !== ids.length) throw notFound("Winner not found.");
@@ -175,20 +206,35 @@ async function awardCreate(tx: Executor, actor: ActorContext, p: { personId?: st
   for (const part of parts) {
     const person = people.find((x) => x.id === part.personId)!;
     const profile = await currentProfile(tx, person.id);
-    const valid = effectiveTaxStatus(profile, now) === "valid";
-    const draft = { id: newId("awd"), orgId: actor.orgId, eventId: event.id, personId: person.id, track: p.track, title: p.title, kind: p.kind, amountMinor: BigInt(part.amountMinor), currency: p.currency ?? "USD", dueAt: p.dueAt ? new Date(p.dueAt) : event.closingAt, requestedBy: actor.memberId, teamId, splitBps: Math.round(10000 / parts.length), splitConfirmed: !teamId };
-    const rec = recommendFulfillment(toAward({ ...draft, fulfillment: "undecided", status: "draft", recommendation: "", shippingMinor: 0n, localMinor: 0n, createdAt: now }, person.name), toPerson(person, { profile, paidYtdMinor: 0n, outstandingMinor: 0n, now }));
+    const valid = profileValidFor(profile, person, org.country, now);
+    const draft = { id: newId("awd"), orgId: actor.orgId, eventId: event.id, personId: person.id, track: p.track, title: p.title, kind: p.kind, amountMinor: BigInt(part.amountMinor), currency, dueAt: p.dueAt ? new Date(p.dueAt) : event.closingAt, requestedBy: actor.memberId, teamId, splitBps: Math.round(10000 / parts.length), splitConfirmed: !teamId };
+    const rec = await fulfillmentFor(tx, draft, person, profile, now);
     const [row] = await tx.insert(s.award).values({ ...draft, status: valid ? "ready" : "needs_form", fulfillment: p.kind === "cash" ? "cash" : "undecided", recommendation: rec.recommendation, shippingMinor: BigInt(rec.shippingMinor), localMinor: BigInt(rec.localMinor) }).returning();
     created.push(row);
-    const nudges = [!valid ? `${person.name} needs a valid ${expectedForm(person)} before payment.` : "", p.kind === "item" && person.country !== "US" ? "Item prize to a non-US winner: withholding cannot come out of an item; consider cash." : ""].filter(Boolean);
+    const nudges = [!valid ? `${person.name} needs a valid ${expectedForm(person, org.country)} before payment.` : "", p.kind === "item" && person.country !== "US" ? "Item prize to a non-US winner: withholding cannot come out of an item; consider cash." : ""].filter(Boolean);
     await recordDecision(tx, {
       orgId: actor.orgId, objectType: "award", objectId: row.id, personId: person.id, personName: person.name, action: "award.create",
-      summary: `${p.title} (${p.track}) for ${person.name}, ${usd(row.amountMinor)}. ${rec.recommendation} ${nudges.join(" ")}`.trim(),
+      summary: `${p.title} (${p.track}) for ${person.name}, ${money(row.amountMinor, row.currency)}. ${rec.recommendation} ${nudges.join(" ")}`.trim(),
       actor, status: nudges.length ? "escalated" : "done", tool: "recommendFulfillment", facts: { recommendation: rec, nudges },
     });
-    if (!valid) await recordNotice(tx, { orgId: actor.orgId, personId: person.id, channel: `email ${maskEmail(person.email)}`, title: `You won ${p.title}`, body: `Congratulations! To receive your prize, complete your ${expectedForm(person)} in the Eve portal.` });
+    if (!valid) await recordNotice(tx, { orgId: actor.orgId, personId: person.id, channel: `email ${maskEmail(person.email)}`, title: `You won ${p.title}`, body: `Congratulations! To receive your prize, complete your ${expectedForm(person, org.country)} in the Eve portal.` });
   }
   return ok(`Created ${created.length} award(s).`, { ids: created.map((a) => a.id), teamId });
+}
+
+/**
+ * Fulfillment recommendation. Cash prizes need no estimate. Item estimates are
+ * USD-only in the engine, so a non-USD item value is converted to USD for the
+ * estimate and the shipping and local-purchase estimates are converted back.
+ */
+async function fulfillmentFor(tx: Executor, draft: { kind: "cash" | "item"; amountMinor: bigint; currency: string } & Omit<typeof s.award.$inferInsert, "kind" | "amountMinor" | "currency">, person: typeof s.person.$inferSelect, profile: Awaited<ReturnType<typeof currentProfile>>, now: Date) {
+  if (draft.kind === "cash") return { recommendation: "Cash prize: pay out after the tax form and withholding.", shippingMinor: "0", localMinor: "0" };
+  const fx = await toUsd(tx, draft.amountMinor, draft.currency, now);
+  const base = { ...draft, id: draft.id!, eventId: draft.eventId, orgId: draft.orgId, personId: draft.personId, track: draft.track, title: draft.title, dueAt: draft.dueAt, requestedBy: draft.requestedBy, teamId: draft.teamId ?? null, splitBps: draft.splitBps ?? 10000, splitConfirmed: draft.splitConfirmed ?? true };
+  const rec = recommendFulfillment(toAward({ ...base, amountMinor: fx.usdMinor, currency: "USD", fulfillment: "undecided", status: "draft", recommendation: "", shippingMinor: 0n, localMinor: 0n, createdAt: now }, person.name), toPerson(person, { profile, paidYtdMinor: 0n, outstandingMinor: 0n, now }));
+  if (draft.currency === "USD") return rec;
+  const back = async (v: string) => (await fromUsd(tx, BigInt(v), draft.currency, now)).minor.toString();
+  return { ...rec, shippingMinor: await back(rec.shippingMinor), localMinor: await back(rec.localMinor), recommendation: `${rec.recommendation} (Estimated in USD at ${fx.fxRate}, ${fx.fxSource}; shown in ${draft.currency}.)` };
 }
 
 async function loadAward(tx: Executor, actor: ActorContext, id: string) {
@@ -284,8 +330,9 @@ async function awardFulfill(tx: Executor, actor: ActorContext, p: { id: string }
   }
   const ctx = await loadPayoutContext(tx, actor.orgId, a.personId);
   if (!ctx.person.adult) throw conflict("Recipient is under 18; Eve does not deliver prizes to minors.");
-  const fmv = a.amountMinor;
-  const { tax, ytdMinor } = taxFor(ctx, "item_prize", fmv);
+  const fx = await toUsd(tx, a.amountMinor, a.currency, new Date());
+  const fmv = fx.usdMinor; // USD books
+  const { tax, ytdMinor } = taxFor(ctx, "item_prize", fmv, { override: await liveOverride(tx, "award", a.id), originalMinor: a.amountMinor, originalCurrency: a.currency });
   if (tax.hold) throw conflict(`Fulfillment held: ${tax.reason} The item's fair market value is reportable income, so it needs the same tax checks as cash.`);
   // Tax cannot come out of an item: the org pays it on top (gross-up) and the grossed-up amount is the income.
   const up = tax.rateBps > 0 ? (tax.grossUp ?? grossUp(fmv, tax.rateBps)) : null;
@@ -294,7 +341,8 @@ async function awardFulfill(tx: Executor, actor: ActorContext, p: { id: string }
   if (grossMinor - withholdingMinor !== fmv) throw conflict("Gross-up did not reconcile to the item's value; held for review.");
   // Reportability is judged on the income actually reported (FMV plus any tax paid on the winner's behalf).
   const year = ctx.event.startsAt.getUTCFullYear();
-  const reported = computeTax({ payerCountry: ctx.org.country, payeeCountry: ctx.person.country, paymentType: "item_prize", grossMinor: grossMinor.toString(), hasValidForm: true, hasTin: Boolean(ctx.profile?.tinLast4), year, ytdMinor, rules: ctx.rules, treatyClaim: Boolean(ctx.profile?.treatyArticle) });
+  const appliedRule = ctx.rules.find((r) => r.id === tax.ruleId && r.version === tax.ruleVersion);
+  const reported = computeTax({ payerCountry: ctx.org.country, payeeCountry: taxPayeeCountry(ctx.org.country, ctx.person), paymentType: "item_prize", grossMinor: grossMinor.toString(), hasValidForm: true, hasTin: Boolean(ctx.profile?.tinLast4), year, ytdMinor, rules: ctx.rules, treatyClaim: Boolean(ctx.profile?.treatyArticle), rule: appliedRule });
   assertFits(await prizeBudgetRoom(tx, a.eventId), grossMinor, "Fulfilling");
   const now = new Date();
   const id = newId("pay");
@@ -328,6 +376,59 @@ async function awardFulfill(tx: Executor, actor: ActorContext, p: { id: string }
 }
 
 // ---------------------------------------------------------------- payouts
+
+/**
+ * payout.resolveRule (controller). Resolves a hold caused only by an
+ * unverified tax rule, for one source: apply the verified default rule, or
+ * accept the unverified rule as stated. The rule table is never changed; the
+ * resolution is stored per source and lapses if the form, amount, payment type
+ * or rule version changes. It never clears form, minor, bank or budget holds,
+ * and the payout still needs its own controller release afterwards.
+ */
+async function resolveRule(tx: Executor, actor: ActorContext, p: { sourceType: "claim" | "award"; sourceId: string; use: "default" | "rule"; reason: string }) {
+  if (actor.role !== "controller") throw forbidden("Only a controller can resolve an unverified tax rule.");
+  const table = p.sourceType === "claim" ? s.claim : s.award;
+  const [peek] = await tx.select({ personId: table.personId }).from(table).where(and(eq(table.id, p.sourceId), eq(table.orgId, actor.orgId)));
+  if (!peek) throw notFound(p.sourceType === "claim" ? "Claim not found." : "Award not found.");
+  const person = await lockPayee(tx, actor.orgId, peek.personId);
+  assertNotBeneficiary(actor, person, "resolve a tax hold on");
+  const loaded = await loadSource(tx, actor.orgId, p);
+  const requestedBy = loaded.award?.requestedBy ?? loaded.claim!.requestedBy;
+  if (requestedBy === actor.memberId) throw forbidden("You requested this payment, so another controller must resolve its tax hold.");
+  const ctx = await loadPayoutContext(tx, actor.orgId, person.id);
+  const { tax } = taxFor(ctx, loaded.source.paymentType, loaded.source.grossMinor);
+  if (!profileValidFor(ctx.profile, person, ctx.org.country, ctx.now)) throw conflict(`Held for a missing or invalid ${expectedForm(person, ctx.org.country)}. A controller cannot override a missing form; the recipient must submit one.`);
+  if (tax.ruleId === "none") throw conflict(`No tax rule covers this payment (${tax.reason}). Add or verify a rule first.`);
+  if (!tax.hold || tax.ruleVerified) throw conflict("Nothing to resolve: this payment is not held by an unverified rule.");
+  let applied = { id: tax.ruleId, version: tax.ruleVersion };
+  if (p.use === "default") {
+    const year = ctx.event.startsAt.getUTCFullYear();
+    const def = selectRule(ctx.rules, { payerCountry: ctx.org.country, payeeCountry: taxPayeeCountry(ctx.org.country, person), paymentType: loaded.source.paymentType, year });
+    if (!def?.verified || def.id === tax.ruleId) throw conflict(`No verified default rule exists for this payment; ${tax.ruleId} is the only rule. Accept it with a reason, or keep the hold.`);
+    applied = { id: def.id, version: def.version };
+  }
+  const now = new Date();
+  await tx.update(s.taxRuleOverride).set({ revokedAt: now }).where(and(eq(s.taxRuleOverride.sourceType, p.sourceType), eq(s.taxRuleOverride.sourceId, p.sourceId), sql`${s.taxRuleOverride.revokedAt} IS NULL`));
+  const id = newId("rov");
+  await tx.insert(s.taxRuleOverride).values({
+    id, orgId: actor.orgId, sourceType: p.sourceType, sourceId: p.sourceId, personId: person.id, taxProfileId: ctx.profile!.id,
+    paymentType: loaded.source.paymentType, amountMinor: loaded.source.originalMinor ?? loaded.source.grossMinor, currency: loaded.source.originalCurrency ?? BOOKS_CURRENCY,
+    ruleId: tax.ruleId, ruleVersion: tax.ruleVersion, decision: p.use, appliedRuleId: applied.id, appliedRuleVersion: applied.version, reason: p.reason, approvedBy: actor.memberId,
+  });
+  await tx.insert(s.approval).values({ id: newId("apr"), orgId: actor.orgId, objectType: "tax_rule_override", objectId: id, requestedBy, approverId: actor.memberId, approverRole: actor.role, decision: "approved", reason: p.reason });
+  const [live] = await tx.select().from(s.payout).where(and(p.sourceType === "claim" ? eq(s.payout.claimId, p.sourceId) : eq(s.payout.awardId, p.sourceId), inArray(s.payout.status, ["held", "proposed", "approved", "frozen"]))).for("update");
+  const after = live ? await requote(tx, live, ctx, `controller resolved unverified rule ${tax.ruleId}`, actor) : undefined;
+  const summary = p.use === "default"
+    ? `Applied verified default ${applied.id} v${applied.version} instead of unverified ${tax.ruleId} v${tax.ruleVersion}: ${p.reason}`
+    : `Accepted unverified ${tax.ruleId} v${tax.ruleVersion} for this payment only (the rule stays unverified): ${p.reason}`;
+  await recordDecision(tx, {
+    orgId: actor.orgId, objectType: p.sourceType, objectId: p.sourceId, personId: person.id, personName: person.name, action: "payout.resolveRule",
+    summary: `${summary}${after ? ` Payout is now ${after.status}; it still needs a separate controller release.` : ""}`, actor, status: "done", tool: "resolveRule",
+    ruleId: applied.id, ruleVersion: applied.version,
+    facts: { overrideId: id, use: p.use, heldRule: { id: tax.ruleId, version: tax.ruleVersion, verified: false }, applied, taxProfileId: ctx.profile!.id, amountMinor: String(loaded.source.originalMinor ?? loaded.source.grossMinor), payoutId: after?.id ?? null },
+  });
+  return ok(`${summary}${after ? ` Payout ${after.status}; release it separately.` : ""}`, { overrideId: id, payoutId: after?.id ?? null, status: after?.status ?? null, ruleId: after?.ruleId ?? applied.id, ruleVersion: after?.ruleVersion ?? applied.version, ruleVerified: after?.ruleVerified ?? p.use === "default", withholdingMinor: after?.withholdingMinor.toString() ?? null });
+}
 
 async function payoutRelease(tx: Executor, actor: ActorContext, p: { id?: string; ids?: string[] }) {
   const ids = p.ids ?? [p.id!];
@@ -388,13 +489,13 @@ export async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payo
   const [existing] = await tx.select({ id: s.sponsorPacket.id, status: s.sponsorPacket.status }).from(s.sponsorPacket).where(eq(s.sponsorPacket.payoutId, payout.id));
   if (existing) throw new ActionError(409, `Sponsor packet ${existing.id} already exists for this payout (${existing.status}).`, { packetId: existing.id });
   const profile = await currentProfile(tx, person.id);
-  if (payout.sourceType === "award" && effectiveTaxStatus(profile, new Date()) !== "valid") throw conflict("The payee's tax form is missing or invalid; the sponsor packet would be incomplete.");
+  if (payout.sourceType === "award" && !profileValidFor(profile, person, org.country, new Date())) throw conflict("The payee's tax form is missing or invalid; the sponsor packet would be incomplete.");
   const methods = await methodsFor(tx, person.id);
   if (methods.pending) throw conflict("Bank details are pending verification; the packet cannot carry payout instructions yet.");
   const id = newId("sp");
   const pdf = await renderPayoutPacket({
     packetId: id, sponsorName: org.sponsorName || "Fiscal sponsor", preparedAt: new Date().toISOString(),
-    payee: { name: person.name, country: person.country, taxForm: profile?.form ?? expectedForm(person), taxStatus: effectiveTaxStatus(profile, new Date()), payoutLast4: methods.active?.last4 },
+    payee: { name: person.name, country: person.country, taxForm: profile?.form ?? expectedForm(person, org.country), taxStatus: effectiveTaxStatus(profile, new Date()), payoutLast4: methods.active?.last4 },
     source: { type: payout.sourceType, id: (payout.claimId ?? payout.awardId)!, description: payout.reason.slice(0, 120) },
     amounts: { currency: payout.currency, grossMinor: payout.grossMinor.toString(), withholdingMinor: payout.withholdingMinor.toString(), feeMinor: "0", netMinor: (payout.grossMinor - payout.withholdingMinor).toString(), destinationCurrency: payout.destinationCurrency, destinationNetMinor: payout.destinationNetMinor.toString(), fxRate: payout.fxRate },
     provider: SPONSOR_PROVIDER, truth: "Simulated", rule: { id: payout.ruleId, version: payout.ruleVersion, verified: payout.ruleVerified, reportingForm: payout.reportingForm ?? undefined },
@@ -691,6 +792,7 @@ const handlers: Record<AppAction, Handler> = {
   "award.split": awardSplit as Handler,
   "award.confirm": awardConfirm as Handler,
   "award.fulfill": awardFulfill as Handler,
+  "payout.resolveRule": resolveRule as Handler,
   "payout.propose": (async (tx, actor, p) => {
     const row = await proposePayout(tx, actor, p);
     return ok(row.status === "proposed" ? "Payout proposed for controller release." : `Payout ${row.status}: ${row.reason}`, { payoutId: row.id, status: row.status });

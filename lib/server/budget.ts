@@ -10,23 +10,29 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { Executor } from "@/lib/db";
 import * as s from "@/lib/db/schema";
 
-import { ActionError, usd, type ClaimRow } from "./core";
+import { ActionError, BOOKS_CURRENCY, toUsd, usd, type ClaimRow } from "./core";
 
 export const PRIZE_CATEGORY = "prizes";
 export const ORG_BOOKED_FLIGHT = "org_booked_flight";
 export const CLAIM_COMMITTED = ["approved", "paid"] as const;
 
-export interface BudgetRoom { lineId: string; name: string; capMinor: bigint; usedMinor: bigint; remainingMinor: bigint }
+/** All amounts in the USD books; `note` records the conversion of a cap entered in another currency. */
+export interface BudgetRoom { lineId: string; name: string; capMinor: bigint; usedMinor: bigint; remainingMinor: bigint; note?: string }
 
 /** Budget category a claim draws on: every travel claim (including org-booked flights) is "travel". */
 export function claimCategory(c: Pick<ClaimRow, "type" | "category">): string {
   return c.type === "travel" ? "travel" : c.category;
 }
 
+/** The line with its cap in book currency (caps are entered in the org's currency). */
 async function lineFor(tx: Executor, eventId: string, category: string, lineId?: string | null) {
-  const [line] = await tx.select().from(s.budgetLine)
+  const [row] = await tx.select({ line: s.budgetLine, currency: s.organization.currency }).from(s.budgetLine)
+    .innerJoin(s.organization, eq(s.organization.id, s.budgetLine.orgId))
     .where(lineId ? eq(s.budgetLine.id, lineId) : and(eq(s.budgetLine.eventId, eventId), eq(s.budgetLine.category, category)));
-  return line;
+  if (!row) return undefined;
+  if (row.currency === BOOKS_CURRENCY) return { ...row.line, note: undefined };
+  const fx = await toUsd(tx, row.line.capMinor, row.currency, new Date());
+  return { ...row.line, capMinor: fx.usdMinor, note: `cap ${row.currency} ${usd(row.line.capMinor).replace("$", "")} converted to USD books at ${fx.fxRate}` };
 }
 
 /** Room left on the claim's line, excluding the claim itself. Null when the org set no line for it. */
@@ -41,7 +47,7 @@ export async function claimBudgetRoom(tx: Executor, claim: Pick<ClaimRow, "id" |
     .where(and(eq(s.claim.eventId, claim.eventId), inArray(s.claim.status, [...CLAIM_COMMITTED]), sql`${s.claim.id} <> ${claim.id}`,
       sql`(${s.claim.budgetLineId} = ${line.id} OR (${s.claim.budgetLineId} IS NULL AND ${matchesLine}))`));
   const usedMinor = BigInt(used);
-  return { lineId: line.id, name: line.name, capMinor: line.capMinor, usedMinor, remainingMinor: line.capMinor - usedMinor };
+  return { lineId: line.id, name: line.name, capMinor: line.capMinor, usedMinor, remainingMinor: line.capMinor - usedMinor, note: line.note };
 }
 
 /** Room left on the event's prizes line, excluding one payout. Null when there is no prizes line. */
@@ -53,12 +59,23 @@ export async function prizeBudgetRoom(tx: Executor, eventId: string, excludePayo
     .where(and(eq(s.award.eventId, eventId), sql`${s.payout.status} NOT IN ('failed', 'returned')`,
       excludePayoutId ? sql`${s.payout.id} <> ${excludePayoutId}` : sql`true`));
   const usedMinor = BigInt(used);
-  return { lineId: line.id, name: line.name, capMinor: line.capMinor, usedMinor, remainingMinor: line.capMinor - usedMinor };
+  return { lineId: line.id, name: line.name, capMinor: line.capMinor, usedMinor, remainingMinor: line.capMinor - usedMinor, note: line.note };
+}
+
+/**
+ * A budget cap (entered in the org's currency) in book currency, for views
+ * that compare it with spent/committed book amounts. Same conversion the
+ * guards use.
+ */
+export async function capInBooks(tx: Executor, capMinor: bigint, orgCurrency: string, on = new Date()): Promise<{ capMinor: bigint; note?: string }> {
+  if (orgCurrency === BOOKS_CURRENCY) return { capMinor };
+  const fx = await toUsd(tx, capMinor, orgCurrency, on);
+  return { capMinor: fx.usdMinor, note: `${orgCurrency} cap converted at ${fx.fxRate} (${fx.fxSource})` };
 }
 
 export function overBudgetMessage(room: BudgetRoom, amountMinor: bigint, verb: string): string {
   const left = room.remainingMinor > 0n ? room.remainingMinor : 0n;
-  return `${verb} ${usd(amountMinor)} would exceed the ${room.name} budget: ${usd(room.capMinor)} cap, ${usd(room.usedMinor)} already spent or committed, ${usd(left)} left. Raise the ${room.name} line in Budget or reduce the amount first.`;
+  return `${verb} ${usd(amountMinor)} would exceed the ${room.name} budget: ${usd(room.capMinor)} cap, ${usd(room.usedMinor)} already spent or committed, ${usd(left)} left${room.note ? ` (${room.note})` : ""}. Raise the ${room.name} line in Budget or reduce the amount first.`;
 }
 
 /** Throws a 409 with the line's numbers when `amountMinor` does not fit. */

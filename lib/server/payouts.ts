@@ -28,8 +28,8 @@ import { postJournal, type JournalLineInput } from "@/lib/ledger";
 
 import { assertFits, claimBudgetRoom, ORG_BOOKED_FLIGHT, prizeBudgetRoom } from "./budget";
 import {
-  ActionError, conflict, currentProfile, forbidden, hasValidForm, invalid, loadOrgEvent, loadPerson, maskEmail,
-  methodsFor, notFound, recordDecision, recordNotice, usd,
+  ActionError, conflict, currentProfile, forbidden, invalid, loadOrgEvent, loadPerson, maskEmail, profileValidFor, taxPayeeCountry,
+  BOOKS_CURRENCY, methodsFor, money, notFound, recordDecision, recordNotice, toUsd, usd,
   type AwardRow, type ClaimRow, type EventRow, type MethodRow, type OrgRow, type PayoutRow, type PersonRow, type ProfileRow,
 } from "./core";
 import { aggregateYtdByForm, big, computeTax, formFamily, paymentTypeFor, quotePayout, selectRule } from "./engines";
@@ -116,6 +116,20 @@ export interface PayoutSource {
   grossMinor: bigint;
   paymentType: string;
   dueAt: Date;
+  /** Conversion into the USD books when the source was entered in another currency. */
+  note?: string;
+  /** The amount as entered on the source, before conversion (rule overrides bind to it). */
+  originalMinor?: bigint;
+  originalCurrency?: string;
+}
+
+export type RuleOverride = typeof s.taxRuleOverride.$inferSelect;
+
+/** The live controller resolution of an unverified-rule hold for a source, if any. */
+export async function liveOverride(tx: Executor, sourceType: "claim" | "award", sourceId: string): Promise<RuleOverride | undefined> {
+  const [row] = await tx.select().from(s.taxRuleOverride)
+    .where(and(eq(s.taxRuleOverride.sourceType, sourceType), eq(s.taxRuleOverride.sourceId, sourceId), sql`${s.taxRuleOverride.revokedAt} IS NULL`));
+  return row;
 }
 
 export function sourceFromClaim(c: ClaimRow): PayoutSource {
@@ -126,7 +140,7 @@ export function sourceFromAward(a: AwardRow): PayoutSource {
   return { type: "award", id: a.id, grossMinor: a.amountMinor, paymentType: paymentTypeFor({ kind: "award", awardKind: a.kind, track: a.track, fulfillment: a.fulfillment }), dueAt: a.dueAt };
 }
 
-export interface LoadedSource { source: PayoutSource; personId: string; eventId: string; claim?: ClaimRow; award?: AwardRow; blockers: string[] }
+export interface LoadedSource { source: PayoutSource; personId: string; eventId: string; claim?: ClaimRow; award?: AwardRow; blockers: string[]; override?: RuleOverride }
 
 /**
  * Loads (and locks) a payout's source and reports why it cannot be paid in
@@ -139,7 +153,7 @@ export async function loadSource(tx: Executor, orgId: string, ref: { sourceType:
     const blockers: string[] = [];
     if (c.category === ORG_BOOKED_FLIGHT) blockers.push("Org-booked flights are bought by the organization; Eve never reimburses them to the attendee.");
     else if (c.status !== "approved" && !(c.status === "paid" && ownPayoutId)) blockers.push(`Claim is ${c.status}; only approved claims can be paid.`);
-    return { source: sourceFromClaim(c), personId: c.personId, eventId: c.eventId, claim: c, blockers };
+    return { source: { ...sourceFromClaim(c), originalMinor: c.amountMinor, originalCurrency: c.currency }, personId: c.personId, eventId: c.eventId, claim: c, blockers, override: await liveOverride(tx, "claim", c.id) };
   }
   const [a] = await tx.select().from(s.award).where(and(eq(s.award.id, ref.sourceId), eq(s.award.orgId, orgId))).for("update");
   if (!a) throw notFound("Award not found.");
@@ -153,7 +167,13 @@ export async function loadSource(tx: Executor, orgId: string, ref: { sourceType:
     const team = await tx.select({ ok: s.award.splitConfirmed }).from(s.award).where(eq(s.award.teamId, a.teamId));
     if (team.some((t) => !t.ok)) blockers.push("Every team member must confirm the prize split first.");
   }
-  return { source: sourceFromAward(a), personId: a.personId, eventId: a.eventId, award: a, blockers };
+  const source: PayoutSource = { ...sourceFromAward(a), originalMinor: a.amountMinor, originalCurrency: a.currency };
+  if (a.currency !== BOOKS_CURRENCY) {
+    const fx = await toUsd(tx, a.amountMinor, a.currency, new Date());
+    source.grossMinor = fx.usdMinor;
+    source.note = `Prize of ${money(a.amountMinor, a.currency)} converted to ${usd(fx.usdMinor)} for the USD books at ${fx.fxRate} (${fx.fxSource}).`;
+  }
+  return { source, personId: a.personId, eventId: a.eventId, award: a, blockers, override: await liveOverride(tx, "award", a.id) };
 }
 
 // ------------------------------------------------------------------ quote
@@ -163,25 +183,50 @@ export interface PayoutContext {
   payments: PaymentRecord[]; rules: TaxRule[]; now: Date;
 }
 
-/** Same-form YTD and the engine's tax result for one payment. Pure. */
-export function taxFor(ctx: PayoutContext, paymentType: string, grossMinor: bigint) {
+/**
+ * Same-form YTD and the engine's tax result for one payment. Pure. A live
+ * controller override clears only an unverified-rule hold, and only while it
+ * still matches the current form, source amount, payment type and rule
+ * version; any other hold (form, minor, bank, budget) is untouched.
+ */
+export function taxFor(ctx: PayoutContext, paymentType: string, grossMinor: bigint, resolution?: { override?: RuleOverride; originalMinor?: bigint; originalCurrency?: string }) {
+  const base = baseTax(ctx, paymentType, grossMinor);
+  const o = resolution?.override;
+  if (!o) return base;
+  const { org, person, profile, now } = ctx;
+  const matches = o.taxProfileId === profile?.id && o.paymentType === paymentType && o.ruleId === base.tax.ruleId && o.ruleVersion === base.tax.ruleVersion
+    && o.amountMinor === (resolution?.originalMinor ?? grossMinor) && o.currency === (resolution?.originalCurrency ?? BOOKS_CURRENCY);
+  if (!matches) return { ...base, tax: { ...base.tax, reason: `${base.tax.reason} An earlier controller resolution no longer applies because the form, amount or rule changed.` } };
+  const onlyUnverified = base.tax.hold && !base.tax.ruleVerified && grossMinor > 0n && profileValidFor(profile, person, org.country, now);
+  if (!onlyUnverified) return base;
+  if (o.decision === "rule") {
+    return { ...base, overrideId: o.id, tax: { ...base.tax, hold: false, reason: `${base.tax.reason} A controller accepted unverified rule ${o.ruleId} v${o.ruleVersion} for this payment only ("${o.reason}"); the rule itself stays unverified.` } };
+  }
+  const def = ctx.rules.find((r) => r.id === o.appliedRuleId && r.version === o.appliedRuleVersion);
+  if (!def?.verified) return base;
+  const forced = baseTax(ctx, paymentType, grossMinor, def);
+  return { ...forced, overrideId: o.id, tax: { ...forced.tax, reason: `${forced.tax.reason} A controller applied the verified default ${def.id} v${def.version} instead of unverified ${o.ruleId} v${o.ruleVersion} ("${o.reason}").` } };
+}
+
+function baseTax(ctx: PayoutContext, paymentType: string, grossMinor: bigint, forceRule?: TaxRule): { tax: ReturnType<typeof computeTax>; ytdMinor: string; overrideId?: string } {
   const { org, person, profile, now } = ctx;
   const year = ctx.event.startsAt.getUTCFullYear();
   // YTD only counts payments on the same reporting form (1099-MISC and 1099-NEC thresholds are separate).
-  const rule = selectRule(ctx.rules, { payerCountry: org.country, payeeCountry: person.country, paymentType, year });
+  const payeeCountry = taxPayeeCountry(org.country, person);
+  const rule = selectRule(ctx.rules, { payerCountry: org.country, payeeCountry, paymentType, year });
   const ytdMinor = rule ? aggregateYtdByForm(ctx.payments, person.id, year)[formFamily(rule.reportingForm)] ?? "0" : "0";
   const tax = computeTax({
-    payerCountry: org.country, payeeCountry: person.country, paymentType,
-    grossMinor: grossMinor.toString(), hasValidForm: hasValidForm(profile, now), hasTin: Boolean(profile?.tinLast4),
-    year, ytdMinor, rules: ctx.rules, treatyClaim: Boolean(profile?.treatyArticle),
+    payerCountry: org.country, payeeCountry, paymentType,
+    grossMinor: grossMinor.toString(), hasValidForm: profileValidFor(profile, person, org.country, now), hasTin: Boolean(profile?.tinLast4),
+    year, ytdMinor, rules: ctx.rules, treatyClaim: Boolean(profile?.treatyArticle), rule: forceRule,
   });
   return { tax, ytdMinor };
 }
 
 /** Pure: computes the payout row for a source. Tax and quote come from the engines. */
-export function buildPayout(ctx: PayoutContext, source: PayoutSource, requestedBy: string, extraHolds: string[] = []) {
+export function buildPayout(ctx: PayoutContext, source: PayoutSource, requestedBy: string, extraHolds: string[] = [], override?: RuleOverride) {
   const { org, person, active, pending } = ctx;
-  const { tax, ytdMinor } = taxFor(ctx, source.paymentType, source.grossMinor);
+  const { tax, ytdMinor } = taxFor(ctx, source.paymentType, source.grossMinor, { override, originalMinor: source.originalMinor, originalCurrency: source.originalCurrency });
   const destinationCurrency = (pending ?? active)?.currency ?? person.payoutCurrency;
   const net = big(tax.netMinor);
   const quote = net > 0n
@@ -194,7 +239,7 @@ export function buildPayout(ctx: PayoutContext, source: PayoutSource, requestedB
   if (!active && !pending) holds.push("No verified payout method on file.");
   let status: PayoutRow["status"] = holds.length ? "held" : "proposed";
   let frozenFrom: PayoutRow["status"] | null = null;
-  let reason = holds.length ? holds.join(" ") : tax.reason;
+  let reason = `${holds.length ? holds.join(" ") : tax.reason}${source.note ? ` ${source.note}` : ""}`;
   if (pending) {
     frozenFrom = status;
     status = "frozen";
@@ -220,7 +265,9 @@ export async function loadPayoutContext(db: Executor, orgId: string, personId: s
   const person = await loadPerson(db, orgId, personId);
   const profile = await currentProfile(db, personId);
   const methods = await methodsFor(db, personId);
-  const rules = await loadRules(db);
+  // CRA thresholds are stated in CAD; the books are USD, so convert them before comparing.
+  const rules = await Promise.all((await loadRules(db)).map(async (r) => r.payerCountry !== "CA" || r.thresholdMinor === "0" ? r
+    : { ...r, thresholdMinor: (await toUsd(db, BigInt(r.thresholdMinor), "CAD", new Date())).usdMinor.toString() }));
   const payments = await paymentsFor(db, personId, excludePayoutId);
   return { org, event, person, profile, active: methods.active, pending: methods.pending, payments, rules, now: new Date() };
 }
@@ -253,7 +300,7 @@ function describeChange(before: PayoutRow, after: typeof s.payout.$inferInsert):
 export async function requote(tx: Executor, p: PayoutRow, ctx: PayoutContext, why: string, actor?: ActorContext): Promise<PayoutRow> {
   if (!(UNPAID as readonly string[]).includes(p.status)) return p;
   const loaded = await loadSource(tx, p.orgId, { sourceType: p.sourceType, sourceId: (p.claimId ?? p.awardId)! }, p.id);
-  const { row } = buildPayout(ctx, loaded.source, p.requestedBy, loaded.blockers);
+  const { row } = buildPayout(ctx, loaded.source, p.requestedBy, loaded.blockers, loaded.override);
   // A frozen payout stays frozen until the bank change is resolved, whatever the hold reason.
   const changed = termsKey(row) !== termsKey(p) || (row.status === "held" && p.status === "held" && row.reason !== p.reason);
   if (!changed) return p;
@@ -279,9 +326,9 @@ export async function requote(tx: Executor, p: PayoutRow, ctx: PayoutContext, wh
 }
 
 /** Award status that mirrors its payout: held for a form -> needs_form, otherwise proposed or paid. */
-export function awardStatusFor(p: Pick<PayoutRow, "status">, ctx: Pick<PayoutContext, "profile" | "now">): AwardRow["status"] {
+export function awardStatusFor(p: Pick<PayoutRow, "status">, ctx: Pick<PayoutContext, "profile" | "now" | "person" | "org">): AwardRow["status"] {
   if (p.status === "paid") return "paid";
-  if (p.status === "held" && !hasValidForm(ctx.profile, ctx.now)) return "needs_form";
+  if (p.status === "held" && !profileValidFor(ctx.profile, ctx.person, ctx.org.country, ctx.now)) return "needs_form";
   return "proposed";
 }
 
@@ -324,7 +371,7 @@ export async function proposePayout(tx: Executor, actor: ActorContext, input: { 
   await assertBudget(tx, loaded, loaded.source.grossMinor, null, "Proposing");
 
   const ctx = await loadPayoutContext(tx, actor.orgId, loaded.personId);
-  const { row, tax, quote, ytdMinor } = buildPayout(ctx, loaded.source, actor.memberId);
+  const { row, tax, quote, ytdMinor } = buildPayout(ctx, loaded.source, actor.memberId, [], loaded.override);
   const pending = await tx.select({ id: s.payout.id, gross: s.payout.grossMinor }).from(s.payout)
     .where(and(eq(s.payout.personId, loaded.personId), eq(s.payout.sourceType, "award"), inArray(s.payout.status, [...UNPAID])));
   if (input.sourceType === "award" && pending.length) {
@@ -423,7 +470,7 @@ export async function prepareRelease(tx: Executor, actor: ActorContext, payoutId
   const profile = await currentProfile(tx, p.personId);
   const methods = await methodsFor(tx, p.personId);
   if (!person.adult) throw conflict("Recipient is under 18; payment blocked.");
-  if (p.sourceType === "award" && !hasValidForm(profile, new Date())) throw conflict("Tax form is missing or invalid; payment held.");
+  if (p.sourceType === "award" && !profileValidFor(profile, person, org.country, new Date())) throw conflict("Tax form is missing, invalid or no longer matches the profile; payment held.");
   if (methods.pending) throw conflict(`Bank details changed to ••${methods.pending.last4}; payout is frozen pending verification.`);
   if (!methods.active || methods.active.version !== p.bankVersion || methods.active.id !== p.payoutMethodId) {
     throw conflict("This payout was quoted against outdated bank details; it must be re-proposed and re-approved.");
@@ -433,7 +480,7 @@ export async function prepareRelease(tx: Executor, actor: ActorContext, payoutId
   await assertBudget(tx, loaded, p.grossMinor, p.id, "Releasing");
   // Recompute tax and quote under the person lock with finalized YTD.
   const ctx = await loadPayoutContext(tx, actor.orgId, p.personId, p.id);
-  const { row } = buildPayout(ctx, loaded.source, p.requestedBy);
+  const { row } = buildPayout(ctx, loaded.source, p.requestedBy, [], loaded.override);
   if (termsKey(row) !== termsKey(p)) {
     const updated = await requote(tx, p, ctx, "terms changed before release", actor);
     return { kind: "requoted", payout: updated };
@@ -649,7 +696,7 @@ export async function verifyBankChange(tx: Executor, actor: ActorContext, input:
 export async function reevaluatePerson(tx: Executor, orgId: string, personId: string, actor?: ActorContext) {
   await lockPayee(tx, orgId, personId);
   const ctx = await loadPayoutContext(tx, orgId, personId);
-  const valid = hasValidForm(ctx.profile, ctx.now);
+  const valid = profileValidFor(ctx.profile, ctx.person, ctx.org.country, ctx.now);
   const withPayout = sql`${s.award.id} NOT IN (SELECT ${s.payout.awardId} FROM ${s.payout} WHERE ${s.payout.awardId} IS NOT NULL AND ${s.payout.status} NOT IN ('failed', 'returned'))`;
   if (valid) await tx.update(s.award).set({ status: "ready" }).where(and(eq(s.award.personId, personId), eq(s.award.status, "needs_form"), withPayout));
   else await tx.update(s.award).set({ status: "needs_form" }).where(and(eq(s.award.personId, personId), eq(s.award.status, "ready"), withPayout));

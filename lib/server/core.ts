@@ -45,6 +45,7 @@ export const ACTION_ROLES: Record<C.AppAction, Who[]> = {
   "award.split": ["organizer", "self"],
   "award.confirm": ["self"],
   "award.fulfill": ["controller"],
+  "payout.resolveRule": ["controller"],
   "payout.propose": ["organizer", "agent"],
   "payout.release": ["controller"],
   "payout.bankChange": ["organizer", "self"],
@@ -120,7 +121,7 @@ export function toOrg(o: OrgRow): C.Organization {
     id: o.id, name: o.name, country: o.country, mode: o.mode, agentLimitMinor: str(o.agentLimitMinor),
     organizerLimitMinor: str(o.organizerLimitMinor), currency: o.currency, sponsorName: o.sponsorName,
     sponsorTurnaroundDays: o.sponsorTurnaroundDays, feesPaidBy: o.feesPaidBy,
-    notificationChannel: o.notificationChannel ?? undefined, policyNotes: o.policyNotes ?? undefined,
+    notificationChannel: o.notificationChannel ?? undefined, policyNotes: o.policyNotes ?? undefined, booksCurrency: BOOKS_CURRENCY,
   };
 }
 
@@ -132,8 +133,28 @@ export function toEvent(e: EventRow): C.EventRecord {
   };
 }
 
-export function expectedForm(p: Pick<PersonRow, "country" | "citizenship">): C.Person["taxForm"] {
-  return p.country === "US" || p.citizenship === "US" ? "W-9" : "W-8BEN";
+/** A US citizen or US resident is a US person for a US payer, wherever they live (IRS: W-9, 1099). */
+export function isUsPerson(p: Pick<PersonRow, "country" | "citizenship">): boolean {
+  return p.country === "US" || p.citizenship === "US";
+}
+
+/**
+ * Payee jurisdiction for rule selection. A US payer classifies by US-person
+ * status (citizenship or residence); a Canadian payer by residence. Payout
+ * destination and fees always use the residence country.
+ */
+export function taxPayeeCountry(payerCountry: string, p: Pick<PersonRow, "country" | "citizenship">): string {
+  return payerCountry === "US" && isUsPerson(p) ? "US" : p.country;
+}
+
+/** Forms a payer accepts from this person. */
+export function acceptedForms(payerCountry: string, p: Pick<PersonRow, "country" | "citizenship">): C.Person["taxForm"][] {
+  if (payerCountry === "CA") return ["Residency declaration"];
+  return isUsPerson(p) ? ["W-9"] : ["W-8BEN", "W-8BEN-E"];
+}
+
+export function expectedForm(p: Pick<PersonRow, "country" | "citizenship">, payerCountry = "US"): C.Person["taxForm"] {
+  return acceptedForms(payerCountry, p)[0];
 }
 
 export function effectiveTaxStatus(profile: ProfileRow | undefined, now: Date): C.Person["taxStatus"] {
@@ -144,6 +165,17 @@ export function effectiveTaxStatus(profile: ProfileRow | undefined, now: Date): 
 
 export function hasValidForm(profile: ProfileRow | undefined, now: Date): boolean {
   return effectiveTaxStatus(profile, now) === "valid";
+}
+
+/**
+ * The form is valid AND still matches the person and payer: the right form
+ * for this payer and the signature matching the current legal name. Guards
+ * against a profile that went stale without being invalidated.
+ */
+export function profileValidFor(profile: ProfileRow | undefined, person: Pick<PersonRow, "name" | "country" | "citizenship">, payerCountry: string, now: Date): boolean {
+  if (!profile || !hasValidForm(profile, now)) return false;
+  if (!acceptedForms(payerCountry, person).includes(profile.form)) return false;
+  return !profile.signatureName || normName(profile.signatureName) === normName(person.name);
 }
 
 export function toPerson(p: PersonRow, extra: {
@@ -270,6 +302,48 @@ export async function toUsd(db: Executor, amountMinor: bigint, currency: string,
     .orderBy(desc(s.fxRate.rateDate)).limit(1);
   if (!row) throw invalid(`No FX rate for ${currency} on ${on.toISOString().slice(0, 10)}.`);
   return { usdMinor: convertMinor(amountMinor, currency, row.rate), fxRate: row.rate, fxSource: `${row.source}, ${row.rateDate}` };
+}
+
+/**
+ * Books are kept in USD for every organization (BOOKS_CURRENCY). An org whose
+ * currency is not USD enters limits, caps and prizes in its own currency; Eve
+ * converts them to USD at the latest stored rate when it decides, and records
+ * the rate and source. It never compares amounts in two currencies.
+ */
+export const BOOKS_CURRENCY = "USD";
+
+/** Converts USD minor units into `currency` at the latest stored rate on or before the date (inverse of toUsd). */
+export async function fromUsd(db: Executor, usdMinor: bigint, currency: string, on: Date): Promise<{ minor: bigint; fxRate: string; fxSource: string }> {
+  if (currency === "USD") return { minor: usdMinor, fxRate: "1.00000000", fxSource: "No conversion" };
+  const [row] = await db.select().from(s.fxRate)
+    .where(and(eq(s.fxRate.base, currency), eq(s.fxRate.quote, "USD"), lte(s.fxRate.rateDate, on.toISOString().slice(0, 10))))
+    .orderBy(desc(s.fxRate.rateDate)).limit(1);
+  if (!row) throw invalid(`No FX rate for ${currency} on ${on.toISOString().slice(0, 10)}.`);
+  const [whole, frac = ""] = row.rate.split(".");
+  const num = BigInt(whole + frac);
+  const inverse = { num: (10n ** BigInt(frac.length + 10)) / num, scale: 10 };
+  return { minor: engineConvert(usdMinor, "USD", currency, inverse), fxRate: row.rate, fxSource: `${row.source}, ${row.rateDate} (inverse)` };
+}
+
+/** "$1,000.00" for USD, "CAD 1,000.00" otherwise. */
+export function money(minor: bigint, currency: string): string {
+  return currency === "USD" ? usd(minor) : `${currency} ${usd(minor).replace("$", "")}`;
+}
+
+/**
+ * The org's policy limits and the event's travel cap in book currency (USD).
+ * Identity for USD orgs; for others each is converted at today's stored rate.
+ */
+export async function limitsInBooks<O extends Pick<OrgRow, "currency" | "agentLimitMinor" | "organizerLimitMinor" | "controllerThresholdMinor">, E extends Pick<EventRow, "travelCapMinor">>(db: Executor, org: O, event: E): Promise<{ org: O; event: E; note: string | null }> {
+  if (org.currency === BOOKS_CURRENCY) return { org, event, note: null };
+  const now = new Date();
+  const c = async (v: bigint) => (await toUsd(db, v, org.currency, now)).usdMinor;
+  const fx = await toUsd(db, 100n, org.currency, now);
+  return {
+    org: { ...org, agentLimitMinor: await c(org.agentLimitMinor), organizerLimitMinor: await c(org.organizerLimitMinor), controllerThresholdMinor: await c(org.controllerThresholdMinor) },
+    event: { ...event, travelCapMinor: await c(event.travelCapMinor) },
+    note: `Books in USD: ${org.currency} limits converted at ${fx.fxRate} (${fx.fxSource}).`,
+  };
 }
 
 /** Exact conversion to USD via the canonical engine (same rounding the policy checks use). */

@@ -412,3 +412,147 @@ describe.skipIf(!hasDatabase)("budget caps (real Postgres)", { timeout: 180_000 
     expect(rev.message).toMatch(/Supplies budget/);
   });
 });
+
+describe.skipIf(!hasDatabase)("tax identity, unverified-rule resolution and scoreboard evidence (real Postgres)", { timeout: 240_000 }, () => {
+  let m: Mods;
+  let t: Awaited<ReturnType<typeof setupOrg>>;
+  beforeAll(async () => {
+    m = await load();
+    t = await setupOrg(m, "taxid");
+  }, 120_000);
+  afterAll(async () => {
+    if (t?.orgId) await dropTestOrg(t.orgId);
+  }, 120_000);
+  const payoutRow = async (id: string) => (await m.db.select().from(m.s.payout).where(eq(m.s.payout.id, id)))[0];
+  const award = async (personId: string, amount: string, extra: Record<string, unknown> = {}) => {
+    const r = await t.run(t.dana, "award.create", { personId, track: "Track", title: "Prize", kind: "cash", amountMinor: amount, ...extra });
+    expect(r.ok, r.message).toBe(true);
+    return (r.data!.ids as string[])[0];
+  };
+
+  it("treats a US citizen living in Canada as a US person, and holds the wrong form for the payer", async () => {
+    const { db, s } = m;
+    const amy = await t.person("Amy Stone", "CA", { currency: "CAD" });
+    await db.update(s.person).set({ citizenship: "US" }).where(eq(s.person.id, amy.id));
+    expect((await t.run(amy.self, "tax.submit", { personId: amy.id, form: "W-9", signature: "Amy Stone", tin: "123-45-1111", certify: true })).data?.status).toBe("valid");
+    const p1 = await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: await award(amy.id, "250000") });
+    const row = await payoutRow(p1.data!.payoutId as string);
+    expect(row).toMatchObject({ ruleId: "us-us-prize", withholdingMinor: 0n, reportable: true, destinationCurrency: "CAD" });
+    expect(row.reportingForm).toMatch(/^1099-MISC/);
+    // A residency declaration is not a US payer's form.
+    const ben = await t.person("Ben Hart", "GB", { currency: "GBP" });
+    const decl = await t.run(ben.self, "tax.submit", { personId: ben.id, form: "Residency declaration", signature: "Ben Hart", certify: true });
+    expect(decl.data?.status).toBe("review");
+    expect((await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: await award(ben.id, "10000") })).data?.status).toBe("held");
+    // Changing residence after signing invalidates the form and holds the proposal.
+    await t.run(amy.self, "person.update", { id: amy.id, citizenship: "CA" });
+    const after = await payoutRow(p1.data!.payoutId as string);
+    expect(after.status).toBe("held");
+    const [profile] = await db.select().from(s.taxProfile).where(eq(s.taxProfile.personId, amy.id));
+    expect(profile.status).toBe("review");
+  });
+
+  it("resolves an unverified-rule hold per source with a reason, never bypassing a missing form, and needs a separate release", async () => {
+    const { db, s } = m;
+    const cara = await t.person("Cara Lane", "CA", { currency: "CAD" });
+    await t.run(cara.self, "tax.submit", { personId: cara.id, form: "W-8BEN", signature: "Cara Lane", certify: true, treatyCountry: "CA", treatyArticle: "XXII" });
+    const awardId = await award(cara.id, "100000");
+    const pid = (await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: awardId })).data!.payoutId as string;
+    expect(await payoutRow(pid)).toMatchObject({ status: "held", ruleId: "us-ca-prize-treaty", ruleVerified: false });
+    expect((await t.run(t.dana, "payout.resolveRule", { sourceType: "award", sourceId: awardId, use: "default", reason: "Advisor says treaty does not cover prizes" })).status).toBe(403);
+    expect((await t.run(t.ari, "payout.resolveRule", { sourceType: "award", sourceId: awardId, use: "default", reason: "short" })).status).toBe(400);
+    const res = await t.run(t.ari, "payout.resolveRule", { sourceType: "award", sourceId: awardId, use: "default", reason: "Advisor: Article XXII lets the US tax the prize; withhold the 30% default" });
+    expect(res.ok, res.message).toBe(true);
+    const resolved = await payoutRow(pid);
+    expect(resolved).toMatchObject({ status: "proposed", ruleId: "us-nonus-prize", ruleVerified: true, withholdingMinor: 30000n, releasedBy: null });
+    const [ov] = await db.select().from(s.taxRuleOverride).where(eq(s.taxRuleOverride.sourceId, awardId));
+    expect(ov).toMatchObject({ ruleId: "us-ca-prize-treaty", decision: "default", appliedRuleId: "us-nonus-prize", approvedBy: t.members.ari });
+    expect((await t.run(t.ari, "payout.release", { id: pid })).ok).toBe(true); // separate release step
+    // A new form makes the resolution lapse for the next payment from a new award.
+    const second = await award(cara.id, "5000");
+    await t.run(t.ari, "payout.resolveRule", { sourceType: "award", sourceId: second, use: "rule", reason: "Accept treaty claim per advisor memo 12" });
+    const p2 = (await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: second })).data!.payoutId as string;
+    expect(await payoutRow(p2)).toMatchObject({ status: "proposed", ruleId: "us-ca-prize-treaty", ruleVerified: false, withholdingMinor: 0n });
+    await t.run(cara.self, "tax.submit", { personId: cara.id, form: "W-8BEN", signature: "Cara Lane", certify: true, treatyCountry: "CA", treatyArticle: "XXII" });
+    const lapsed = await payoutRow(p2);
+    expect(lapsed.status).toBe("held");
+    expect(lapsed.reason).toMatch(/no longer applies/);
+    // No form: cannot be resolved.
+    const dee = await t.person("Dee Moss", "CA", { currency: "CAD" });
+    const noForm = await award(dee.id, "5000");
+    expect((await t.run(t.ari, "payout.resolveRule", { sourceType: "award", sourceId: noForm, use: "rule", reason: "Please just pay this one" })).message).toMatch(/cannot override a missing form/);
+  });
+
+  it("does not count a payment released after a verified bank change as wrongful", async () => {
+    const { db, s } = m;
+    const jo = await t.person("Jo Park", "US");
+    await t.run(jo.self, "tax.submit", { personId: jo.id, form: "W-9", signature: "Jo Park", tin: "123-45-2222", certify: true });
+    const pid = (await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: await award(jo.id, "20000") })).data!.payoutId as string;
+    await t.run(t.dana, "payout.bankChange", { personId: jo.id, last4: "9902", currency: "USD", requestedVia: "email" });
+    await db.insert(s.answerKey).values({ id: `${t.orgId}_kf`, orgId: t.orgId, scenario: "Bank change", objectType: "person", objectId: jo.id, expected: "freeze", description: "" });
+    let board = await m.scoreboard.computeScoreboard(db, t.orgId);
+    expect(board.results.find((r) => r.id === `${t.orgId}_kf`)?.passed).toBe(true);
+    // Verify with the code from the vault (the original channel), then release.
+    const [pending] = await db.select().from(s.payoutMethod).where(eq(s.payoutMethod.personId, jo.id));
+    const methods = await db.select().from(s.payoutMethod).where(eq(s.payoutMethod.personId, jo.id));
+    const pm = methods.find((x) => x.status === "pending_verification") ?? pending;
+    const { openSecret } = await import("@/lib/server/vault");
+    const code = await m.db.transaction((tx) => openSecret(tx, t.orgId, pm.verificationVaultId!));
+    expect((await t.run(jo.self, "payout.verify", { id: jo.id, confirmation: code })).ok).toBe(true);
+    expect((await t.run(t.ari, "payout.release", { id: pid })).ok).toBe(true);
+    board = await m.scoreboard.computeScoreboard(db, t.orgId);
+    expect(board.wrongfulPayouts).toBe(0);
+    expect(board.results.find((r) => r.id === `${t.orgId}_kf`)?.passed).toBe(true);
+    await db.delete(s.answerKey).where(eq(s.answerKey.orgId, t.orgId));
+  });
+});
+
+describe.skipIf(!hasDatabase)("CAD organization (real Postgres)", { timeout: 240_000 }, () => {
+  let m: Mods;
+  let t: Awaited<ReturnType<typeof setupOrg>>;
+  beforeAll(async () => {
+    m = await load();
+    t = await setupOrg(m, "cad");
+    await m.db.update(m.s.organization).set({ country: "CA", currency: "CAD" }).where(eq(m.s.organization.id, t.orgId));
+  }, 120_000);
+  afterAll(async () => {
+    if (t?.orgId) await dropTestOrg(t.orgId);
+  }, 120_000);
+
+  it("creates CAD cash and item prizes, converts them to the USD books, and resolves CA rules explicitly", async () => {
+    const { db, s } = m;
+    const eli = await t.person("Eli Ross", "CA", { currency: "CAD" });
+    expect((await t.run(eli.self, "tax.submit", { personId: eli.id, form: "W-8BEN", signature: "Eli Ross", certify: true })).data?.status).toBe("review"); // wrong form for a CA payer
+    expect((await t.run(eli.self, "tax.submit", { personId: eli.id, form: "Residency declaration", signature: "Eli Ross", certify: true })).data?.status).toBe("valid");
+    const cash = await t.run(t.dana, "award.create", { personId: eli.id, track: "Best Hack", title: "First", kind: "cash", amountMinor: "100000" });
+    expect(cash.ok, cash.message).toBe(true);
+    const cashId = (cash.data!.ids as string[])[0];
+    const [a] = await db.select().from(s.award).where(eq(s.award.id, cashId));
+    expect(a.currency).toBe("CAD");
+    expect((await t.run(t.dana, "award.create", { personId: eli.id, track: "Judge stipend", title: "Judge", kind: "cash", amountMinor: "20000" })).ok).toBe(true);
+    const item = await t.run(t.dana, "award.create", { personId: eli.id, track: "Hardware", title: "Switch", kind: "item", amountMinor: "45000" });
+    expect(item.ok, item.message).toBe(true);
+    expect((await t.run(t.dana, "award.create", { personId: eli.id, track: "X", title: "Y", kind: "cash", amountMinor: "100", currency: "EUR" })).status).toBe(400);
+    const pid = (await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: cashId })).data!.payoutId as string;
+    const p = (await db.select().from(s.payout).where(eq(s.payout.id, pid)))[0];
+    expect(p.grossMinor).toBe(72876n); // CAD 1,000.00 at 0.72876 into USD books
+    expect(p.currency).toBe("USD");
+    expect(p.ruleId).toBe("ca-ca-prize");
+    expect(p.status).toBe("held");
+    expect(p.reason).toMatch(/CAD 1,000.00 converted/);
+    const r = await t.run(t.ari, "payout.resolveRule", { sourceType: "award", sourceId: cashId, use: "rule", reason: "Advisor: contest prize, no withholding, T4A review at year end" });
+    expect(r.ok, r.message).toBe(true);
+    expect((await db.select().from(s.payout).where(eq(s.payout.id, pid)))[0].status).toBe("proposed");
+    // CA reimbursements now name a real (unverified) rule and are not held for it.
+    await db.insert(s.claim).values({ id: `${t.orgId}_c`, orgId: t.orgId, eventId: `${t.orgId}_evt`, personId: eli.id, type: "expense", merchant: "Staples", category: "supplies", amountMinor: 5000n, currency: "CAD", usdMinor: 3644n, fxRate: "0.72876000", fxSource: "test", purchasedAt: new Date("2026-10-20T00:00:00Z"), status: "escalated", dueAt: new Date("2026-11-01T00:00:00Z"), requestedBy: `${eli.id}_m` });
+    expect((await t.run(t.dana, "claim.review", { id: `${t.orgId}_c`, decision: "approve", reason: "ok" })).ok).toBe(true);
+    const [cp] = await db.select().from(s.payout).where(eq(s.payout.claimId, `${t.orgId}_c`));
+    expect(cp).toMatchObject({ ruleId: "ca-any-reimbursement", status: "proposed" });
+    // Budget caps entered in CAD are compared in USD books.
+    await db.insert(s.budgetLine).values({ id: `${t.orgId}_pz`, orgId: t.orgId, eventId: `${t.orgId}_evt`, name: "Prizes", category: "prizes", capMinor: 110000n, fundingSource: "x" });
+    const big = (await t.run(t.dana, "award.create", { personId: eli.id, track: "Best Design", title: "First", kind: "cash", amountMinor: "50000" })).data!.ids as string[];
+    const over = await t.run(t.dana, "payout.propose", { sourceType: "award", sourceId: big[0] });
+    expect(over.status).toBe(409); // CAD 1,100 cap = USD 801.64; 728.76 + 364.38 exceeds it
+    expect(over.message).toMatch(/converted to USD books/);
+  });
+});
