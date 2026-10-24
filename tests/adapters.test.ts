@@ -61,7 +61,7 @@ describe("stripe test-mode adapter", () => {
     expect(stripeFromEnv({})).toBeNull();
   });
 
-  const platform = (country: string) => ({ id: "acct_platform", country, default_currency: country === "CA" ? "cad" : "usd", payouts_enabled: true });
+  const platform = (country: string) => ({ id: "acct_platform", country, default_currency: ({ CA: "cad", JP: "jpy" } as Record<string, string>)[country] ?? "usd", payouts_enabled: true });
 
   it("reads the platform country from Stripe instead of assuming US", async () => {
     const { impl, calls } = fakeFetch(() => ({ body: platform("CA") }));
@@ -117,6 +117,36 @@ describe("stripe test-mode adapter", () => {
     expect((post.init.headers as Record<string, string>)["Idempotency-Key"]).toBe("eve-payout-9");
     expect(String(post.init.body)).toContain("destination=acct_1");
     expect(String(post.init.body)).toContain("amount=70000");
+  });
+
+  it("never reports a completed transfer as paid; only a confirmed connected payout settles", async () => {
+    const { impl, calls } = fakeFetch((url) =>
+      url.includes("/v1/payouts/") ? { body: { id: "po_1", status: "paid", arrival_date: 1793000000 } } : { body: { id: "tr_1", reversed: false, amount_reversed: 0 } },
+    );
+    const s = new StripeTestProvider({ secretKey: "sk_test_x", platformCountry: "CA", fetchImpl: impl });
+    const ref = { provider: "stripe" as const, id: "tr_1", idempotencyKey: "k" };
+    expect(await s.status(ref)).toBe("pending");
+    expect((await s.settlementStatus(ref)).state).toBe("awaiting_bank_payout");
+    expect(await s.settlementStatus(ref, { accountId: "acct_9", payoutId: "po_1" })).toMatchObject({ state: "bank_paid", payoutId: "po_1" });
+    const poCall = calls.find((c) => c.url.endsWith("/v1/payouts/po_1"))!;
+    expect((poCall.init.headers as Record<string, string>)["Stripe-Account"]).toBe("acct_9");
+    const failed = new StripeTestProvider({
+      secretKey: "sk_test_x", platformCountry: "CA",
+      fetchImpl: fakeFetch((url) => (url.includes("/v1/payouts/") ? { body: { id: "po_2", status: "failed", failure_code: "account_closed" } } : { body: { id: "tr_1" } })).impl,
+    });
+    expect(await failed.settlementStatus(ref, { accountId: "acct_9", payoutId: "po_2" })).toMatchObject({ state: "bank_failed", failureCode: "account_closed" });
+  });
+
+  it("rejects currencies the destination account cannot receive", async () => {
+    const s = new StripeTestProvider({ secretKey: "sk_test_x", platformCountry: "CA", fetchImpl: fakeFetch(() => ({ body: {} })).impl });
+    expect((await s.supports("CA", "CAD")).supported).toBe(true);
+    expect((await s.supports("CA", "USD")).supported).toBe(true);
+    expect((await s.supports("CA", "EUR")).supported).toBe(false);
+    expect((await s.supports("US", "CAD")).supported).toBe(false);
+    expect((await s.supports("CA", "XYZ")).supported).toBe(false);
+    expect((await s.supports("CA", "CAD")).minAmount).toEqual({ amountMinor: 100n, currency: "CAD" });
+    await expect(s.quote(50n, "CAD", "CAD", "CA")).rejects.toMatchObject({ stripeCode: "amount_too_small" });
+    await expect(s.quote(10_000n, "USD", "EUR", "CA")).rejects.toMatchObject({ stripeCode: "country_or_currency_unsupported" });
   });
 
   it("refuses live-mode responses and maps reversals to returned", async () => {
