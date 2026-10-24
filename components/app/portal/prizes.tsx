@@ -22,7 +22,6 @@ export function PortalPrizes() {
             {mine.map((a) => {
               const payout = s.payouts.find((p) => p.sourceType === "award" && p.sourceId === a.id);
               const o = prizeOptions(s, a, me, payout);
-              const team = a.teamId ? s.awards.filter((x) => x.teamId === a.teamId) : [];
               return (
                 <Section key={a.id} title={awardName(a)} aside={<span className="inline-flex items-center gap-2"><StatusBadge status={a.status} />{a.status === "paid" ? null : <DueChip due={a.dueAt} now={s.now} align="end" />}</span>}>
                   <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_16rem]">
@@ -51,11 +50,11 @@ export function PortalPrizes() {
                           ))}
                         </div>
                       ) : null}
-                      {team.length > 1 ? (
+                      {a.teamId ? (
                         <div className="flex flex-col gap-2 rounded-lg border p-3">
                           <h3 className="font-semibold">Team split</h3>
                           <p className="text-small text-muted-foreground">
-                            {team.map((t) => t.personName.split(" ")[0]).join(", ")} share this prize. {a.splitConfirmed ? "You confirmed your share." : "Confirm your share so the team can be paid."}
+                            This is a team prize. {a.splitConfirmed ? "You confirmed your share." : "Confirm your share so the team can be paid."}
                           </p>
                           {!a.splitConfirmed ? <ActionButton wide size="default" variant="secondary" label="Confirm my share" pendingLabel="Confirming" call={payloads.awardConfirm(a.id)} /> : null}
                         </div>

@@ -91,6 +91,7 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
   const suggested = me.taxForm;
   const [form, setForm] = useState<Person["taxForm"]>(me.taxStatus === "valid" ? me.taxForm : suggested);
   const [tin, setTin] = useState("");
+  const [noTin, setNoTin] = useState(false);
   const [treaty, setTreaty] = useState(me.country !== s.org.country ? me.country : "");
   const [article, setArticle] = useState("");
   const [signature, setSignature] = useState("");
@@ -124,9 +125,15 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
               </NativeSelect>
             )}
           </Field>
-          <Field label={form === "W-9" ? "SSN or ITIN" : form === "Residency declaration" ? (me.country === "CA" ? "SIN (optional)" : "Tax ID (optional)") : "Foreign tax ID (optional)"} error={errors.tin} help="Sent once to the vault. It is never shown again.">
-            {(p) => <Input {...p} type="password" autoComplete="off" inputMode="text" value={tin} onChange={(e) => setTin(e.target.value.replace(/[^0-9A-Za-z-]/g, ""))} />}
+          <Field label={form === "W-9" ? "SSN or ITIN" : form === "Residency declaration" ? (me.country === "CA" ? "SIN (optional)" : "Tax ID (optional)") : "Foreign tax ID (optional)"} error={errors.tin} help={form === "W-9" ? "Sent once to the vault. If you cannot provide a TIN yet, choose the option below." : "Sent once to the vault. It is never shown again."}>
+            {(p) => <Input {...p} type="password" autoComplete="off" inputMode="text" value={tin} onChange={(e) => { setTin(e.target.value.replace(/[^0-9A-Za-z-]/g, "")); setNoTin(false); setErrors((current) => ({ ...current, tin: "" })); }} />}
           </Field>
+          {form === "W-9" ? (
+            <label className="flex items-start gap-2 text-small sm:col-span-2">
+              <input type="checkbox" checked={noTin} onChange={(e) => { setNoTin(e.target.checked); if (e.target.checked) setTin(""); setErrors((current) => ({ ...current, tin: "" })); }} className="mt-0.5 size-4 accent-foreground" />
+              <span>TIN not provided. <span className="text-muted-foreground">Eve applies backup withholding when required.</span></span>
+            </label>
+          ) : null}
           {form === "W-8BEN" ? (
             <Field label="Treaty country" help="Prefilled from your residency.">
               {(p) => (
@@ -160,6 +167,7 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
           onDone={(r) => {
             if (r.ok) {
               setTin("");
+              setNoTin(false);
               setSignature("");
               setCertify(false);
             }
@@ -167,7 +175,7 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
           call={() => {
             const e: Record<string, string> = {};
             if (signature.trim().toLowerCase() !== me.name.trim().toLowerCase()) e.signature = `Type your name exactly as on your profile: ${me.name}.`;
-            if (form === "W-9" && tin.length < 4) e.tin = "A W-9 needs your SSN or ITIN.";
+            if (form === "W-9" && !tin && !noTin) e.tin = "Enter your SSN or ITIN, or choose TIN not provided.";
             if (tin && (tin.length < 4 || tin.length > 20)) e.tin = "Tax IDs are 4 to 20 letters, digits, or dashes.";
             if (!certify) e.certify = "Check the certification to sign.";
             setErrors(e);

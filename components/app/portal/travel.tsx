@@ -117,7 +117,7 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
 
   return (
     <div className="flex flex-col gap-10">
-      <Section title="Find a flight" aside={<span>Cap <Money amountMinor={big(s.event.travelCapMinor)} />{s.event.economyOnly ? " · economy only" : ""} · book by {fmtDate(s.event.bookingDeadline)}</span>}>
+      <Section title="Find a flight" aside={<span>Cap <Money amountMinor={big(s.event.travelCapMinor)} currency={s.org.currency} />{s.event.economyOnly ? " · economy only" : ""} · book by {fmtDate(s.event.bookingDeadline)}</span>}>
         <form
           noValidate
           className="flex flex-wrap items-end gap-3"
