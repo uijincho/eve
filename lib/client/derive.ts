@@ -558,7 +558,7 @@ export function runLine(run: Run, s: Pick<AppSnapshot, "payouts">): string {
   }
   switch (last.tool) {
     case "waitForController":
-      return last.status === "waiting" ? "Awaiting controller" : last.status === "escalated" ? `Release stopped: ${firstSentence(last.summary)}` : "Release request closed; quote changed";
+      return last.status === "waiting" ? "Awaiting controller" : last.status === "escalated" ? `Release stopped: ${firstSentence(last.summary)}` : "Quote changed; closed";
     case "queueControllerRelease":
       return `Release queued${amount}`;
     case "executePayout": {
