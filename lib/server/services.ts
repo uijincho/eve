@@ -21,6 +21,7 @@ import * as s from "@/lib/db/schema";
 import { destinationFor, fixtureOrigins, fixtureOffers, suggestFlights } from "@/lib/flights";
 import { offerSigningKeyFromEnv, signOffers, verifyFlightRequest } from "@/lib/flights/verify";
 import { lockPeriod, postJournal, type JournalLineInput } from "@/lib/ledger";
+import { convertMinor as convertFx } from "@/lib/engines/money";
 import { renderPayoutPacket, renderTaxFormReceipt } from "@/lib/pdf";
 
 import { actionSchemas } from "./action-schemas";
@@ -481,6 +482,22 @@ async function payoutRelease(tx: Executor, actor: ActorContext, p: { id?: string
 //     bear transfer fees: the sponsor sent the requested amount and the
 //     difference was deducted in transit, so AP settles in full. When the org
 //     bears fees the shortfall is still owed to the payee and cannot be closed.
+// The sponsor sends gross less withholding with no Eve provider fee, so the
+// payout's destination amount is always that USD figure converted at the
+// payout's locked quote rate (an estimate; no new quote is invented). An
+// accepted shortfall records what the payee actually received: net is the
+// remitted amount, the fee is the shortfall, and the destination follows.
+
+/** Destination amount for a USD sponsor amount at the payout's locked quote rate. */
+function sponsorDestination(payout: Pick<typeof s.payout.$inferSelect, "currency" | "destinationCurrency" | "fxRate">, usdMinor: bigint) {
+  return convertFx(usdMinor, payout.currency, payout.destinationCurrency, payout.fxRate);
+}
+
+/** Discloses the locked rate when the payee is paid in another currency. */
+function sponsorFxNote(payout: Pick<typeof s.payout.$inferSelect, "currency" | "destinationCurrency" | "fxRate">, usdMinor: bigint) {
+  if (payout.destinationCurrency === payout.currency) return "";
+  return ` About ${money(sponsorDestination(payout, usdMinor), payout.destinationCurrency)} at the payout's quoted rate, 1 ${payout.currency} = ${payout.fxRate} ${payout.destinationCurrency} (estimate; the sponsor's rate may differ).`;
+}
 
 export async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payoutId: string }) {
   await lockOrgFinance(tx, actor.orgId);
@@ -500,16 +517,17 @@ export async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payo
   const methods = await methodsFor(tx, person.id);
   if (methods.pending) throw conflict("Bank details are pending verification; the packet cannot carry payout instructions yet.");
   const id = newId("sp");
+  const requested = payout.grossMinor - payout.withholdingMinor;
+  const converts = payout.destinationCurrency !== payout.currency;
   const pdf = await renderPayoutPacket({
     packetId: id, sponsorName: org.sponsorName || "Fiscal sponsor", preparedAt: new Date().toISOString(),
     payee: { name: person.name, country: person.country, taxForm: profile?.form ?? expectedForm(person, org.country), taxStatus: effectiveTaxStatus(profile, new Date()), payoutLast4: methods.active?.last4 },
     source: { type: payout.sourceType, id: (payout.claimId ?? payout.awardId)!, description: payout.reason.slice(0, 120) },
-    amounts: { currency: payout.currency, grossMinor: payout.grossMinor.toString(), withholdingMinor: payout.withholdingMinor.toString(), feeMinor: "0", netMinor: (payout.grossMinor - payout.withholdingMinor).toString(), destinationCurrency: payout.destinationCurrency, destinationNetMinor: payout.destinationNetMinor.toString(), fxRate: payout.fxRate },
+    amounts: { currency: payout.currency, grossMinor: payout.grossMinor.toString(), withholdingMinor: payout.withholdingMinor.toString(), feeMinor: "0", netMinor: requested.toString(), destinationCurrency: payout.destinationCurrency, destinationNetMinor: sponsorDestination(payout, requested).toString(), fxRate: payout.fxRate, ...(converts ? { fxSource: "payout's quoted rate; estimate, the sponsor's rate may differ" } : {}) },
     provider: SPONSOR_PROVIDER, truth: "Simulated", rule: { id: payout.ruleId, version: payout.ruleVersion, verified: payout.ruleVerified, reportingForm: payout.reportingForm ?? undefined },
     approvals: [], attachments: [],
   });
   const doc = await storeDocument(tx, { orgId: actor.orgId, personId: person.id, uploadedBy: actor.memberId, kind: "sponsor_packet", name: `${id}.pdf`, mimeType: "application/pdf", bytes: pdf });
-  const requested = payout.grossMinor - payout.withholdingMinor;
   await tx.insert(s.sponsorPacket).values({ id, orgId: actor.orgId, payoutId: payout.id, requestedMinor: requested, status: "draft", feesPaidBy: org.feesPaidBy, dueAt: new Date(Date.now() + org.sponsorTurnaroundDays * 86_400_000), documentId: doc.id });
   await recordDecision(tx, { orgId: actor.orgId, objectType: "packet", objectId: id, personId: person.id, personName: person.name, action: "sponsor.create", summary: `Sponsor packet drafted for ${usd(requested)} (gross ${usd(payout.grossMinor)} less ${usd(payout.withholdingMinor)} withholding). A controller must submit it; it cannot also be released directly.`, actor, status: "waiting", tool: "sponsorPacket", documentId: doc.id, facts: { payoutId: payout.id, terms: termsKey(payout) } });
   return ok("Sponsor packet drafted.", { id, documentId: doc.id });
@@ -547,7 +565,7 @@ export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: 
   if (pk.requestedMinor !== payout.grossMinor - payout.withholdingMinor) throw conflict("The packet no longer matches the payout's terms; draft a new packet.");
   const org = orgNow;
   await tx.insert(s.approval).values({ id: newId("apr"), orgId: actor.orgId, objectType: "payout", objectId: payout.id, requestedBy: payout.requestedBy, approverId: actor.memberId, approverRole: actor.role, decision: "approved", reason: `Submitted to sponsor in packet ${pk.id}`, bankVersion: payout.bankVersion });
-  const [sent] = await tx.update(s.payout).set({ status: "processing", provider: SPONSOR_PROVIDER, truth: "Simulated", releasedBy: actor.memberId, providerRef: pk.id, attempts: payout.attempts + 1, feeMinor: 0n, netMinor: pk.requestedMinor, reason: `Submitted to ${org.sponsorName || "the fiscal sponsor"} in packet ${pk.id}; awaiting remittance.` })
+  const [sent] = await tx.update(s.payout).set({ status: "processing", provider: SPONSOR_PROVIDER, truth: "Simulated", releasedBy: actor.memberId, providerRef: pk.id, attempts: payout.attempts + 1, feeMinor: 0n, netMinor: pk.requestedMinor, destinationNetMinor: sponsorDestination(payout, pk.requestedMinor), reason: `Submitted to ${org.sponsorName || "the fiscal sponsor"} in packet ${pk.id}; awaiting remittance.${sponsorFxNote(payout, pk.requestedMinor)}` })
     .where(and(eq(s.payout.id, payout.id), inArray(s.payout.status, ["proposed", "approved"]))).returning();
   if (!sent) throw conflict("Payout changed while submitting; try again.");
   await postAccrual(tx, sent, actor.memberId, await payoutCategory(tx, sent));
@@ -599,7 +617,8 @@ export async function reconcilePacket(tx: Executor, actor: ActorContext, p: { id
     });
   }
   const now = new Date();
-  await tx.update(s.payout).set({ status: "paid", paidAt: now, destinationNetMinor: payout.destinationCurrency === "USD" ? paid : payout.destinationNetMinor, reason }).where(eq(s.payout.id, payout.id));
+  // Net is what the payee received; an accepted shortfall is the recipient-borne fee (AP still settles in full above).
+  await tx.update(s.payout).set({ status: "paid", paidAt: now, netMinor: paid, feeMinor: short, destinationNetMinor: sponsorDestination(payout, paid), reason: `${reason}${sponsorFxNote(payout, paid)}` }).where(eq(s.payout.id, payout.id));
   if (payout.claimId) await tx.update(s.claim).set({ status: "paid" }).where(eq(s.claim.id, payout.claimId));
   if (payout.awardId) await tx.update(s.award).set({ status: "paid" }).where(eq(s.award.id, payout.awardId));
   await tx.update(s.sponsorPacket).set({ status: "paid", paidMinor: paid, reason }).where(eq(s.sponsorPacket.id, pk.id));
