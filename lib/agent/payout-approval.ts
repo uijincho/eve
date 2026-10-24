@@ -2,12 +2,14 @@ import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import type { ActorContext } from "@/lib/auth/session";
+import { demoModeEnabled } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import * as s from "@/lib/db/schema";
 
 type PayoutRow = typeof s.payout.$inferSelect;
 export interface ApprovalTarget { orgId: string; payoutId: string; quoteFingerprint: string }
 export interface ControllerApproval { memberId: string; quoteFingerprint: string }
+export class ApprovalConflictError extends Error {}
 
 /** Approval is bound to these exact terms. A bank change or re-quote needs a new release. */
 export function payoutQuoteFingerprint(p: Pick<PayoutRow, "id" | "orgId" | "personId" | "grossMinor" | "withholdingMinor" | "feeMinor" | "netMinor" | "currency" | "destinationCurrency" | "destinationNetMinor" | "fxRate" | "provider" | "payoutMethodId" | "bankVersion" | "ruleId" | "ruleVersion" | "requestedBy" | "idempotencyKey">): string {
@@ -23,10 +25,10 @@ export function approvalToken(target: ApprovalTarget): string {
 }
 
 export function assertControllerApproval(actor: Pick<ActorContext, "role" | "memberId" | "orgId">, payout: Pick<PayoutRow, "orgId" | "requestedBy" | "status">): void {
-  if (actor.role !== "controller") throw new Error("Only a controller can release money.");
-  if (payout.orgId !== actor.orgId) throw new Error("Payout not found.");
-  if (payout.requestedBy === actor.memberId) throw new Error("The requester cannot release their own payout.");
-  if (!["proposed", "approved"].includes(payout.status)) throw new Error(`This payout is ${payout.status} and cannot be released.`);
+  if (actor.role !== "controller") throw new ApprovalConflictError("Only a controller can release money.");
+  if (payout.orgId !== actor.orgId) throw new ApprovalConflictError("Payout not found.");
+  if (payout.requestedBy === actor.memberId) throw new ApprovalConflictError("The requester cannot release their own payout.");
+  if (!["proposed", "approved"].includes(payout.status)) throw new ApprovalConflictError(`This payout is ${payout.status} and cannot be released.`);
 }
 
 export async function loadApprovalTarget(orgId: string, payoutId: string): Promise<ApprovalTarget | null> {
@@ -56,4 +58,46 @@ export async function recordApprovalWait(target: ApprovalTarget, runId: string, 
     }).onConflictDoNothing();
     return true;
   });
+}
+
+/** Runs only after the authenticated controller route resumes the hook. Re-check everything under the payout lock. */
+export async function executeControllerApproval(target: ApprovalTarget, approval: ControllerApproval, runId: string): Promise<{ payoutId: string; status: string; replayed: boolean }> {
+  const { releasePayout } = await import("@/lib/server/payouts");
+  return getDb().transaction(async (tx) => {
+    const [member] = await tx.select().from(s.orgMember).where(and(eq(s.orgMember.id, approval.memberId), eq(s.orgMember.orgId, target.orgId))).for("update");
+    if (!member || member.role !== "controller") throw new ApprovalConflictError("The approver no longer has controller access.");
+    const [org] = await tx.select().from(s.organization).where(eq(s.organization.id, target.orgId));
+    if (!org || (member.demoPersona && (!org.isDemo || !demoModeEnabled()))) throw new ApprovalConflictError("The demo approval is no longer valid.");
+    const [payout] = await tx.select().from(s.payout).where(and(eq(s.payout.id, target.payoutId), eq(s.payout.orgId, target.orgId))).for("update");
+    if (!payout) throw new ApprovalConflictError("Payout no longer exists.");
+    if (approval.quoteFingerprint !== target.quoteFingerprint || payoutQuoteFingerprint(payout) !== target.quoteFingerprint) {
+      throw new ApprovalConflictError("The payout quote or bank details changed. A fresh controller release is required.");
+    }
+    if (payout.status === "paid" && payout.releasedBy === member.id) return { payoutId: payout.id, status: "paid", replayed: true };
+    const actor: ActorContext = {
+      memberId: member.id, orgId: member.orgId, role: member.role, name: member.name, email: member.email,
+      personId: member.personId, userId: member.userId, demo: member.demoPersona && org.isDemo,
+    };
+    assertControllerApproval(actor, payout);
+    const paid = await releasePayout(tx, actor, payout.id);
+    const id = createHash("sha256").update(`${runId}:released`).digest("hex").slice(0, 32);
+    await tx.insert(s.decisionLog).values({
+      id: `dec_${id}`, orgId: target.orgId, runId, objectType: "payout", objectId: paid.id, personId: paid.personId,
+      action: "Controller hook resumed", summary: "The authenticated controller approved these exact terms. Release, bank-version checks, approval evidence and journal posting completed in one transaction.",
+      actor: actor.name, actorRole: actor.role, status: "done", tool: "executePayout",
+      facts: { approverId: member.id, quoteFingerprint: target.quoteFingerprint, providerRef: paid.providerRef, truth: paid.truth },
+    }).onConflictDoNothing();
+    return { payoutId: paid.id, status: paid.status, replayed: false };
+  });
+}
+
+export async function recordApprovalFailure(target: ApprovalTarget, runId: string, reason: string): Promise<void> {
+  const [payout] = await getDb().select({ id: s.payout.id }).from(s.payout).where(and(eq(s.payout.id, target.payoutId), eq(s.payout.orgId, target.orgId)));
+  if (!payout) return;
+  const id = createHash("sha256").update(`${runId}:blocked`).digest("hex").slice(0, 32);
+  await getDb().insert(s.decisionLog).values({
+    id: `dec_${id}`, orgId: target.orgId, runId, objectType: "payout", objectId: payout.id,
+    action: "Controller release needs another review", summary: reason, actor: "Eve (agent)", actorRole: "agent", status: "escalated", tool: "waitForController",
+    facts: { quoteFingerprint: target.quoteFingerprint },
+  }).onConflictDoNothing();
 }

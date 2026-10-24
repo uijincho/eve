@@ -4,7 +4,7 @@ import type { ChaseAdvance, ChaseTarget } from "@/lib/agent/automation";
 /** Durable day 0, 2, 5, 10 sequence. A valid form stops the next stage. */
 export async function taxChaseWorkflow(target: ChaseTarget, acceleratedDemo = false) {
   "use workflow";
-  using guard = createHook({ token: `tax-chase:${target.orgId}:${target.personId}:${target.generation}`, experimental_minRetention: "14d" });
+  using guard = createHook({ token: `tax-chase:${target.orgId}:${target.personId}:${target.generation}` });
   const conflict = await guard.getConflict();
   if (conflict) return { duplicateOf: conflict.runId };
   const { workflowRunId } = getWorkflowMetadata();

@@ -26,19 +26,23 @@ export function taxNeedsAttention(profile: { status: string; signedAt: Date | nu
 /** Only internal callers may choose an organization. No PII enters workflow arguments. */
 export async function getChaseCandidates(orgId: string): Promise<ChaseTarget[]> {
   const db = getDb();
-  const [people, profiles, awards, payouts] = await Promise.all([
+  const [people, profiles, awards, payouts, notices] = await Promise.all([
     db.select().from(s.person).where(eq(s.person.orgId, orgId)),
     db.select().from(s.taxProfile).where(and(eq(s.taxProfile.orgId, orgId), isNull(s.taxProfile.supersededAt))),
     db.select({ personId: s.award.personId }).from(s.award).where(and(eq(s.award.orgId, orgId), inArray(s.award.status, ["draft", "needs_form", "ready", "proposed"]))),
     db.select({ personId: s.payout.personId }).from(s.payout).where(and(eq(s.payout.orgId, orgId), inArray(s.payout.status, ["held", "proposed", "frozen"]))),
+    db.select({ id: s.notice.id }).from(s.notice).where(eq(s.notice.orgId, orgId)),
   ]);
   const awaiting = new Set([...awards, ...payouts].map((row) => row.personId));
   const byPerson = new Map(profiles.map((profile) => [profile.personId, profile]));
+  const noticeIds = new Set(notices.map((notice) => notice.id));
   return people.flatMap((person) => {
     const profile = byPerson.get(person.id);
     const attention = taxNeedsAttention(profile);
+    const generation = generationFor(person, profile);
+    if (noticeIds.has(`ntc_${idFor(`tax:${orgId}:${person.id}:${generation}:10:portal`)}`)) return [];
     return attention && (awaiting.has(person.id) || attention === "expiring")
-      ? [{ orgId, personId: person.id, generation: generationFor(person, profile) }] : [];
+      ? [{ orgId, personId: person.id, generation }] : [];
   });
 }
 
