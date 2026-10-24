@@ -51,10 +51,8 @@ export function BudgetView() {
   );
 }
 
-/** A budget line as the server sends it: amounts in the USD books, plus the cap as the organizer entered it. */
-type BudgetDTO = BudgetLine & { currency?: string; enteredCapMinor?: string; enteredCurrency?: string; fxSource?: string };
-
-function BudgetRow({ line: b, snapshot }: { line: BudgetDTO; snapshot: AppSnapshot }) {
+/** Amounts are in the USD books; enteredCapMinor is the cap as the organizer typed it, in enteredCurrency. */
+function BudgetRow({ line: b, snapshot }: { line: BudgetLine; snapshot: AppSnapshot }) {
   const books = b.currency ?? booksCurrency(snapshot);
   const entered = b.enteredCurrency ?? snapshot.org.currency;
   const [editing, setEditing] = useState(false);
