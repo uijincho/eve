@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import type { ActionResult, AppSnapshot } from "@/lib/contracts";
 
 import { ResultText } from "@/components/app/result-text";
+import { MoneyDisplay } from "@/components/eve/money";
 
 import { ApiError, getSnapshot, runAction, switchPersona } from "./api";
 import { hasLiveWork } from "./derive";
@@ -132,6 +133,8 @@ export function EveProvider({
     return () => setWatchers((n) => n - 1);
   }, []);
 
+  const explicitUsd = Boolean(snapshot && snapshot.org.currency !== "USD");
+  const moneyDisplay = useMemo(() => ({ explicitUsd }), [explicitUsd]);
   const announce = useCallback((result: ActionResult) => setNotice({ result, key: Date.now() }), []);
   useEffect(() => {
     if (!notice) return;
@@ -145,7 +148,7 @@ export function EveProvider({
   );
   return (
     <Ctx.Provider value={value}>
-      {children}
+      <MoneyDisplay.Provider value={moneyDisplay}>{children}</MoneyDisplay.Provider>
       <Announcer notice={notice?.result ?? null} onDismiss={() => setNotice(null)} />
     </Ctx.Provider>
   );

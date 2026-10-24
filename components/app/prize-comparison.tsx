@@ -57,6 +57,14 @@ export function PrizeComparison({
           ]}
         />
         <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-small">
+          {payout && award.currency !== payout.currency ? (
+            <>
+              <dt className="text-muted-foreground">Prize</dt>
+              <dd>
+                <Money amountMinor={BigInt(award.amountMinor)} currency={award.currency} /> as awarded, booked as <Money amountMinor={BigInt(payout.grossMinor)} currency={payout.currency} />
+              </dd>
+            </>
+          ) : null}
           <dt className="text-muted-foreground">Rule</dt>
           <dd className="flex flex-wrap items-center gap-2">
             {rule ? (

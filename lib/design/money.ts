@@ -27,10 +27,17 @@ export function minorToDecimalString(
 export function formatMoney(
   amountMinor: MinorUnits,
   currency = "USD",
-  { signDisplay = "auto" }: { signDisplay?: "auto" | "always" | "exceptZero" } = {},
+  {
+    signDisplay = "auto",
+    explicitUsd = false,
+  }: {
+    signDisplay?: "auto" | "always" | "exceptZero";
+    /** Print USD as "US$" where a bare "$" could be read as the org's own dollar (CAD). */
+    explicitUsd?: boolean;
+  } = {},
 ): string {
   // Intl formats decimal strings exactly, so no float touches the amount.
-  const formatted = new Intl.NumberFormat("en-US", {
+  const formatted = new Intl.NumberFormat(explicitUsd && currency === "USD" ? "en-CA" : "en-US", {
     style: "currency",
     currency,
     signDisplay,
