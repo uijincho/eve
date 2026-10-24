@@ -34,3 +34,5 @@ export {
   type FeeSchedule,
 } from "@/lib/payouts/quote";
 export { CACHED_FX, crossRate, withSpread, fetchReferenceRates, type FxSnapshot } from "@/lib/payouts/fx";
+export { planPayout, type PlanPayoutInput, type PlanPayoutResult, type PayoutAmounts } from "./plan";
+export { TAX_SCENARIOS, type TaxScenario } from "./fixtures";
