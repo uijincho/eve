@@ -272,7 +272,7 @@ describe("agent rail lines", () => {
       d({ tool: "waitForController", status: "waiting", summary: "Still waiting.", createdAt: "2026-10-24T10:01:00Z" }),
     ]);
     expect(runSubject(run, { payouts: [payout], packets: [] })).toBe("Quinn Davis · $600.00");
-    expect(runLine(run, { payouts: [payout] })).toBe("Waiting for controller");
+    expect(runLine(run, { payouts: [payout] })).toBe("Awaiting controller");
     const [paid] = groupRuns([d({ runId: "r2", personName: "Quinn Davis", tool: "executePayout", status: "done", summary: "Released $600.00 to ••9625 via simulated provider (sim_x)." })]);
     expect(runLine(paid, { payouts: [payout] })).toBe("Paid $600.00 · ••9625");
     const [filings] = groupRuns([d({ runId: "f", objectType: "filings", objectId: "2026", tool: "draftFilings", summary: "Drafted 0 filing(s) for 2026.", facts: { year: 2026, count: 0 } })]);

@@ -531,7 +531,7 @@ export function runHeading(run: Run, s: Pick<AppSnapshot, "payouts" | "packets">
   }
   if (run.objectType === "packet" || run.objectType === "sponsor_packet") {
     const k = s.packets.find((x) => x.id === run.objectId);
-    return { name: k ? `Sponsor packet · ${k.personName}` : "Sponsor packet", amount: k ? fmtPlain(big(k.requestedMinor), "USD") : undefined };
+    return { name: k ? k.personName : "Sponsor packet", amount: k ? fmtPlain(big(k.requestedMinor), "USD") : undefined };
   }
   return { name: objectLabel(run) };
 }
@@ -547,13 +547,18 @@ export function runLine(run: Run, s: Pick<AppSnapshot, "payouts">): string {
   const last = run.steps[run.steps.length - 1];
   const p = run.objectType === "payout" ? s.payouts.find((x) => x.id === run.objectId) : undefined;
   const amount = p ? ` ${fmtPlain(payoutValue(p), p.currency)}` : "";
+  if (run.objectType === "packet" || run.objectType === "sponsor_packet") {
+    // "Sponsor paid $970.00 on a $1,000.00 request (short $30.00)." -> "Sponsor short $30.00 · paid $970.00"
+    const short = /paid (\S+) on a \S+ request \(short (\S+?)\)/.exec(last.summary);
+    if (short) return `Sponsor short ${short[2]} · paid ${short[1]}`;
+  }
   if (run.objectType === "filings") {
     const count = Number(last.facts?.count ?? NaN);
     if (Number.isFinite(count)) return count === 0 ? "No new filings to draft" : `Drafted ${count} ${count === 1 ? "filing" : "filings"}`;
   }
   switch (last.tool) {
     case "waitForController":
-      return last.status === "waiting" ? "Waiting for controller" : last.status === "escalated" ? `Release stopped: ${firstSentence(last.summary)}` : "Release request closed; quote changed";
+      return last.status === "waiting" ? "Awaiting controller" : last.status === "escalated" ? `Release stopped: ${firstSentence(last.summary)}` : "Release request closed; quote changed";
     case "queueControllerRelease":
       return `Release queued${amount}`;
     case "executePayout": {
