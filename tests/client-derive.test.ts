@@ -9,7 +9,9 @@ import {
   groupRuns,
   isAdultOn,
   prizeOptions,
+  payoutFees,
   prizeRule,
+  ruleLabel,
   runCounters,
   suggestedForm,
 } from "@/lib/client/derive";
@@ -116,6 +118,16 @@ describe("prizeRule with seeded rule shapes", () => {
   });
   it("skips expired versions for domestic winners", () => {
     expect(prizeRule(snap, { ...priya, country: "US" }, "cash")?.id).toBe("us-us-prize");
+  });
+});
+
+describe("payout display", () => {
+  it("keeps an org-paid fee out of the recipient's net", () => {
+    expect(payoutFees({ grossMinor: "129900", withholdingMinor: "38970", feeMinor: "5000", netMinor: "90930" })).toEqual({ recipient: 0n, org: 5000n });
+    expect(payoutFees({ grossMinor: "3820", withholdingMinor: "0", feeMinor: "25", netMinor: "3795" })).toEqual({ recipient: 25n, org: 0n });
+  });
+  it("names rules in words", () => {
+    expect(ruleLabel({ payerCountry: "US", payeeCountry: "NONUS", paymentType: "item_prize:treaty", version: 1 })).toBe("US → non-US, item prize (treaty), v1");
   });
 });
 

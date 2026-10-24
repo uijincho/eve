@@ -400,6 +400,25 @@ export function prizeRule(
   return treaty ?? latest(forPayee(typed(base))) ?? latest(forPayee(typed("cash_prize"))) ?? latest(forPayee(live.filter((r) => r.paymentType.includes("prize"))));
 }
 
+/** "US → non-US, item prize (treaty), v1" from a rule's keys. */
+export function ruleLabel(r: Pick<AppSnapshot["rules"][number], "payerCountry" | "payeeCountry" | "paymentType" | "version">) {
+  const payee = r.payeeCountry === "*" ? "anyone" : r.payeeCountry.startsWith("NON") ? `non-${r.payeeCountry.slice(3)}` : r.payeeCountry;
+  const [type, variant] = r.paymentType.split(":");
+  return `${r.payerCountry} → ${payee}, ${type.replace(/_/g, " ")}${variant ? ` (${variant})` : ""}, v${r.version}`;
+}
+
+/**
+ * Splits a payout's fee between the recipient and the organization. The
+ * server's net is authoritative: whatever the recipient bears is the gap
+ * between gross less withholding and net; the rest of the fee is the org's.
+ */
+export function payoutFees(p: Pick<Payout, "grossMinor" | "withholdingMinor" | "netMinor" | "feeMinor">) {
+  const fee = big(p.feeMinor);
+  const gap = big(p.grossMinor) - big(p.withholdingMinor) - big(p.netMinor);
+  const recipient = gap < 0n ? 0n : gap > fee ? fee : gap;
+  return { recipient, org: fee - recipient };
+}
+
 export type PrizeOptions = {
   gross: bigint;
   withholding: bigint;
@@ -413,7 +432,8 @@ export type PrizeOptions = {
 };
 
 export function prizeOptions(s: Pick<AppSnapshot, "rules" | "org"> & { now?: string }, award: Award, person?: Person, payout?: Payout): PrizeOptions {
-  const rule = prizeRule(s, person, award.kind);
+  // A proposed payout names the rule it used; otherwise estimate one.
+  const rule = (payout && s.rules.find((r) => r.id === payout.ruleId && r.version === payout.ruleVersion)) ?? prizeRule(s, person, award.kind);
   const gross = big(award.amountMinor);
   const withholding = payout ? big(payout.withholdingMinor) : rule ? (gross * BigInt(rule.rateBps)) / 10000n : 0n;
   // The engine leads with its choice ("Buy it locally. …", "Cash equivalent: …");

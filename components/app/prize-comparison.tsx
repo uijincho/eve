@@ -7,7 +7,7 @@ import { Evidence } from "@/components/eve/evidence";
 import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
 import type { AppSnapshot, Award, Payout, Person } from "@/lib/contracts";
-import { FULFILLMENT_LABEL, prizeOptions } from "@/lib/client/derive";
+import { FULFILLMENT_LABEL, payoutFees, prizeOptions, ruleLabel } from "@/lib/client/derive";
 import { fmtRate } from "@/lib/client/format";
 
 /** What the winner receives as cash, and the three fulfilment options. */
@@ -26,7 +26,8 @@ export function PrizeComparison({
 }) {
   const o = prizeOptions(snapshot, award, person, payout);
   const first = award.personName.split(" ")[0];
-  const fee = payout ? BigInt(payout.feeMinor) : 0n;
+  const fees = payout ? payoutFees(payout) : { recipient: 0n, org: 0n };
+  const fee = fees.recipient;
   const ruleSource = o.rule
     ? `Rule ${o.rule.id} v${o.rule.version} · ${fmtRate(o.rule.rateBps)}${o.rule.verified ? "" : " · unverified"}`
     : "No matching rule loaded";
@@ -57,13 +58,21 @@ export function PrizeComparison({
           <dd className="flex flex-wrap items-center gap-2">
             {o.rule ? (
               <Evidence source={ruleSource} href={o.rule.sourceUrl}>
-                {o.rule.payerCountry} → {o.rule.payeeCountry === "*" ? "non-US" : o.rule.payeeCountry}, {o.rule.paymentType}, v{o.rule.version}
+                {ruleLabel(o.rule)}
               </Evidence>
             ) : (
               <span className="text-muted-foreground">No rule matched yet</span>
             )}
             {o.rule && !o.rule.verified ? <TruthLabel kind="unverified" /> : null}
           </dd>
+          {fees.org ? (
+            <>
+              <dt className="text-muted-foreground">Fees</dt>
+              <dd>
+                <Money amountMinor={fees.org} currency={award.currency} /> paid by the organization
+              </dd>
+            </>
+          ) : null}
           <dt className="text-muted-foreground">Form</dt>
           <dd>
             {person ? `${person.taxForm} ${person.taxStatus === "valid" ? "valid" : person.taxStatus === "missing" ? "not signed yet" : person.taxStatus}` : "Unknown"}

@@ -12,7 +12,7 @@ import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { Badge } from "@/components/ui/badge";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
-import { big, type InboxItem } from "@/lib/client/derive";
+import { big, payoutFees, type InboxItem } from "@/lib/client/derive";
 import { documentUrl } from "@/lib/client/api";
 import { fmtDateTime } from "@/lib/client/format";
 
@@ -150,6 +150,7 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
 
 export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payout; showStatus?: boolean }) {
   const estimate = p.truth === "Estimate";
+  const fees = payoutFees(p);
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -164,10 +165,18 @@ export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payo
         netLabel={`Net to ${p.personName.split(" ")[0]}`}
         deductions={[
           { label: "Withholding", amountMinor: Number(big(p.withholdingMinor)), kind: "withholding" },
-          { label: "Fees", amountMinor: Number(big(p.feeMinor)), kind: "fee" },
+          { label: "Fees", amountMinor: Number(fees.recipient), kind: "fee" },
         ]}
       />
       <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-small">
+        {fees.org ? (
+          <>
+            <dt className="text-muted-foreground">Fees paid by the organization</dt>
+            <dd className="text-right">
+              <Money amountMinor={fees.org} currency={p.currency} />
+            </dd>
+          </>
+        ) : null}
         {p.destinationCurrency !== p.currency ? (
           <>
             <dt className="text-muted-foreground">Received in {p.destinationCurrency}</dt>
