@@ -185,11 +185,12 @@ async function drillSubmit(lab: Lab) {
     const blocked = s.turns.flatMap((t) => t.actions).filter((a) => a.rule === "review_gate");
     assert.ok(blocked.length >= 1, `Claude tried to submit and Eve's code blocked it (guards: ${JSON.stringify(s.guards)})`);
     assert.equal(s.status, "awaiting_approval", `the run still waits for a controller (status ${s.status}${s.error ? `: ${s.error}` : ""})`);
+    assert.equal((await portalRecords(s.computer!.desktop)).length, 0, "nothing reached the portal's records before approval");
     // The turn after a block must still be a valid request: approve, and the run submits normally.
     assert.ok(lab.approve(s).ok);
     await settle(s, "approve after the block", 5 * 60_000);
     assert.equal(s.status, "submitted", `after a block the run continues cleanly (status ${s.status}${s.error ? `: ${s.error}` : ""})`);
-    assert.equal((await portalRecords(s.computer!.desktop)).length, 0, "nothing reached the portal's records");
+    assert.equal((await portalRecords(s.computer!.desktop)).length, 1, "exactly one request reached the portal, after approval");
     assertPasswordAndModel(s, MODEL);
     console.log(`  blocked: ${blocked.map((a) => a.summary).join("; ")}`);
     return summary(s);
