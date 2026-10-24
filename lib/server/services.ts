@@ -90,7 +90,11 @@ async function budgetUpdate(tx: Executor, actor: ActorContext, p: { id?: string;
 
 // ------------------------------------------------------------------ people
 
-type PersonInput = { name: string; email: string; country: string; citizenship?: string; dateOfBirth: string; address?: string; role?: string; payoutCurrency?: string };
+type ProjectStatus = "unknown" | "submitted" | "none";
+type PersonInput = {
+  name: string; email: string; country: string; citizenship?: string; dateOfBirth: string; address?: string; role?: string; payoutCurrency?: string;
+  projectStatus?: ProjectStatus; projectUrl?: string;
+};
 
 /**
  * A signed form certifies the name, residence and citizenship on file at signing.
@@ -133,9 +137,84 @@ async function peopleImport(tx: Executor, actor: ActorContext, p: { people: Pers
     if ((await staleProfileAfterChange(tx, actor, old, next)).length) invalidated++;
   }
   const minors = rows.filter((r) => !r.adult).length;
+  const projectRows = p.people.flatMap((x, i) => {
+    const url = x.projectUrl?.trim() || undefined;
+    const status = x.projectStatus ?? (url ? "submitted" as const : undefined);
+    return status ? [{ email: rows[i].email, name: rows[i].name, status, url }] : [];
+  });
+  if (projectRows.length) {
+    const saved = await tx.select({ id: s.person.id, email: s.person.email }).from(s.person)
+      .where(and(eq(s.person.orgId, actor.orgId), inArray(s.person.email, projectRows.map((r) => r.email))));
+    const idByEmail = new Map(saved.map((r) => [r.email, r.id]));
+    const now = new Date();
+    for (const row of projectRows) {
+      const personId = idByEmail.get(row.email);
+      if (!personId) continue;
+      await tx.update(s.person).set({
+        projectStatus: row.status, ...(row.url ? { projectUrl: row.url } : {}), projectSource: "csv", projectUpdatedAt: now,
+      }).where(eq(s.person.id, personId));
+      await recordDecision(tx, {
+        orgId: actor.orgId, objectType: "person", objectId: personId, personId, personName: row.name, action: "people.import",
+        summary: `Project submission for ${row.name} set to ${row.status} from CSV${row.url ? ` (${row.url})` : ""}.`,
+        actor, status: "done", tool: "importPeople", facts: { projectStatus: row.status, projectUrl: row.url ?? null, projectSource: "csv" },
+      });
+    }
+  }
   if (invalidated) await recordDecision(tx, { orgId: actor.orgId, objectType: "people", objectId: event.id, action: "tax.invalidate", summary: `${invalidated} existing tax form(s) moved to review because the imported name, residence or citizenship changed.`, actor, status: "escalated", tool: "validateTaxForm" });
-  await recordDecision(tx, { orgId: actor.orgId, objectType: "people", objectId: event.id, action: "people.import", summary: `Imported ${rows.length} people${minors ? `; ${minors} under 18 blocked from payments` : ""}.`, actor, status: minors ? "escalated" : "done", tool: "importPeople", facts: { count: rows.length, minors } });
-  return ok(`Imported ${rows.length} people.`, { imported: rows.length, minors });
+  await recordDecision(tx, { orgId: actor.orgId, objectType: "people", objectId: event.id, action: "people.import", summary: `Imported ${rows.length} people${minors ? `; ${minors} under 18 blocked from payments` : ""}${projectRows.length ? `; ${projectRows.length} project status${projectRows.length === 1 ? "" : "es"} set` : ""}.`, actor, status: minors ? "escalated" : "done", tool: "importPeople", facts: { count: rows.length, minors, projectUpdates: projectRows.length } });
+  return ok(`Imported ${rows.length} people.`, { imported: rows.length, minors, projectUpdates: projectRows.length });
+}
+
+async function personSetProject(tx: Executor, actor: ActorContext, p: { id: string; projectStatus: ProjectStatus; projectUrl?: string | null }) {
+  if (actor.role === "attendee") throw forbidden("Attendees cannot set their own project submission status.");
+  const before = await loadPerson(tx, actor.orgId, p.id, true);
+  const url = p.projectUrl === undefined ? before.projectUrl : (p.projectUrl?.trim() || null);
+  await tx.update(s.person).set({ projectStatus: p.projectStatus, projectUrl: url, projectSource: "organizer", projectUpdatedAt: new Date() }).where(eq(s.person.id, p.id));
+  await recordDecision(tx, {
+    orgId: actor.orgId, objectType: "person", objectId: p.id, personId: p.id, personName: before.name, action: "person.setProject",
+    summary: `${actor.name} set ${before.name}'s project submission to ${p.projectStatus}${url ? ` (${url})` : ""}.`,
+    actor, status: "done", tool: "profile", facts: { before: before.projectStatus, projectStatus: p.projectStatus, projectUrl: url, projectSource: "organizer" },
+  });
+  return ok(`${before.name} is marked ${p.projectStatus}.`);
+}
+
+async function peopleMarkSubmitted(tx: Executor, actor: ActorContext, p: { people: { email?: string; name?: string; projectUrl?: string }[] }) {
+  const all = await tx.select().from(s.person).where(eq(s.person.orgId, actor.orgId));
+  const byEmail = new Map(all.map((x) => [x.email.toLowerCase(), x]));
+  const byName = new Map<string, typeof all>();
+  for (const person of all) {
+    const key = normName(person.name);
+    byName.set(key, [...(byName.get(key) ?? []), person]);
+  }
+  const unmatched: string[] = [];
+  const ambiguous: string[] = [];
+  const seen = new Set<string>();
+  let updated = 0;
+  const now = new Date();
+  for (const entry of p.people) {
+    let person = entry.email ? byEmail.get(entry.email.toLowerCase()) : undefined;
+    if (!person && entry.name) {
+      const hits = byName.get(normName(entry.name)) ?? [];
+      if (hits.length > 1) { ambiguous.push(entry.name); continue; }
+      person = hits[0];
+    }
+    const label = entry.email ?? entry.name ?? "row";
+    if (!person) { unmatched.push(label); continue; }
+    if (seen.has(person.id)) continue;
+    seen.add(person.id);
+    const url = entry.projectUrl?.trim() || person.projectUrl;
+    await tx.update(s.person).set({ projectStatus: "submitted", projectUrl: url, projectSource: "organizer", projectUpdatedAt: now }).where(eq(s.person.id, person.id));
+    await recordDecision(tx, {
+      orgId: actor.orgId, objectType: "person", objectId: person.id, personId: person.id, personName: person.name, action: "people.markSubmitted",
+      summary: `${actor.name} marked ${person.name} as project submitted${url ? ` (${url})` : ""}.`,
+      actor, status: "done", tool: "importPeople", facts: { projectStatus: "submitted", projectUrl: url, projectSource: "organizer", before: person.projectStatus },
+    });
+    updated++;
+  }
+  const bits = [`Marked ${updated} ${updated === 1 ? "person" : "people"} as submitted.`];
+  if (unmatched.length) bits.push(`Not found: ${unmatched.slice(0, 8).join(", ")}${unmatched.length > 8 ? "…" : ""}.`);
+  if (ambiguous.length) bits.push(`Ambiguous names skipped: ${ambiguous.slice(0, 8).join(", ")}.`);
+  return ok(bits.join(" "), { updated, unmatched, ambiguous });
 }
 
 async function personUpdate(tx: Executor, actor: ActorContext, p: { id: string } & Partial<PersonInput>) {
@@ -782,7 +861,9 @@ const handlers: Record<AppAction, Handler> = {
   "event.update": eventUpdate as Handler,
   "budget.update": budgetUpdate as Handler,
   "people.import": peopleImport as Handler,
+  "people.markSubmitted": peopleMarkSubmitted as Handler,
   "person.update": personUpdate as Handler,
+  "person.setProject": personSetProject as Handler,
   "tax.submit": taxSubmit as Handler,
   "claim.submit": (async (tx, actor, p, prepared) => {
     const { claim, replayed } = await submitClaim(tx, actor, p, prepared as ClaimEvidence);

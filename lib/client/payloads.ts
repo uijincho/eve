@@ -20,6 +20,8 @@ export type PersonInput = {
   address?: string;
   role?: string;
   payoutCurrency?: string;
+  projectStatus?: "unknown" | "submitted" | "none";
+  projectUrl?: string;
 };
 
 // Mirrors lib/server/action-schemas.ts (strict objects: unknown keys are rejected).
@@ -89,6 +91,11 @@ export const payloads = {
   ) => call("person.update", { id, ...stripEmpty(fields) }),
   peopleImport: (people: PersonInput[]) =>
     call("people.import", { people: people.map((p) => stripEmpty(p)) }),
+  /** Organizer only. Attendees cannot set this; it is not part of person.update. */
+  personSetProject: (id: string, projectStatus: Person["projectStatus"], projectUrl?: string) =>
+    call("person.setProject", { id, projectStatus, projectUrl: projectUrl?.trim() ? projectUrl.trim() : null }),
+  peopleMarkSubmitted: (people: { email?: string; name?: string; projectUrl?: string }[]) =>
+    call("people.markSubmitted", { people: people.map((p) => stripEmpty(p)) }),
 
   sponsorCreate: (payoutId: string) => call("sponsor.create", { payoutId }),
   sponsorSubmit: (id: string) => call("sponsor.submit", { id }),

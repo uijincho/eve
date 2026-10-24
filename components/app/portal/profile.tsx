@@ -9,7 +9,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Person } from "@/lib/contracts";
-import { isAdultOn } from "@/lib/client/derive";
+import { isAdultOn, projectStatusLabel } from "@/lib/client/derive";
 import { fmtDate } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 
@@ -69,6 +69,7 @@ function Identity({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
         </Field>
       </div>
       <p className="text-small text-muted-foreground">Your email, {me.email}, is the original contact channel and cannot change here.</p>
+      <p className="text-small text-muted-foreground">Project submission: {projectStatusLabel(me.projectStatus)}{me.projectUrl ? ` · ${me.projectUrl}` : ""}. Only an organizer can change this.</p>
       <ActionButton
         className="self-start"
         label="Save profile"
