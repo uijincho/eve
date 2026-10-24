@@ -91,6 +91,7 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
   const [form, setForm] = useState<Person["taxForm"]>(me.taxStatus === "valid" ? me.taxForm : suggested);
   const [tin, setTin] = useState("");
   const [treaty, setTreaty] = useState(me.country !== s.org.country ? me.country : "");
+  const [article, setArticle] = useState("");
   const [signature, setSignature] = useState("");
   const [certify, setCertify] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -131,6 +132,11 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
               )}
             </Field>
           ) : null}
+          {form === "W-8BEN" && treaty ? (
+            <Field label="Treaty article (optional)" help="Part II of the W-8BEN, for example Article XXII. Leave it blank unless you claim a reduced rate.">
+              {(p) => <Input {...p} value={article} maxLength={40} onChange={(e) => setArticle(e.target.value)} placeholder="Article XXII" />}
+            </Field>
+          ) : null}
           <Field label="Signature" error={errors.signature} help={`Type your full legal name: ${me.name}`}>
             {(p) => <Input {...p} value={signature} onChange={(e) => setSignature(e.target.value)} />}
           </Field>
@@ -161,7 +167,7 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
             if (!certify) e.certify = "Check the certification to sign.";
             setErrors(e);
             if (Object.keys(e).length) return null;
-            return payloads.taxSubmit({ personId: me.id, form, signature: signature.trim(), tin: tin || undefined, treatyCountry: form === "W-8BEN" ? treaty || undefined : undefined });
+            return payloads.taxSubmit({ personId: me.id, form, signature: signature.trim(), tin: tin || undefined, treatyCountry: form === "W-8BEN" ? treaty || undefined : undefined, treatyArticle: form === "W-8BEN" && treaty ? article.trim() || undefined : undefined });
           }}
         />
       </form>
