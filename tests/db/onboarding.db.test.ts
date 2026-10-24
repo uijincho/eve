@@ -150,6 +150,72 @@ describe.skipIf(!hasDatabase)("onboarding and invitations against real Postgres"
     await expect(svc.createInvitation(users.mallory, demo.id, { email: "x@example.com", role: "auditor" })).rejects.toMatchObject({ status: 403 });
   });
 
+  it("links an imported adult attendee to a real account through an attendee-only invite", async () => {
+    const { svc, db, s, auth, session } = m;
+    const orgId = createdOrgs[0];
+    const services = await import("@/lib/server/services");
+    const { buildSnapshot } = await import("@/lib/server/snapshot");
+    const [danaMember] = await db.select().from(s.orgMember).where(eq(s.orgMember.userId, users.dana.id));
+    const dana = { memberId: danaMember.id, orgId, role: "organizer" as const, name: "Dana", email: users.dana.email, personId: null, demo: false, userId: users.dana.id };
+    const emails = { ada: `ada.${tag}@example.com`, kid: `kid.${tag}@example.com`, moe: `moe.${tag}@example.com`, zed: `zed.${tag}@example.com` };
+    const imported = await services.runAuthorizedAction(dana, "people.import", { people: [
+      { name: "Ada Okoro", email: emails.ada, country: "CA", dateOfBirth: "1998-02-01" },
+      { name: "Kid Young", email: emails.kid, country: "US", dateOfBirth: "2010-06-01" },
+      { name: "Moe Park", email: emails.moe, country: "US", dateOfBirth: "1990-06-01" },
+      { name: "Zed Lin", email: emails.zed, country: "US", dateOfBirth: "1991-06-01" },
+    ] });
+    expect(imported.ok).toBe(true);
+    const people = await db.select().from(s.person).where(eq(s.person.orgId, orgId));
+    const byEmail = (e: string) => people.find((p) => p.email === e)!;
+
+    // Staff invite form cannot mint attendee roles; attendee invites cannot target minors or other orgs' people.
+    await expect(svc.createInvitation(users.dana, orgId, { email: emails.ada, role: "attendee" })).rejects.toMatchObject({ status: 400 });
+    await expect(svc.createAttendeeInvitation(users.dana, orgId, { personId: byEmail(emails.kid).id })).rejects.toMatchObject({ code: "minor" });
+    await expect(svc.createAttendeeInvitation(users.ari, orgId, { personId: byEmail(emails.ada).id })).rejects.toMatchObject({ status: 403 });
+    await expect(svc.createAttendeeInvitation(users.dana, orgId, { personId: "per_missing" })).rejects.toMatchObject({ status: 404 });
+    await expect(svc.createAttendeeInvitation(users.dana, orgId, { personId: byEmail(emails.ada).id, role: "controller" })).rejects.toMatchObject({ status: 400 });
+
+    const invite = await svc.createAttendeeInvitation(users.dana, orgId, { personId: byEmail(emails.ada).id });
+    expect(invite.invitation.role).toBe("attendee");
+    expect(invite.acceptPath).toBe(`/invite/${invite.token}`);
+    expect((await svc.lookupInvitation(invite.token)).role).toBe("attendee");
+
+    // Wrong account is refused; payload cannot ask for a staff role.
+    await expect(svc.acceptInvitation(users.mallory, { token: invite.token })).rejects.toMatchObject({ code: "email_mismatch" });
+
+    const res = await auth.getAuth().api.signUpEmail({ body: { email: emails.ada, password: "correct-horse-battery", name: "Ada O." }, asResponse: true });
+    const cookie = res.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ");
+    const request = new Request("http://localhost:3000/api/app", { headers: { cookie } });
+    const adaUser = (await session.getSessionUser(request))!;
+    await expect(svc.acceptInvitation(adaUser, { token: invite.token, role: "organizer" })).rejects.toMatchObject({ status: 400 });
+    const accepted = await svc.acceptInvitation(adaUser, { token: invite.token });
+    expect(accepted).toMatchObject({ role: "attendee", personId: byEmail(emails.ada).id });
+
+    const actor = (await session.resolveSession(request)).actor!;
+    expect(actor).toMatchObject({ role: "attendee", personId: byEmail(emails.ada).id, demo: false });
+    const snap = await buildSnapshot(actor);
+    expect(snap.people.map((p) => p.id)).toEqual([byEmail(emails.ada).id]);
+    expect(snap.budgets).toEqual([]);
+    // Attendees cannot act on staff routes.
+    expect((await services.runAuthorizedAction(actor, "org.update", { name: "Mine now" })).status).toBe(403);
+    await expect(svc.listMembers(adaUser, orgId)).rejects.toMatchObject({ status: 403 });
+
+    // Records that change after the invite are re-checked at acceptance.
+    const moeInvite = await svc.createAttendeeInvitation(users.dana, orgId, { personId: byEmail(emails.moe).id });
+    await db.update(s.person).set({ email: `moe.changed.${tag}@example.com` }).where(eq(s.person.id, byEmail(emails.moe).id));
+    const moeUser = { id: users.late.id, name: "Moe", email: emails.moe, emailVerified: false };
+    await expect(svc.acceptInvitation(moeUser, { token: moeInvite.token })).rejects.toMatchObject({ code: "person_changed" });
+    const zedInvite = await svc.createAttendeeInvitation(users.dana, orgId, { personId: byEmail(emails.zed).id });
+    await db.update(s.person).set({ adult: false, dateOfBirth: "2011-01-01" }).where(eq(s.person.id, byEmail(emails.zed).id));
+    await expect(svc.acceptInvitation({ ...moeUser, email: emails.zed }, { token: zedInvite.token })).rejects.toMatchObject({ code: "minor" });
+
+    // A linked attendee cannot be invited again; staff see the member list.
+    await expect(svc.createAttendeeInvitation(users.dana, orgId, { personId: byEmail(emails.ada).id })).rejects.toMatchObject({ code: "already_member" });
+    const members = await svc.listMembers(users.dana, orgId);
+    expect(members.find((x) => x.personId === byEmail(emails.ada).id)).toMatchObject({ role: "attendee", hasAccount: true });
+    expect(members.find((x) => x.isYou)?.role).toBe("organizer");
+  });
+
   it("resolves a real Better Auth session: no membership means setup, never the demo persona", async () => {
     const { auth, session, svc } = m;
     const email = `real.${tag}@example.com`;

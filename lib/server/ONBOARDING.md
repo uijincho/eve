@@ -18,9 +18,11 @@ Real Better Auth accounts only (`/api/auth/*`, email + password). Demo persona c
 | POST | `/api/onboarding/active-org` | `{ orgId }` | `{ ok, orgId, role, orgName }`; sets the active-org cookie (membership required) |
 | GET | `/api/invitations` | none | `{ ok, orgId, invitations: [{ id, email, role, invitedBy, createdAt, expiresAt, status: "pending"\|"accepted"\|"revoked"\|"expired", acceptedAt }] }` (organizer/controller/auditor of the active org) |
 | POST | `/api/invitations` | `{ email, role: "organizer"\|"controller"\|"auditor" }` | 201 `{ ok, invitation: { id, email, role, status, expiresAt }, token, acceptPath: "/invite/<token>", acceptUrl, delivery: { channel: "copy_link", sent: false, detail } }`. Organizers only. Shown once; re-inviting the same email rotates the token. |
+| POST | `/api/invitations/attendee` | `{ personId }` | 201 `{ ok, invitation: { id, email, role: "attendee", status, expiresAt }, person: { id, name }, token, acceptPath, acceptUrl, delivery }`. Organizers only. The person must be imported, an adult, and not already linked; the email is the one on file. |
+| GET | `/api/members` | none | `{ ok, orgId, members: [{ memberId, name, email, role, personId, hasAccount, demoPersona, isYou, createdAt }] }` (organizer/controller/auditor; read-only, no role changes or removal) |
 | POST | `/api/invitations/:id/revoke` | none | `{ ok, id, status: "revoked" }` (organizers) |
 | GET | `/api/invitations/lookup?token=` | none | `{ ok, orgName, role, emailMasked, status, expiresAt }` (no session needed; for the invite page) |
-| POST | `/api/invitations/accept` | `{ token }` | `{ ok, orgId, memberId, role, alreadyAccepted }`; sets the active-org cookie |
+| POST | `/api/invitations/accept` | `{ token }` | `{ ok, orgId, memberId, role, personId, alreadyAccepted }`; sets the active-org cookie. Attendee invites link the account to the person found by the invited email at accept time. |
 
 ### `POST /api/onboarding/organization` body
 
@@ -36,10 +38,10 @@ Only `org.name`, `org.country` (US or CA) and the `event` fields are required. D
 
 ## Error codes
 
-`unauthenticated` 401 · `setup_required` 403 · `not_member` / `forbidden` / `demo_org` / `email_mismatch` 403 · `not_found` 404 · `already_member` / `self_invite` / `used` / `not_pending` 409 · `expired` / `revoked` 410 · `invalid` 400.
+`unauthenticated` 401 · `setup_required` 403 · `not_member` / `forbidden` / `demo_org` / `email_mismatch` 403 · `not_found` 404 · `already_member` / `self_invite` / `used` / `not_pending` / `minor` / `no_email` / `person_changed` 409 · `expired` / `revoked` 410 · `invalid` 400.
 
 ## Notes
 
 - No email provider is configured, so invites are delivered by copy-link. The invitee also sees pending invites in `GET /api/onboarding`, but still needs the link token to accept.
 - The token is 256 bits of randomness; only its SHA-256 is stored. It expires after 7 days and works once. Possessing it together with a matching signed-in email is the proof of invitation (accounts are not email-verified).
-- Attendees are not invited here; they come from `people.import`.
+- Attendees are first imported with `people.import`, then invited with `POST /api/invitations/attendee`. The invite page and accept call are the same as for staff. At acceptance the person is looked up again by the invited email and must still exist and be an adult; the new membership is attendee-only and linked to that person, so the attendee portal shows only their own records.

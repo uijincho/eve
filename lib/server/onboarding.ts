@@ -81,6 +81,7 @@ export const createOrganizationSchema = z.strictObject({
 });
 
 export const createInvitationSchema = z.strictObject({ email: z.email().max(200), role: z.enum(INVITABLE_ROLES) });
+export const createAttendeeInvitationSchema = z.strictObject({ personId: z.string().min(1).max(80) });
 export const acceptInvitationSchema = z.strictObject({ token: z.string().regex(/^[A-Za-z0-9_-]{43}$/, "Invalid invitation token") });
 export const selectOrgSchema = z.strictObject({ orgId: z.string().min(1).max(80) });
 
@@ -233,6 +234,62 @@ export async function createInvitation(userIn: SessionUser | null, orgId: string
   });
 }
 
+/** Finds the imported person an attendee invitation refers to, by org and the invited email. */
+async function personForEmail(db: Executor, orgId: string, email: string) {
+  const [p] = await db.select().from(s.person).where(and(eq(s.person.orgId, orgId), sql`lower(${s.person.email}) = ${email}`));
+  return p;
+}
+
+/**
+ * Invites an already-imported adult attendee to claim their portal. The role
+ * is always attendee and the email is the person's email on file.
+ */
+export async function createAttendeeInvitation(userIn: SessionUser | null, orgId: string, raw: unknown, db = getDb()) {
+  const user = requireRealUser(userIn);
+  const parsed = createAttendeeInvitationSchema.safeParse(raw);
+  if (!parsed.success) throw new OnboardingError(400, "invalid", "Send { personId } of an imported attendee.");
+  return db.transaction(async (tx) => {
+    const inviter = await requireOrganizer(tx, user, orgId);
+    const [person] = await tx.select().from(s.person).where(and(eq(s.person.id, parsed.data.personId), eq(s.person.orgId, orgId)));
+    if (!person) throw new OnboardingError(404, "not_found", "Person not found in this organization.");
+    if (!person.adult) throw new OnboardingError(409, "minor", "Eve cannot onboard anyone under 18 at the event start date.");
+    const email = person.email.toLowerCase();
+    if (!email.includes("@")) throw new OnboardingError(409, "no_email", "This person has no email on file.");
+    const [already] = await tx.select({ id: s.orgMember.id, role: s.orgMember.role }).from(s.orgMember)
+      .where(and(eq(s.orgMember.orgId, orgId), sql`lower(${s.orgMember.email}) = ${email}`));
+    if (already) throw new OnboardingError(409, "already_member", `${person.name} already has a membership (${already.role}).`);
+    await tx.update(orgInvitation).set({ status: "revoked", revokedAt: new Date() })
+      .where(and(eq(orgInvitation.orgId, orgId), eq(orgInvitation.email, email), eq(orgInvitation.status, "pending")));
+    const token = randomBytes(32).toString("base64url");
+    const id = newId("inv");
+    const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
+    await tx.insert(orgInvitation).values({ id, orgId, email, role: "attendee", tokenHash: hashToken(token), invitedBy: inviter.member.id, expiresAt });
+    await recordDecision(tx, {
+      orgId, objectType: "invitation", objectId: id, personId: person.id, personName: person.name, action: "invitation.create",
+      summary: `${user.name} invited ${person.name} to the attendee portal (expires ${expiresAt.toISOString().slice(0, 10)}).`,
+      actor: { memberId: inviter.member.id, role: "organizer", name: user.name }, status: "waiting", tool: "onboarding", facts: { role: "attendee", emailMasked: maskEmail(email) },
+    });
+    const path = invitePath(token);
+    return {
+      invitation: { id, email, role: "attendee" as const, status: "pending" as const, expiresAt: expiresAt.toISOString() },
+      person: { id: person.id, name: person.name },
+      token,
+      acceptPath: path,
+      acceptUrl: `${appOrigin()}${path}`,
+      delivery: { channel: "copy_link" as const, sent: false, detail: "Email delivery is not configured. Copy this link and send it to the attendee yourself; it works once and expires in 7 days." },
+    };
+  });
+}
+
+/** Staff view of the active organization's members (no role changes or removal here). */
+export async function listMembers(userIn: SessionUser | null, orgId: string, db: Executor = getDb()) {
+  const user = requireRealUser(userIn);
+  const m = await memberOf(db, user.id, orgId);
+  if (!m || !["organizer", "controller", "auditor"].includes(m.member.role)) throw new OnboardingError(403, "forbidden", "Only staff can view members.");
+  const rows = await db.select().from(s.orgMember).where(eq(s.orgMember.orgId, orgId)).orderBy(asc(s.orgMember.createdAt));
+  return rows.map((r) => ({ memberId: r.id, name: r.name, email: r.email, role: r.role, personId: r.personId, hasAccount: r.userId !== null, demoPersona: r.demoPersona, isYou: r.userId === user.id, createdAt: r.createdAt.toISOString() }));
+}
+
 export async function listInvitations(userIn: SessionUser | null, orgId: string, db: Executor = getDb()) {
   const user = requireRealUser(userIn);
   const m = await memberOf(db, user.id, orgId);
@@ -278,7 +335,7 @@ export async function acceptInvitation(userIn: SessionUser | null, raw: unknown,
     if (inv.email !== user.email) throw new OnboardingError(403, "email_mismatch", `This invitation is for ${maskEmail(inv.email)}. Sign in with that email to accept it.`);
     const existing = await memberOf(tx, user.id, inv.orgId);
     if (inv.status === "accepted") {
-      if (existing && inv.acceptedByUserId === user.id) return { orgId: inv.orgId, memberId: existing.member.id, role: existing.member.role, alreadyAccepted: true };
+      if (existing && inv.acceptedByUserId === user.id) return { orgId: inv.orgId, memberId: existing.member.id, role: existing.member.role, personId: existing.member.personId, alreadyAccepted: true };
       throw new OnboardingError(409, "used", "This invitation has already been used.");
     }
     if (inv.status === "revoked") throw new OnboardingError(410, "revoked", "This invitation was revoked. Ask the organizer for a new one.");
@@ -286,12 +343,24 @@ export async function acceptInvitation(userIn: SessionUser | null, raw: unknown,
     if (existing) throw new OnboardingError(409, "already_member", `You are already a member of this organization (${existing.member.role}).`);
     const [byEmail] = await tx.select({ id: s.orgMember.id }).from(s.orgMember).where(and(eq(s.orgMember.orgId, inv.orgId), eq(s.orgMember.email, user.email)));
     if (byEmail) throw new OnboardingError(409, "already_member", "This email already has a membership in the organization.");
+    let personId: string | null = null;
+    let displayName = user.name;
+    if (inv.role === "attendee") {
+      // Re-resolved now: the person must still exist with this email and still be an adult.
+      const person = await personForEmail(tx, inv.orgId, inv.email);
+      if (!person) throw new OnboardingError(409, "person_changed", "The attendee record for this invitation no longer matches. Ask the organizer for a new link.");
+      if (!person.adult) throw new OnboardingError(409, "minor", "Eve cannot onboard anyone under 18 at the event start date.");
+      const [linked] = await tx.select({ id: s.orgMember.id }).from(s.orgMember).where(and(eq(s.orgMember.orgId, inv.orgId), eq(s.orgMember.personId, person.id)));
+      if (linked) throw new OnboardingError(409, "already_member", "This attendee record is already linked to an account.");
+      personId = person.id;
+      displayName = person.name;
+    }
     const memberId = newId("mem");
-    // The role comes from the invitation row only.
-    await tx.insert(s.orgMember).values({ id: memberId, orgId: inv.orgId, userId: user.id, role: inv.role, name: user.name, email: user.email });
+    // The role (and for attendees the person) comes from the invitation row only.
+    await tx.insert(s.orgMember).values({ id: memberId, orgId: inv.orgId, userId: user.id, role: inv.role, personId, name: displayName, email: user.email });
     await tx.update(orgInvitation).set({ status: "accepted", acceptedAt: new Date(), acceptedByUserId: user.id }).where(eq(orgInvitation.id, inv.id));
     await recordDecision(tx, { orgId: inv.orgId, objectType: "invitation", objectId: inv.id, action: "invitation.accept", summary: `${user.name} joined as ${inv.role}.`, actor: { memberId, role: inv.role, name: user.name }, status: "done", tool: "onboarding" });
-    return { orgId: inv.orgId, memberId, role: inv.role, alreadyAccepted: false };
+    return { orgId: inv.orgId, memberId, role: inv.role, personId, alreadyAccepted: false };
   });
 }
 
