@@ -60,6 +60,7 @@ export function payoutSource(s: Pick<AppSnapshot, "awards" | "claims">, p: Pick<
 const OBJECT_LABEL: Record<string, string> = {
   payout: "Payout", claim: "Claim", award: "Prize", packet: "Sponsor packet", sponsor_packet: "Sponsor packet",
   person: "Person", period: "Period", filing: "Filing", org: "Settings", event: "Event", budget: "Budget",
+  invitation: "Invitation", people: "People import", member: "Team", tax_profile: "Tax form", payout_method: "Payout account",
 };
 
 /** "Priya Raman · Payout" for an agent run or decision, instead of its database id. */
