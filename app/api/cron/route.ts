@@ -5,6 +5,7 @@ import { queueScheduledRun } from "@/lib/agent/triggers";
 import { getDb } from "@/lib/db";
 import * as s from "@/lib/db/schema";
 import { deliverBankVerification } from "@/lib/server/bank-verification-delivery";
+import { trackCheapestFares } from "@/lib/server/fares";
 
 export const maxDuration = 120;
 
@@ -34,5 +35,11 @@ export async function GET(request: Request) {
     const results = await Promise.allSettled(methods.slice(offset, offset + 5).map((m) => deliverBankVerification(m.orgId, m.id)));
     bankVerificationsDelivered += results.filter((r) => r.status === "fulfilled" && r.value.status === "sent").length;
   }
-  return Response.json({ ok: failed === 0, runs, failed, delivered, bankVerificationsDelivered, ...(filingYear ? { filingYear } : {}) }, { status: failed ? 207 : 200 });
+  // Nightly fare tracker: today's cheapest fare per origin, until each event starts (the fare check's own history).
+  let faresRecorded = 0;
+  for (const org of orgs) {
+    try { faresRecorded += (await trackCheapestFares(org.id, { maxOrigins: 15 })).recorded; }
+    catch { /* No event yet, or a provider outage; tomorrow's run retries. */ }
+  }
+  return Response.json({ ok: failed === 0, runs, failed, delivered, bankVerificationsDelivered, faresRecorded, ...(filingYear ? { filingYear } : {}) }, { status: failed ? 207 : 200 });
 }

@@ -48,6 +48,7 @@ This records the implemented scope against `PRD.md` and `PRODUCT.md`. It is a de
 - Seeded plants: Marcus's $495.12 YYZ → SFO (also cap-hugging) and a $285 SEA → SFO fare that is under the cap and the auto-approve limit.
 - When the only problems are fare flags (`fare_peer`, `cap_hugging`) plus checks that need a person anyway (agent limit, budget, hand-entered receipt), the claim goes to `needs_info` and Eve asks the attendee one question (portal notice). The attendee answers with `claim.explain`; the claim moves to `escalated` with the answer, and organizers see the peer median, 75th percentile, question and answer in the claim detail.
 - Market check (`fare_market`): when an attendee searches flights, Eve stores a price-insights snapshot for the route (Google Flights via SerpApi when `SERPAPI_API_KEY` is set, otherwise a simulated fixture), at most once a day and only before the event starts. A claim is flagged when its fare is more than 25% above the typical high from the snapshot nearest its booking date; without insights, the nightly tracker's cheapest fare is used with a 60% margin. Snapshots live in `fare_snapshot` (migration 0006).
+- Nightly tracker: the daily cron (`/api/cron`, 09:00 UTC) records each event origin's cheapest economy fare (Duffel test mode when `DUFFEL_ACCESS_TOKEN` is set, otherwise simulated fixtures) until the event starts, at most 15 routes per org per run.
 
 ## Deferred stretch and presentation work
 
