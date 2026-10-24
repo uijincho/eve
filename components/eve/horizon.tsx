@@ -16,6 +16,10 @@ export type HorizonItem = { id: string; label: string; dueAt: string };
 
 const LANE = 22;
 const AXIS = 28;
+/** Labels stack at most this deep; further labels drop and their dots stay. */
+const MAX_LANES = 3;
+/** Marks closer than this many pixels share one dot and one label. */
+const CLUSTER_PX = 10;
 
 /**
  * Every open deadline on one line from now to two weeks out, each mark in its
@@ -54,6 +58,7 @@ export function Horizon({
   const showLabels = width >= 560;
   const marks = layoutMarks(items, nowDate, width, showLabels);
   const lanes = showLabels ? Math.max(1, ...marks.map((m) => m.lane + 1)) : 0;
+  const isActive = (m: (typeof marks)[number]) => activeId !== null && m.ids.includes(activeId);
   const height = lanes * LANE + AXIS + 18;
 
   return (
@@ -95,9 +100,10 @@ export function Horizon({
       {/* Marks */}
       <ul>
         {marks.map((m) => {
-          const dimmed = activeId !== null && activeId !== m.id;
-          const active = activeId === m.id;
-          const stem = showLabels ? (m.lane + 1) * LANE - 6 : 0;
+          const active = isActive(m);
+          const dimmed = activeId !== null && !active;
+          const labelled = showLabels && m.lane >= 0;
+          const stem = labelled ? (m.lane + 1) * LANE - 6 : 0;
           return (
             <li
               key={m.id}
@@ -106,7 +112,7 @@ export function Horizon({
             >
               <button
                 type="button"
-                aria-label={`${m.label}. ${describeDue(new Date(m.dueAt), nowDate)}`}
+                aria-label={`${m.count > 1 ? `${m.count} items, first ${m.first}` : m.label}. ${describeDue(new Date(m.dueAt), nowDate)}`}
                 aria-pressed={active}
                 onMouseEnter={() => onActiveChange?.(m.id)}
                 onFocus={() => onActiveChange?.(m.id)}
@@ -121,7 +127,7 @@ export function Horizon({
                   )}
                 />
               </button>
-              {showLabels ? (
+              {labelled ? (
                 <>
                   <span
                     aria-hidden
@@ -149,20 +155,44 @@ export function Horizon({
   );
 }
 
-/** Greedy lane assignment so labels never overlap at the measured width. */
+/**
+ * Clusters marks that would sit on top of each other (a real event puts dozens
+ * of prizes on the closing ceremony), then assigns label lanes greedily so
+ * labels never overlap at the measured width. Lane -1 means dot only.
+ */
 function layoutMarks(
   items: HorizonItem[],
   now: Date,
   width: number,
   withLabels: boolean,
 ) {
-  const placed = items
-    .map((item) => {
-      const due = new Date(item.dueAt);
-      const x = horizonX(due, now);
-      return { ...item, x, band: duskBand(due, now), flip: x > 0.82, lane: 0 };
-    })
-    .sort((a, b) => a.x - b.x);
+  const sorted = items
+    .map((item) => ({ ...item, due: new Date(item.dueAt) }))
+    .map((item) => ({ ...item, x: horizonX(item.due, now) }))
+    .sort((a, b) => a.x - b.x || a.due.getTime() - b.due.getTime());
+
+  const clusters: (typeof sorted)[] = [];
+  for (const item of sorted) {
+    const last = clusters.at(-1);
+    if (last && (item.x - last[0].x) * width < CLUSTER_PX) last.push(item);
+    else clusters.push([item]);
+  }
+
+  const placed = clusters.map((group) => {
+    const first = group[0];
+    return {
+      id: first.id,
+      ids: group.map((g) => g.id),
+      count: group.length,
+      first: first.label,
+      label: group.length > 1 ? `${first.label} +${group.length - 1}` : first.label,
+      dueAt: first.dueAt,
+      x: first.x,
+      band: duskBand(first.due, now),
+      flip: first.x > 0.82,
+      lane: 0,
+    };
+  });
 
   if (!withLabels) return placed;
 
@@ -172,7 +202,11 @@ function layoutMarks(
     const labelWidth = mark.label.length * 6.6 + 20;
     const [start, end] = mark.flip ? [px - labelWidth, px] : [px, px + labelWidth];
     let lane = laneEnds.findIndex((laneEnd) => laneEnd < start);
-    if (lane === -1) lane = laneEnds.length;
+    if (lane === -1 && laneEnds.length < MAX_LANES) lane = laneEnds.length;
+    if (lane === -1) {
+      mark.lane = -1;
+      continue;
+    }
     laneEnds[lane] = end;
     mark.lane = lane;
   }
