@@ -6,6 +6,7 @@ import { buildSnapshot } from "@/lib/server/snapshot";
 import { actionSchemas } from "@/lib/server/action-schemas";
 import { queueControllerRelease } from "@/lib/agent/release";
 import { queueAgentRun, queueChangedAwards, startPendingApprovals, startTaxChases } from "@/lib/agent/triggers";
+import { deliverBankVerification } from "@/lib/server/bank-verification-delivery";
 
 export const maxDuration = 120;
 
@@ -36,6 +37,14 @@ export async function POST(request: Request) {
     response = await runAuthorizedAction(actor, action, payload ?? {});
   }
   const { status, ...result } = response;
+  if (result.ok && action === "payout.bankChange" && typeof result.data?.methodId === "string") {
+    const methodId = result.data.methodId;
+    result.message = "Bank change recorded. Confirmation through the original contact is pending; affected payouts stay frozen.";
+    after(async () => {
+      try { await deliverBankVerification(actor.orgId, methodId); }
+      catch { console.warn("[bank-verification] Delivery remains pending; the scheduled sweep will retry."); }
+    });
+  }
   if (result.ok && ["award.create", "award.choose", "award.confirm", "award.split", "tax.submit", "claim.submit", "claim.review", "payout.propose", "payout.verify", "payout.retry"].includes(action)) {
     // The business transaction already committed. Cron retries missed starts; hooks deduplicate active runs.
     after(async () => {

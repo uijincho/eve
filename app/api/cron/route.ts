@@ -1,9 +1,10 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, gt, isNull } from "drizzle-orm";
 import { verifyBearer } from "@/lib/agent/webhook-auth";
 import { deliverRecordedNotice } from "@/lib/agent/automation";
 import { queueScheduledRun } from "@/lib/agent/triggers";
 import { getDb } from "@/lib/db";
 import * as s from "@/lib/db/schema";
+import { deliverBankVerification } from "@/lib/server/bank-verification-delivery";
 
 export const maxDuration = 120;
 
@@ -26,5 +27,12 @@ export async function GET(request: Request) {
     const results = await Promise.allSettled(notices.slice(offset, offset + 5).map((n) => deliverRecordedNotice(n.orgId, n.id)));
     delivered += results.filter((r) => r.status === "fulfilled" && ["sent", "simulated"].includes(r.value.status)).length;
   }
-  return Response.json({ ok: failed === 0, runs, failed, delivered, ...(filingYear ? { filingYear } : {}) }, { status: failed ? 207 : 200 });
+  const methods = await db.select({ id: s.payoutMethod.id, orgId: s.payoutMethod.orgId }).from(s.payoutMethod)
+    .where(and(eq(s.payoutMethod.status, "pending_verification"), gt(s.payoutMethod.verificationExpiresAt, today))).limit(20);
+  let bankVerificationsDelivered = 0;
+  for (let offset = 0; offset < methods.length; offset += 5) {
+    const results = await Promise.allSettled(methods.slice(offset, offset + 5).map((m) => deliverBankVerification(m.orgId, m.id)));
+    bankVerificationsDelivered += results.filter((r) => r.status === "fulfilled" && r.value.status === "sent").length;
+  }
+  return Response.json({ ok: failed === 0, runs, failed, delivered, bankVerificationsDelivered, ...(filingYear ? { filingYear } : {}) }, { status: failed ? 207 : 200 });
 }
