@@ -396,16 +396,18 @@ export function prizeOptions(s: Pick<AppSnapshot, "rules" | "org">, award: Award
   const rule = prizeRule(s, person);
   const gross = big(award.amountMinor);
   const withholding = payout ? big(payout.withholdingMinor) : rule ? (gross * BigInt(rule.rateBps)) / 10000n : 0n;
-  const rec = award.recommendation.toLowerCase();
+  // The engine leads with its choice ("Buy it locally. …", "Cash equivalent: …");
+  // later text mentions the other options, so only the opening phrase decides.
+  const rec = award.recommendation.trim().toLowerCase();
   const recommended: Award["fulfillment"] =
     award.fulfillment !== "undecided"
       ? award.fulfillment
-      : rec.includes("cash")
-        ? "cash"
-        : rec.includes("local")
-          ? "local"
-          : rec.includes("ship")
-            ? "ship"
+      : /^(buy it locally|buy locally|local)/.test(rec)
+        ? "local"
+        : /^ship/.test(rec)
+          ? "ship"
+          : /^(offer the cash|cash)/.test(rec)
+            ? "cash"
             : "undecided";
   return {
     gross,

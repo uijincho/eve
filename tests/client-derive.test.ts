@@ -79,6 +79,16 @@ describe("prizeOptions", () => {
     expect(o.cashNet).toBe(90930n);
     expect(o.recommended).toBe("cash");
   });
+
+  it("takes the engine's choice from its first sentence only", () => {
+    const award = {
+      ...s.awards[0],
+      recommendation: "Buy it locally. Sold locally for about $1,350.96. Cash lets withholding come out of the payout.",
+    };
+    expect(prizeOptions(s, award).recommended).toBe("local");
+    expect(prizeOptions(s, { ...award, recommendation: "Offer the cash equivalent. Not sold locally in BR." }).recommended).toBe("cash");
+    expect(prizeOptions(s, { ...award, recommendation: "Ship the item. Domestic winner." }).recommended).toBe("ship");
+  });
 });
 
 describe("runs", () => {
