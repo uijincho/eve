@@ -99,20 +99,48 @@ export async function loadDemoPersona(memberId: string, orgId?: string): Promise
   return toActor(row.member, true);
 }
 
-export async function resolveActor(request: Request): Promise<ActorContext | null> {
+/** Selected organization for users with several memberships (validated against membership on every request). */
+export const ORG_COOKIE = "eve_org";
+
+export function orgCookieHeader(orgId: string): string {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${ORG_COOKIE}=${encodeURIComponent(orgId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${30 * 86400}${secure}`;
+}
+
+export interface SessionUser { id: string; name: string; email: string; emailVerified: boolean }
+
+export interface ResolvedSession {
+  actor: ActorContext | null;
+  /** Set when a real Better Auth session exists (independent of membership). */
+  user: SessionUser | null;
+  memberships: MemberRow[];
+}
+
+/** Real Better Auth user only. Demo persona cookies never produce a user. */
+export async function getSessionUser(request: Request): Promise<SessionUser | null> {
   const cookieHeader = request.headers.get("cookie");
-  if (cookieHeader && BETTER_AUTH_COOKIE.test(cookieHeader)) {
-    const session = await getAuth().api.getSession({ headers: request.headers });
-    if (session?.user) {
-      const wantedOrg = request.headers.get("x-eve-org");
-      const members = await getDb().select().from(orgMember)
-        .where(eq(orgMember.userId, session.user.id)).orderBy(asc(orgMember.createdAt));
-      const member = members.find((m) => !wantedOrg || m.orgId === wantedOrg);
-      // A signed-in user with no membership gets no org data, demo or otherwise.
-      return member ? toActor(member, false) : null;
-    }
+  if (!cookieHeader || !BETTER_AUTH_COOKIE.test(cookieHeader)) return null;
+  const session = await getAuth().api.getSession({ headers: request.headers });
+  if (!session?.user) return null;
+  return { id: session.user.id, name: session.user.name, email: session.user.email.toLowerCase(), emailVerified: Boolean(session.user.emailVerified) };
+}
+
+export async function resolveSession(request: Request): Promise<ResolvedSession> {
+  const cookieHeader = request.headers.get("cookie");
+  const user = await getSessionUser(request);
+  if (user) {
+    const memberships = await getDb().select().from(orgMember)
+      .where(eq(orgMember.userId, user.id)).orderBy(asc(orgMember.createdAt));
+    const wantedOrg = request.headers.get("x-eve-org") ?? readCookie(cookieHeader, ORG_COOKIE);
+    const member = memberships.find((m) => m.orgId === wantedOrg) ?? memberships[0];
+    // A signed-in user with no membership gets no org data, demo or otherwise.
+    return { actor: member ? toActor(member, false) : null, user, memberships };
   }
   const demo = verifyDemoToken(readCookie(cookieHeader, DEMO_COOKIE));
-  if (demo) return loadDemoPersona(demo.memberId, demo.orgId);
-  return null;
+  if (demo) return { actor: await loadDemoPersona(demo.memberId, demo.orgId), user: null, memberships: [] };
+  return { actor: null, user: null, memberships: [] };
+}
+
+export async function resolveActor(request: Request): Promise<ActorContext | null> {
+  return (await resolveSession(request)).actor;
 }

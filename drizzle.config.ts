@@ -28,7 +28,7 @@ function credentials() {
 
 export default defineConfig({
   dialect: "postgresql",
-  schema: "./lib/db/schema.ts",
+  schema: ["./lib/db/schema.ts", "./lib/db/schema-onboarding.ts"],
   out: "./lib/db/migrations",
   dbCredentials: credentials(),
   strict: true,
