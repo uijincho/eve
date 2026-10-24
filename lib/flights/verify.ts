@@ -5,12 +5,12 @@
 // server's own data: the deterministic fixture table, an HMAC-signed offer
 // token, or a server cache. Client-supplied copies of those fields are
 // compared and reported, never used.
-import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
 
 import type { EventRecord, Truth } from "@/lib/contracts";
 import type { FxSnapshot } from "@/lib/payouts/fx";
 
-import { DEFAULT_FLIGHT_POLICY, fixtureOffers, suggestFlights, type FlightOffer, type FlightPolicy, type RankedOffer } from "./index";
+import { DEFAULT_FLIGHT_POLICY, destinationFor, fixtureOffers, suggestFlights, type FlightOffer, type FlightPolicy, type RankedOffer } from "./index";
 
 /** Signed offers are honoured for this long after search unless the offer itself expires sooner. */
 export const OFFER_TOKEN_TTL_MS = 30 * 60 * 1000;
@@ -43,18 +43,31 @@ function mac(key: Uint8Array, payload: string): Buffer {
   return createHmac("sha256", key).update(`eve-offer.v1.${payload}`).digest();
 }
 
-/** Opaque token binding an offer's server-side fields to the time it was issued. */
-export function signOffer(offer: FlightOffer, key: Uint8Array, issuedAtMs: number): string {
-  const payload = b64url(JSON.stringify({ offer, iat: issuedAtMs }));
+/** The event fields an offer was searched against. */
+export type OfferEvent = Pick<EventRecord, "checkInAt" | "closingAt"> & Partial<Pick<EventRecord, "id" | "venue">>;
+
+/**
+ * Fingerprint of the event an offer was searched for: id, check-in, closing
+ * and destination airport. A token from another event, or from before the
+ * event's dates or venue changed, no longer matches.
+ */
+export function eventBinding(event: OfferEvent): string {
+  const parts = [event.id ?? "", new Date(event.checkInAt).toISOString(), new Date(event.closingAt).toISOString(), destinationFor(event.venue).airport];
+  return createHash("sha256").update(parts.join("|")).digest("base64url").slice(0, 22);
+}
+
+/** Opaque token binding an offer's server-side fields to the event it was searched for and the time it was issued. */
+export function signOffer(offer: FlightOffer, key: Uint8Array, issuedAtMs: number, event: OfferEvent): string {
+  const payload = b64url(JSON.stringify({ offer, iat: issuedAtMs, evt: eventBinding(event) }));
   return `v1.${payload}.${b64url(mac(key, payload))}`;
 }
 
 /** Attach a token to every offer for the search response. */
-export function signOffers(offers: readonly FlightOffer[], key: Uint8Array, issuedAtMs: number): (FlightOffer & { offerToken: string })[] {
-  return offers.map((o) => ({ ...o, offerToken: signOffer(o, key, issuedAtMs) }));
+export function signOffers(offers: readonly FlightOffer[], key: Uint8Array, issuedAtMs: number, event: OfferEvent): (FlightOffer & { offerToken: string })[] {
+  return offers.map((o) => ({ ...o, offerToken: signOffer(o, key, issuedAtMs, event) }));
 }
 
-type TokenResult = { ok: true; offer: FlightOffer; issuedAt: number } | { ok: false; code: "bad_token" | "bad_signature" };
+type TokenResult = { ok: true; offer: FlightOffer; issuedAt: number; evt?: string } | { ok: false; code: "bad_token" | "bad_signature" };
 
 export function readOfferToken(token: string, key: Uint8Array): TokenResult {
   const parts = token.split(".");
@@ -63,9 +76,9 @@ export function readOfferToken(token: string, key: Uint8Array): TokenResult {
   const given = Buffer.from(parts[2], "base64url");
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return { ok: false, code: "bad_signature" };
   try {
-    const body = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as { offer?: FlightOffer; iat?: number };
+    const body = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as { offer?: FlightOffer; iat?: number; evt?: unknown };
     if (!body.offer || typeof body.iat !== "number") return { ok: false, code: "bad_token" };
-    return { ok: true, offer: body.offer, issuedAt: body.iat };
+    return { ok: true, offer: body.offer, issuedAt: body.iat, evt: typeof body.evt === "string" ? body.evt : undefined };
   } catch {
     return { ok: false, code: "bad_token" };
   }
@@ -92,12 +105,13 @@ export type VerifyFlightResult =
     /** Client fields that disagreed with the server offer (ignored). */
     mismatches: string[];
   }
-  | { ok: false; code: "unknown_offer" | "origin_mismatch" | "expired" | "bad_token" | "bad_signature" | "id_mismatch"; reason: string };
+  | { ok: false; code: "unknown_offer" | "origin_mismatch" | "expired" | "bad_token" | "bad_signature" | "id_mismatch" | "event_mismatch"; reason: string };
 
 export async function verifyFlightRequest(
   input: FlightRequestInput,
   ctx: {
-    event: Pick<EventRecord, "checkInAt" | "closingAt" | "travelCapMinor" | "economyOnly">;
+    /** The requester's current event. Fixture offers are regenerated for it; signed offers must have been searched for it. */
+    event: Pick<EventRecord, "checkInAt" | "closingAt" | "travelCapMinor" | "economyOnly"> & Partial<Pick<EventRecord, "id" | "venue">>;
     now: number;
     signingKey?: Uint8Array;
     cache?: OfferCache;
@@ -111,17 +125,20 @@ export async function verifyFlightRequest(
   let source: OfferSource | undefined;
   let fetchedAt: number | undefined;
 
-  if (/^fx_[A-Z]{3}_\d+$/.test(input.offerId)) {
-    offer = fixtureOffers(input.offerId.slice(3, 6)).find((o) => o.id === input.offerId);
-    source = "fixture";
-  } else if (input.offerToken) {
+  // A token, when sent, is always checked (signature, offer id, event, expiry), fixture offers included.
+  if (input.offerToken) {
     if (!ctx.signingKey) return { ok: false, code: "bad_token", reason: "Offer tokens cannot be verified: no signing key configured." };
     const t = readOfferToken(input.offerToken, ctx.signingKey);
     if (!t.ok) return { ok: false, code: t.code, reason: t.code === "bad_signature" ? "Offer token signature is invalid." : "Offer token is malformed." };
     if (t.offer.id !== input.offerId) return { ok: false, code: "id_mismatch", reason: "Offer token belongs to a different offer." };
+    if (t.evt !== eventBinding(ctx.event)) return { ok: false, code: "event_mismatch", reason: "This fare was quoted for different event dates or another event; search again." };
     offer = t.offer;
     source = "signed";
     fetchedAt = t.issuedAt;
+  } else if (/^fx_[A-Z]{3}_\d+$/.test(input.offerId)) {
+    // Regenerated for the requester's current event: itinerary and price are what this server offers for it now.
+    offer = fixtureOffers(input.offerId.slice(3, 6), ctx.event).find((o) => o.id === input.offerId);
+    source = "fixture";
   } else if (ctx.cache) {
     const cached = await ctx.cache.get(input.offerId);
     if (cached) {

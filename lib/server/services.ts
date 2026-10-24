@@ -18,7 +18,7 @@ import type { ActionResult, AppAction } from "@/lib/contracts";
 import { getDb, type Executor } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
-import { fixtureOffers, suggestFlights } from "@/lib/flights";
+import { destinationFor, fixtureOrigins, fixtureOffers, suggestFlights } from "@/lib/flights";
 import { offerSigningKeyFromEnv, signOffers, verifyFlightRequest } from "@/lib/flights/verify";
 import { lockPeriod, postJournal, type JournalLineInput } from "@/lib/ledger";
 import { renderFilingDraft, renderPayoutPacket, renderTaxFormReceipt } from "@/lib/pdf";
@@ -618,12 +618,19 @@ function offerKey(): Buffer | undefined {
 async function flightSearch(tx: Executor, actor: ActorContext, p: { origin: string; date?: string; personId?: string }) {
   if (p.personId) assertSelfOrStaff(actor, p.personId);
   const { event } = await loadOrgEvent(tx, actor.orgId);
-  const offers = fixtureOffers(p.origin);
-  const result = suggestFlights(offers, toEvent(event));
+  const evt = toEvent(event);
+  // Simulated fares timed to this event's check-in and closing, into the venue's city.
+  const destination = destinationFor(evt.venue);
+  const offers = fixtureOffers(p.origin, evt);
+  const result = suggestFlights(offers, evt);
   const key = offerKey();
-  // The token binds the server's price and itinerary; flight.request trusts only the token or the fixture table.
-  const options = key ? signOffers(result.options, key, Date.now()) : result.options;
-  return ok(result.options.length ? `${result.options.length} option(s) under policy.` : result.reason, { offers: options, rejected: result.rejected, truth: result.truth });
+  // The token binds the server's price, itinerary and this event; flight.request trusts only the token or the fixture table regenerated for the same event.
+  const options = key ? signOffers(result.options, key, Date.now(), evt) : result.options;
+  const note = destination.recognized ? "" : ` The venue names no city Eve has simulated fares for, so these fares go to ${destination.airport}.`;
+  const message = !offers.length
+    ? p.origin.toUpperCase() === destination.airport ? `${destination.airport} is the event's own airport; no flight needed.` : `Eve has no simulated fares from ${p.origin.toUpperCase()}. Try ${fixtureOrigins().join(", ")}, or submit your own booking as a travel claim.`
+    : result.options.length ? `${result.options.length} option(s) under policy.` : result.reason;
+  return ok(`${message}${note}`, { offers: options, rejected: result.rejected, truth: result.truth, destination: destination.airport, destinationRecognized: destination.recognized });
 }
 
 /**

@@ -42,7 +42,7 @@ describe("flight request verification", () => {
   });
 
   it("verifies signed Duffel offers and rejects tampering, swaps and expiry", async () => {
-    const token = signOffer(duffel, key, now);
+    const token = signOffer(duffel, key, now, event);
     const ok = await verifyFlightRequest({ offerId: duffel.id, origin: "YYZ", offerToken: token }, { event, now: now + 60_000, signingKey: key });
     expect(ok).toMatchObject({ ok: true, source: "signed", truth: "Test mode" });
 
@@ -63,7 +63,7 @@ describe("flight request verification", () => {
   it("resolves from a server cache when no token is sent", async () => {
     const cache = { get: (id: string) => (id === duffel.id ? { offer: duffel, fetchedAt: "2026-10-01T12:00:00Z" } : undefined) };
     expect(await verifyFlightRequest({ offerId: duffel.id, origin: "YYZ" }, { event, now, cache })).toMatchObject({ ok: true, source: "cache" });
-    expect(signOffers([duffel], key, now)[0].offerToken).toMatch(/^v1\./);
+    expect(signOffers([duffel], key, now, event)[0].offerToken).toMatch(/^v1\./);
     expect(() => offerSigningKeyFromEnv({ BETTER_AUTH_SECRET: "short" })).toThrow();
   });
 });

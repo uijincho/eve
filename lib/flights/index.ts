@@ -2,7 +2,8 @@
 //
 // Offers come from Duffel test mode (duffel.ts) when a test token is set, or
 // from the fixture table below. Fixture fares are realistic round numbers
-// for demo routes into SFO, labelled "Simulated". Nothing here books a flight.
+// for demo routes, timed to the event and aimed at its venue city, labelled
+// "Simulated". Nothing here books a flight.
 import type { EventRecord, Truth } from "@/lib/contracts";
 import { EngineError, convertMinor, parseMinor, toMinor } from "@/lib/engines/money";
 import { CACHED_FX, crossRate, type FxSnapshot } from "@/lib/payouts/fx";
@@ -163,29 +164,107 @@ function toUtc(local: string, offset: string, plusHours = 0): string {
   return new Date(Date.parse(`${local}:00${offset}`) + plusHours * 3_600_000).toISOString();
 }
 
+/**
+ * The fare table is written for Cal Hacks weekend: check-in Fri 1:30 PM PT and
+ * closing Sun 3 PM PT. Fixture offers for another event keep the same timing
+ * relative to that event's own check-in and closing.
+ */
+export const FIXTURE_ANCHOR = { checkInAt: "2026-10-23T20:30:00.000Z", closingAt: "2026-10-25T22:00:00.000Z", destination: "SFO" } as const;
+
+/** Approximate airport positions, used only to scale simulated durations and fares to other destinations. */
+const AIRPORTS: Record<string, { lat: number; lon: number; city: string }> = {
+  SFO: { lat: 37.62, lon: -122.38, city: "San Francisco" },
+  LAX: { lat: 33.94, lon: -118.41, city: "Los Angeles" },
+  SEA: { lat: 47.45, lon: -122.31, city: "Seattle" },
+  YVR: { lat: 49.19, lon: -123.18, city: "Vancouver" },
+  YYZ: { lat: 43.68, lon: -79.63, city: "Toronto" },
+  YUL: { lat: 45.47, lon: -73.74, city: "Montreal" },
+  JFK: { lat: 40.64, lon: -73.78, city: "New York" },
+  BOS: { lat: 42.36, lon: -71.01, city: "Boston" },
+  ORD: { lat: 41.97, lon: -87.91, city: "Chicago" },
+  AUS: { lat: 30.19, lon: -97.67, city: "Austin" },
+  LHR: { lat: 51.47, lon: -0.45, city: "London" },
+};
+
+const VENUE_AIRPORTS: [RegExp, string][] = [
+  [/\b(san francisco|sf|berkeley|oakland|palo alto|stanford|mountain view|san jose|bay area)\b/i, "SFO"],
+  [/\b(los angeles|ucla|pasadena)\b/i, "LAX"],
+  [/\bseattle\b/i, "SEA"],
+  [/\bvancouver\b/i, "YVR"],
+  [/\b(toronto|waterloo)\b/i, "YYZ"],
+  [/\b(montreal|montréal)\b/i, "YUL"],
+  [/\b(new york|nyc|brooklyn|manhattan)\b/i, "JFK"],
+  [/\b(boston|cambridge,? ma)\b/i, "BOS"],
+  [/\bchicago\b/i, "ORD"],
+  [/\baustin\b/i, "AUS"],
+  [/\blondon\b/i, "LHR"],
+];
+
+export interface FixtureDestination {
+  airport: string;
+  /** False when the venue named no city we have simulated fares for; fares then go to SFO. */
+  recognized: boolean;
+}
+
+/** Destination airport for an event, read from its venue text. */
+export function destinationFor(venue: string | undefined): FixtureDestination {
+  for (const [pattern, airport] of VENUE_AIRPORTS) if (venue && pattern.test(venue)) return { airport, recognized: true };
+  return { airport: FIXTURE_ANCHOR.destination, recognized: false };
+}
+
+function km(a: string, b: string): number {
+  const p = AIRPORTS[a], q = AIRPORTS[b];
+  const rad = Math.PI / 180;
+  const h = Math.sin(((q.lat - p.lat) * rad) / 2) ** 2 + Math.cos(p.lat * rad) * Math.cos(q.lat * rad) * Math.sin(((q.lon - p.lon) * rad) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+
+export type FixtureEvent = Pick<EventRecord, "checkInAt" | "closingAt"> & Partial<Pick<EventRecord, "venue">>;
+
 export function fixtureOrigins(): string[] {
   return ROUTES.map((r) => r.origin);
 }
 
-export function fixtureOffers(origin: string): FlightOffer[] {
+/**
+ * Simulated offers from `origin` to the event. Without an event, the table's
+ * own Cal Hacks weekend into SFO. With an event, departures move with its
+ * check-in, returns with its closing, and the destination comes from its venue
+ * (durations and fares scaled by distance for destinations other than SFO).
+ * Deterministic: the same origin and event always yield the same offers, so a
+ * request can be re-verified against the event it was searched for.
+ */
+export function fixtureOffers(origin: string, event?: FixtureEvent): FlightOffer[] {
   const route = ROUTES.find((r) => r.origin === origin.toUpperCase());
   if (!route) return [];
-  return route.fares.map((f, i) => ({
-    id: `fx_${route.origin}_${i + 1}`,
-    carrier: f.carrier,
-    flightNumber: f.code,
-    origin: route.origin,
-    destination: "SFO",
-    departAt: toUtc(f.departLocal, route.utcOffset),
-    arriveAt: toUtc(f.departLocal, route.utcOffset, route.hours + f.stops * 1.5),
-    returnDepartAt: toUtc(f.returnLocal, "-07:00"),
-    returnArriveAt: toUtc(f.returnLocal, "-07:00", route.hours),
-    cabin: f.cabin ?? "economy",
-    stops: f.stops,
-    totalMinor: f.minor.toString(),
-    currency: route.currency,
-    source: "fixture",
-  }));
+  const dest = event ? destinationFor(event.venue).airport : FIXTURE_ANCHOR.destination;
+  if (dest === route.origin) return [];
+  const outShift = event ? Date.parse(event.checkInAt) - Date.parse(FIXTURE_ANCHOR.checkInAt) : 0;
+  const backShift = event ? Date.parse(event.closingAt) - Date.parse(FIXTURE_ANCHOR.closingAt) : 0;
+  if (Number.isNaN(outShift) || Number.isNaN(backShift)) throw new EngineError("invalid_input", "event check-in and closing times are required");
+  const scaled = dest !== FIXTURE_ANCHOR.destination;
+  const hours = scaled ? Math.round((0.75 + km(route.origin, dest) / 800) * 4) / 4 : route.hours;
+  const ratio = scaled ? Math.min(1.6, Math.max(0.5, km(route.origin, dest) / km(route.origin, FIXTURE_ANCHOR.destination))) : 1;
+  const at = (iso: string, shift: number, plusHours = 0) => new Date(Date.parse(iso) + shift + plusHours * 3_600_000).toISOString();
+  return route.fares.map((f, i) => {
+    const departAt = at(toUtc(f.departLocal, route.utcOffset), outShift);
+    const returnDepartAt = at(toUtc(f.returnLocal, "-07:00"), backShift);
+    return {
+      id: `fx_${route.origin}_${i + 1}`,
+      carrier: f.carrier,
+      flightNumber: f.code,
+      origin: route.origin,
+      destination: dest,
+      departAt,
+      arriveAt: at(departAt, 0, hours + f.stops * 1.5),
+      returnDepartAt,
+      returnArriveAt: at(returnDepartAt, 0, hours),
+      cabin: f.cabin ?? "economy",
+      stops: f.stops,
+      totalMinor: (scaled ? Math.round((f.minor * ratio) / 100) * 100 : f.minor).toString(),
+      currency: route.currency,
+      source: "fixture",
+    };
+  });
 }
 
 export { searchDuffelOffers, DuffelError, assertDuffelTestToken } from "./duffel";
