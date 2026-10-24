@@ -27,7 +27,7 @@ export function FilingsView() {
         <>
           <LinkButton href={exportUrl("filings")} external variant="outline">
             <DownloadIcon aria-hidden />
-            Packet CSV
+            Filings CSV
           </LinkButton>
           {s.org.country === "US" ? (
             <LinkButton href={exportUrl("1042-summary", undefined, { year: new Date(s.now).getFullYear() })} external target="_blank" variant="outline">
