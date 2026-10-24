@@ -39,7 +39,7 @@ export function awardName(a: Pick<Award, "track" | "title">, sep = ": "): string
 }
 
 const PROVIDER_LABEL: Record<string, string> = {
-  mock_wire: "Simulated wire", mock: "Simulated", simulated: "Simulated", stripe_test: "Stripe test mode", stripe: "Stripe test mode",
+  mock_wire: "Simulated wire", in_kind: "In-kind delivery", mock: "Simulated", simulated: "Simulated", stripe_test: "Stripe test mode", stripe: "Stripe test mode",
 };
 
 /** "mock_wire" -> "Simulated wire". */
@@ -69,6 +69,11 @@ export function objectLabel(d: { objectType: string; personName?: string; object
   if (d.objectType === "person") return d.personName || type;
   if (d.objectType === "period") return `Period ${d.objectId}`;
   return d.personName ? `${d.personName} · ${type}` : type;
+}
+
+/** A flight the organization books for the attendee: never paid out to them. */
+export function isOrgBookedFlight(c: Pick<Claim, "category">): boolean {
+  return c.category === "org_booked_flight";
 }
 
 /** A persona's name for an actor id ("mem_demo_ari" -> "Ari Novak"); the id itself if unknown. */
@@ -101,6 +106,28 @@ export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "p
     return no(`Only a controller releases money. ${controllerName(s)} is the controller.`);
   if (payout.requestedBy === actor.id || payout.requestedBy === actor.name)
     return no("You requested this payout. A different controller must release it.");
+  return ok;
+}
+
+/**
+ * Whether the current persona may confirm an item prize was shipped or bought
+ * locally (award.fulfill). Mirrors the server's checks so the reason shows
+ * before the click; the server still decides.
+ */
+export function canFulfill(actor: Actor, award: Award, s: Pick<AppSnapshot, "personas" | "people" | "payouts" | "awards" | "rules" | "org"> & { now?: string }): Permission {
+  if (award.kind !== "item" || (award.fulfillment !== "ship" && award.fulfillment !== "local")) return no("Choose ship or buy locally first.");
+  if (award.status === "paid") return no("Already delivered.");
+  if (actor.role === "auditor") return no("Auditors have read-only access.");
+  if (actor.role !== "controller") return no(`A controller confirms delivery. ${controllerName(s)} is the controller.`);
+  if (award.requestedBy === actor.id || award.requestedBy === actor.name) return no("You entered this prize, so another controller must confirm its delivery.");
+  const person = s.people.find((p) => p.id === award.personId);
+  if (person && actor.personId === person.id) return no("You cannot confirm your own prize.");
+  if (person && !person.adult) return no("Eve does not deliver prizes to anyone under 18.");
+  if (person && person.taxStatus !== "valid") return no(`Held until ${person.name.split(" ")[0]} signs a valid ${person.taxForm}. The item's value is reportable income.`);
+  if (s.payouts.some((p) => p.sourceType === "award" && p.sourceId === award.id && !["failed", "returned"].includes(p.status))) return no("A payout already exists for this prize, so its terms are locked.");
+  if (award.teamId && s.awards.some((a) => a.teamId === award.teamId && !a.splitConfirmed)) return no("Every team member must confirm the split first.");
+  const rule = prizeRule(s, person, "item");
+  if (rule && !rule.verified) return no(`Rule ${rule.id} v${rule.version} is unverified; a person must verify it before delivery.`);
   return ok;
 }
 

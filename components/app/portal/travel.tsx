@@ -3,7 +3,8 @@
 import { LoaderCircleIcon, PlaneIcon } from "lucide-react";
 import { useState } from "react";
 
-import { ActionButton, ResultText } from "@/components/app/action-button";
+import { ActionButton } from "@/components/app/action-button";
+import { ResultText } from "@/components/app/result-text";
 import { Field } from "@/components/app/field";
 import { Section } from "@/components/app/page-header";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -13,42 +14,58 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResult, AppSnapshot, Person } from "@/lib/contracts";
 import { big } from "@/lib/client/derive";
-import { fmtDate, fmtDateTime } from "@/lib/client/format";
+import { fmtDate, fmtDateTime, humanize } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 import { useEve } from "@/lib/client/use-eve";
 
 import { PortalFrame } from "./portal-frame";
 
-/** A fare offer as the server returns it. Read defensively: fixtures may vary. */
+/**
+ * A fare as flight.search returns it (lib/flights RankedOffer). The price and
+ * itinerary are for display; the request sends only the offer id and the
+ * server's signed token, so the server decides what is booked and for how much.
+ */
 type Offer = {
   id: string;
+  offerToken?: string;
   carrier: string;
+  flightNumber?: string;
   origin: string;
+  destination?: string;
   departAt: string;
   arriveAt?: string;
-  amountMinor: string;
+  returnDepartAt?: string;
+  totalMinor: string;
   currency: string;
+  usdMinor?: string;
   cabin?: string;
   stops?: number;
-  note?: string;
-  truth?: string;
+  source?: string;
+  expiresAt?: string;
 };
+
+const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
 
 function readOffers(data: Record<string, unknown> | undefined, origin: string): Offer[] {
   const raw = Array.isArray(data?.offers) ? (data!.offers as Record<string, unknown>[]) : [];
   return raw
     .map((o) => ({
-      id: String(o.id ?? o.offerId ?? ""),
-      carrier: String(o.carrier ?? o.airline ?? "Airline"),
-      origin: String(o.origin ?? origin),
-      departAt: String(o.departAt ?? o.departureAt ?? ""),
-      arriveAt: o.arriveAt ? String(o.arriveAt) : o.arrivalAt ? String(o.arrivalAt) : undefined,
-      amountMinor: String(o.amountMinor ?? o.priceMinor ?? "0"),
-      currency: String(o.currency ?? "USD"),
-      cabin: o.cabin ? String(o.cabin) : undefined,
+      id: String(o.id ?? ""),
+      offerToken: str(o.offerToken),
+      carrier: str(o.carrier) ?? "Airline",
+      flightNumber: str(o.flightNumber),
+      origin: str(o.origin) ?? origin,
+      destination: str(o.destination),
+      departAt: str(o.departAt) ?? "",
+      arriveAt: str(o.arriveAt),
+      returnDepartAt: str(o.returnDepartAt),
+      totalMinor: String(o.totalMinor ?? "0"),
+      currency: str(o.currency) ?? "USD",
+      usdMinor: str(o.usdMinor),
+      cabin: str(o.cabin),
       stops: typeof o.stops === "number" ? o.stops : undefined,
-      note: o.note ? String(o.note) : o.reason ? String(o.reason) : undefined,
-      truth: o.truth ? String(o.truth) : o.label ? String(o.label) : undefined,
+      source: str(o.source),
+      expiresAt: str(o.expiresAt),
     }))
     .filter((o) => o.id && o.departAt);
 }
@@ -106,24 +123,27 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
           <ul className="flex flex-col divide-y rounded-xl border" aria-label="Suggested fares">
             {offers.slice(0, 3).map((o, i) => (
               <li key={o.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                <span className="flex flex-col gap-0.5">
+                <span className="flex min-w-0 flex-col gap-0.5">
                   <span className="flex flex-wrap items-center gap-2 font-semibold">
-                    {o.carrier} · {o.origin} → SFO
+                    {o.carrier}{o.flightNumber ? ` ${o.flightNumber}` : ""} · {o.origin}{o.destination ? ` → ${o.destination}` : ""}
                     {i === 0 ? <span className="text-caption font-medium text-muted-foreground">Best fit</span> : null}
                   </span>
                   <span className="text-small text-muted-foreground">
-                    Departs {fmtDateTime(o.departAt)}{o.arriveAt ? ` · arrives ${fmtDateTime(o.arriveAt)}` : ""}{o.cabin ? ` · ${o.cabin}` : ""}{o.stops !== undefined ? ` · ${o.stops === 0 ? "nonstop" : `${o.stops} stop${o.stops > 1 ? "s" : ""}`}` : ""}
+                    Departs {fmtDateTime(o.departAt)}{o.arriveAt ? ` · arrives ${fmtDateTime(o.arriveAt)}` : ""}{o.cabin ? ` · ${humanize(o.cabin).toLowerCase()}` : ""}{o.stops !== undefined ? ` · ${o.stops === 0 ? "nonstop" : `${o.stops} stop${o.stops > 1 ? "s" : ""}`}` : ""}
                   </span>
-                  {o.note ? <span className="text-small text-muted-foreground">{o.note}</span> : null}
+                  {o.returnDepartAt ? <span className="text-small text-muted-foreground">Returns {fmtDateTime(o.returnDepartAt)}</span> : null}
                 </span>
-                <span className="flex items-center gap-3">
-                  {o.truth ? <TruthLabel kind={o.truth.toLowerCase().includes("test") ? "test" : "simulated"} /> : <TruthLabel kind="simulated" />}
-                  <Money amountMinor={big(o.amountMinor)} currency={o.currency} className="font-semibold" />
+                <span className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
+                  <TruthLabel kind={o.source === "duffel_test" ? "test" : "simulated"} />
+                  <span className="flex flex-col items-end">
+                    <Money amountMinor={big(o.totalMinor)} currency={o.currency} className="font-semibold" />
+                    {o.usdMinor && o.currency !== "USD" ? <Money amountMinor={big(o.usdMinor)} currency="USD" estimate className="text-caption text-muted-foreground" /> : null}
+                  </span>
                   <ActionButton
                     label="Request this flight"
                     pendingLabel="Requesting"
                     variant={i === 0 ? "secondary" : "ghost"}
-                    call={payloads.flightRequest({ personId: me.id, offerId: o.id, origin: o.origin, carrier: o.carrier, departAt: o.departAt, amountMinor: o.amountMinor, currency: o.currency, cabin: o.cabin })}
+                    call={payloads.flightRequest({ personId: me.id, offerId: o.id, origin: o.origin, offerToken: o.offerToken })}
                   />
                 </span>
               </li>
@@ -138,7 +158,7 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
             {requests.map((c) => (
               <li key={c.id} className="flex items-center justify-between gap-3 px-4 py-3">
                 <span className="flex flex-col">
-                  <span className="font-medium">{c.merchant} · {c.origin ?? ""} → SFO</span>
+                  <span className="font-medium">{c.merchant}{c.origin ? ` · from ${c.origin}` : ""}</span>
                   <span className="text-small text-muted-foreground">{c.reason || c.description}</span>
                 </span>
                 <span className="flex flex-col items-end gap-1">
@@ -151,6 +171,11 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
         ) : (
           <p className="text-small text-muted-foreground">No flight requests or travel claims yet. Already booked? Upload the e-ticket on Claims.</p>
         )}
+        {requests.some((c) => c.category === "org_booked_flight") ? (
+          <p className="text-small text-muted-foreground">
+            Flights you request are booked by the organizers once approved, so you pay nothing and there is nothing to reimburse. Bookings in this demo are simulated.
+          </p>
+        ) : null}
       </Section>
     </div>
   );

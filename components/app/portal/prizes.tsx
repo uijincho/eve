@@ -60,7 +60,15 @@ export function PortalPrizes() {
                           {!a.splitConfirmed ? <ActionButton wide size="default" variant="secondary" label="Confirm my share" pendingLabel="Confirming" call={payloads.awardConfirm(a.id)} /> : null}
                         </div>
                       ) : null}
-                      {payout ? <p className="text-small text-muted-foreground">Your payout is {payout.status}. Track it on Payouts.</p> : null}
+                      {payout?.provider === "in_kind" ? (
+                        <p className="text-small text-muted-foreground">
+                          Organizers confirmed your prize was {a.fulfillment === "ship" ? "shipped" : "bought locally for you"} (simulated in this demo). Its value counts as reportable income.
+                        </p>
+                      ) : payout ? (
+                        <p className="text-small text-muted-foreground">Your payout is {payout.status}. Track it on Payouts.</p>
+                      ) : a.kind === "item" && (a.fulfillment === "ship" || a.fulfillment === "local") ? (
+                        <p className="text-small text-muted-foreground">You chose {a.fulfillment === "ship" ? "shipping" : "buying it locally"}. A controller confirms delivery after your tax form is valid.</p>
+                      ) : null}
                     </div>
                   </div>
                 </Section>

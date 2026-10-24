@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ActionButton, ResultText } from "@/components/app/action-button";
 import { DataTable, FilterChips, type Column } from "@/components/app/data-table";
 import { EvidenceSheet } from "@/components/app/evidence-sheet";
+import { FulfillAction } from "@/components/app/fulfill-action";
 import { Field, NativeSelect } from "@/components/app/field";
 import { PageFrame } from "@/components/app/page-frame";
 import { PrizeComparison } from "@/components/app/prize-comparison";
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResult, AppSnapshot, Award } from "@/lib/contracts";
 import { awardName, big, canManage, FULFILLMENT_LABEL, prizeOptions } from "@/lib/client/derive";
+import { fmtDateTime } from "@/lib/client/format";
 import { payloads, toMinor } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
 import { useEve } from "@/lib/client/use-eve";
@@ -131,7 +133,9 @@ export function AwardDetail({ award: a, snapshot: s, onEvidence }: { award: Awar
   const manage = canManage(s.actor);
   const o = prizeOptions(s, a, person, payout);
   const team = a.teamId ? s.awards.filter((x) => x.teamId === a.teamId) : [];
-  const canPropose = !payout && a.status === "ready" && !(a.teamId && !a.splitConfirmed) && (a.kind === "cash" || a.fulfillment !== "undecided");
+  // Items shipped or bought locally are delivered, not paid out; only cash goes through a payout.
+  const inKind = a.kind === "item" && (a.fulfillment === "ship" || a.fulfillment === "local");
+  const canPropose = !payout && a.status === "ready" && !(a.teamId && !a.splitConfirmed) && (a.kind === "cash" || a.fulfillment === "cash");
 
   return (
     <div className="flex flex-col gap-6">
@@ -142,7 +146,7 @@ export function AwardDetail({ award: a, snapshot: s, onEvidence }: { award: Awar
       {a.recommendation ? <p className="text-small">{a.recommendation}</p> : null}
       <PrizeComparison snapshot={s} award={a} person={person} payout={payout} />
 
-      {a.kind === "item" && !payout ? (
+      {a.kind === "item" && !payout && a.status !== "paid" ? (
         <section className="flex flex-col gap-2">
           <h3 className="font-semibold">Choose fulfilment</h3>
           <div className="flex flex-wrap gap-2">
@@ -164,10 +168,16 @@ export function AwardDetail({ award: a, snapshot: s, onEvidence }: { award: Awar
       {team.length > 1 ? <TeamSplit award={a} team={team} snapshot={s} /> : null}
 
       <div className="flex flex-col gap-2 border-t pt-4">
-        {payout ? (
+        {payout?.provider === "in_kind" ? (
+          <p className="text-small text-muted-foreground">
+            {a.fulfillment === "ship" ? "Shipped" : "Bought locally"} (simulated){payout.paidAt ? ` ${fmtDateTime(payout.paidAt)}` : ""}. {payout.reason}
+          </p>
+        ) : payout ? (
           <p className="text-small text-muted-foreground">
             The payout is {payout.status}. {payout.status === "proposed" ? "A controller releases it from Payouts." : payout.reason}
           </p>
+        ) : inKind && a.status !== "paid" ? (
+          <FulfillAction award={a} snapshot={s} />
         ) : a.status === "needs_form" ? (
           <ActionButton wide size="default" label="Propose payout" permission={{ allowed: false, reason: `Held until ${a.personName.split(" ")[0]} signs the ${person?.taxForm ?? "tax form"}. Eve is chasing on schedule.` }} call={() => null} />
         ) : canPropose ? (

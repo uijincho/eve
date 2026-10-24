@@ -3,6 +3,7 @@
 import { cn } from "cn";
 
 import { ActionButton } from "@/components/app/action-button";
+import { FulfillAction } from "@/components/app/fulfill-action";
 import { LinkButton } from "@/components/app/link-button";
 import { ReasonAction } from "@/components/app/reason-action";
 import { VerifyCode } from "@/components/app/verify-code";
@@ -152,7 +153,18 @@ export function ItemActions({
           </div>
         );
       }
-      if (a.status === "ready" && !(a.teamId && !a.splitConfirmed)) {
+      if (a.kind === "item" && (a.fulfillment === "ship" || a.fulfillment === "local") && a.status !== "paid") {
+        return (
+          <div className={wrap}>
+            <FulfillAction award={a} snapshot={snapshot} layout={pane ? "pane" : "row"} />
+            <LinkButton href={`/prizes?award=${encodeURIComponent(a.id)}`} size="sm" variant="ghost">
+              Open prize
+            </LinkButton>
+            {evidence}
+          </div>
+        );
+      }
+      if (a.status === "ready" && !(a.teamId && !a.splitConfirmed) && (a.kind === "cash" || a.fulfillment === "cash")) {
         return (
           <div className={wrap}>
             <ActionButton

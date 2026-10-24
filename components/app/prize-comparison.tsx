@@ -26,6 +26,7 @@ export function PrizeComparison({
 }) {
   const o = prizeOptions(snapshot, award, person, payout);
   const first = award.personName.split(" ")[0];
+  const inKind = payout?.provider === "in_kind";
   const fees = payout ? payoutFees(payout) : { recipient: 0n, org: 0n };
   const fee = fees.recipient;
   const ruleSource = o.rule
@@ -36,17 +37,17 @@ export function PrizeComparison({
     <div className={cn("flex flex-col gap-6", className)}>
       <section className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className="font-semibold">What {first} receives as cash</h3>
+          <h3 className="font-semibold">{inKind ? `What ${first} received, as reported income` : `What ${first} receives as cash`}</h3>
           {o.fromPayout ? null : <TruthLabel kind="estimate" />}
         </div>
         <BreakdownBar
           grossMinor={Number(o.gross)}
           currency={award.currency}
           estimate={!o.fromPayout}
-          netLabel={`${o.fromPayout ? "Net" : "Est. net"} to ${first}`}
+          netLabel={inKind ? `Item value delivered to ${first}` : `${o.fromPayout ? "Net" : "Est. net"} to ${first}`}
           deductions={[
             {
-              label: o.rule ? `Withholding, ${fmtRate(o.rule.rateBps)}` : "Withholding",
+              label: inKind ? "Withholding the organization pays on top" : o.rule ? `Withholding, ${fmtRate(o.rule.rateBps)}` : "Withholding",
               amountMinor: Number(o.withholding),
               kind: "withholding",
             },

@@ -57,6 +57,8 @@ export const payloads = {
   awardSplit: (teamId: string, splits: { personId: string; bps: number }[]) =>
     call("award.split", { teamId, splits }),
   awardConfirm: (id: string) => call("award.confirm", { id }),
+  /** Controller confirms an item prize was shipped or bought locally (simulated delivery). */
+  awardFulfill: (id: string) => call("award.fulfill", { id }),
 
   payoutPropose: (sourceId: string, sourceType: "claim" | "award") =>
     call("payout.propose", { sourceId, sourceType }),
@@ -102,16 +104,12 @@ export const payloads = {
 
   flightSearch: (fields: { origin: string; date?: string; personId?: string }) =>
     call("flight.search", stripEmpty(fields)),
-  flightRequest: (fields: {
-    offerId: string;
-    origin: string;
-    carrier: string;
-    departAt: string;
-    amountMinor: string;
-    currency?: string;
-    cabin?: string;
-    personId?: string;
-  }) => call("flight.request", stripEmpty(fields)),
+  /**
+   * Requests a server-issued offer. Price, carrier and times come only from the
+   * server's offer (the signed offerToken from flight.search), never the client.
+   */
+  flightRequest: (fields: { offerId: string; origin: string; offerToken?: string; personId?: string }) =>
+    call("flight.request", stripEmpty(fields)),
 };
 
 function stripEmpty<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {

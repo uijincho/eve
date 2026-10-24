@@ -33,10 +33,15 @@ const calls: ActionCall[] = [
   payloads.demoRun(),
   payloads.demoReset(),
   payloads.flightSearch({ origin: "YYZ", date: "2026-10-23" }),
-  payloads.flightRequest({ offerId: "off_1", origin: "YYZ", carrier: "Air Canada", departAt: "2026-10-23T08:00:00Z", amountMinor: "41200", currency: "USD", cabin: "economy" }),
+  payloads.flightRequest({ offerId: "off_1", origin: "YYZ", offerToken: "signed.offer.token.value" }),
 ];
 
 describe("action payloads", () => {
+  it("never send a client price or itinerary as a flight request's authority", () => {
+    const c = payloads.flightRequest({ offerId: "off_1", origin: "YYZ", offerToken: "signed.offer.token.value", personId: "p1" });
+    expect(Object.keys(c.payload).sort()).toEqual(["offerId", "offerToken", "origin", "personId"]);
+  });
+
   it("never carry a role or actor", () => {
     for (const c of calls) {
       expect(Object.keys(c.payload)).not.toContain("role");
