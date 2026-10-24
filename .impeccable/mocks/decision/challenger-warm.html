@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Eve · Inbox (Action Colour)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Action Colour: orange appears only on what Dana can press right now. Hold ink deepened from #9A6A00 to #855B00 so 12px pill text passes AA on #FBEFD0. */
+:root{--ground:#FBF5EE;--line:#F1E9DF;--quiet:#F4ECE2;--ink:#2B241F;--ink2:#6F625A;--act:#FF5B2E;--act-hover:#F04C1F;--off:#EDE5DB;--offink:#9C8F86;--crit:#C62F2F;--critbg:#FCECE9;--hold:#855B00;--holdbg:#FBEFD0}
+*{box-sizing:border-box}
+html,body{width:1440px;height:900px;overflow:hidden;margin:0}
+body{background:var(--ground);color:var(--ink);font:400 14px/20px Figtree,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+::selection{background:#F1DDCB;color:var(--ink)}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+button,input{font:inherit;color:inherit}
+svg{flex:none}
+.num{font-variant-numeric:tabular-nums}
+/* top bar */
+.bar{height:56px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:20px;padding:0 24px}
+.mark{font:700 22px/1 Figtree;letter-spacing:-.03em;color:var(--ink);text-decoration:none}
+.switch{display:flex;align-items:center;gap:10px;height:40px;padding:0 10px 0 12px;border:0;border-radius:12px;background:var(--quiet);text-align:left;cursor:pointer}
+.switch b{display:block;font:600 13px/16px Figtree}.switch small{display:block;font:500 12px/16px Figtree;color:var(--ink2)}
+.switch:hover{background:var(--off)}
+nav{display:flex;align-self:stretch}
+nav a{display:flex;align-items:center;gap:6px;padding:0 9px;color:var(--ink2);text-decoration:none;font-weight:500;position:relative}
+nav a:hover{color:var(--ink)}
+nav a[aria-current=page]{color:var(--ink);font-weight:600}
+nav a[aria-current=page]::after{content:"";position:absolute;left:9px;right:9px;bottom:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--act)}
+.count{font:600 12px/18px Figtree;padding:0 6px;border-radius:6px;background:var(--quiet);color:var(--ink);font-variant-numeric:tabular-nums}
+.end{margin-left:auto;display:flex;align-items:center;gap:16px}
+.sample{font:500 12px/16px Figtree;color:var(--ink2);background:var(--quiet);padding:4px 8px;border-radius:8px}
+.me{display:flex;align-items:center;gap:10px}
+.av{width:32px;height:32px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font:600 12px/1 Figtree;letter-spacing:.02em}
+.me b{display:block;font:600 13px/16px Figtree}.me small{display:block;font:500 12px/16px Figtree;color:var(--ink2)}
+/* page */
+main{width:1160px;margin:0 auto;padding-top:24px;display:grid;grid-template-columns:760px 360px;gap:40px;align-items:start}
+.head{display:flex;align-items:baseline;justify-content:space-between}
+h1{font:700 30px/34px Figtree;letter-spacing:-.025em;margin:0}
+.now{font:500 13px/20px Figtree;color:var(--ink2)}.now b{color:var(--ink);font-weight:600}
+.lede{margin:4px 0 0;font:400 15px/22px Figtree;color:var(--ink2);text-wrap:pretty}
+.tools{display:flex;align-items:center;gap:8px;margin:16px 0 12px}
+.seg{display:flex;gap:2px;padding:4px;background:var(--quiet);border-radius:12px}
+.seg a{height:32px;display:flex;align-items:center;gap:6px;padding:0 12px;border-radius:8px;color:var(--ink2);text-decoration:none;font-weight:500}
+.seg a:hover{color:var(--ink)}
+.seg a[aria-current=true]{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(43,36,31,.10)}
+.seg i{font-style:normal;font-variant-numeric:tabular-nums;color:var(--ink2);font-weight:500}
+.search{margin-left:auto;position:relative;display:flex;align-items:center}
+.search svg{position:absolute;left:12px;color:var(--ink2)}
+.search input{width:200px;height:40px;padding:0 12px 0 36px;border:1px solid var(--line);border-radius:12px;background:#fff;caret-color:var(--ink)}
+.search input::placeholder{color:var(--ink2)}
+.sort{height:40px;display:flex;align-items:center;gap:6px;padding:0 12px 0 14px;border:0;border-radius:12px;background:var(--quiet);font-weight:500;cursor:pointer}
+.sort:hover{background:var(--off)}
+/* inbox cards */
+.list{display:flex;flex-direction:column;gap:12px}
+.item{background:#fff;border:1px solid var(--line);border-radius:20px;padding:17px 23px}
+.top{display:flex;align-items:center;gap:10px}
+.top h2{font:600 17px/24px Figtree;letter-spacing:-.01em;margin:0}
+.amt{margin-left:auto;font:600 17px/24px Figtree;font-variant-numeric:tabular-nums}
+.item p{margin:4px 0 0;color:var(--ink2);max-width:690px;text-wrap:pretty}
+.acts{display:flex;align-items:center;gap:8px;margin-top:14px}
+.due{margin-left:auto;font:500 13px/18px Figtree;color:var(--ink2);text-align:right}.due b{color:var(--ink);font-weight:600}
+.btn{height:40px;display:inline-flex;align-items:center;gap:8px;padding:0 16px;border:0;border-radius:12px;background:var(--quiet);font-weight:600;cursor:pointer;white-space:nowrap}
+.btn:hover{background:var(--off)}
+.btn.go{background:var(--act);color:var(--ink)}.btn.go:hover{background:var(--act-hover)}
+.btn:disabled{background:var(--off);color:var(--offink);cursor:not-allowed}
+.link{font-weight:600;color:var(--ink);text-decoration:underline 2px var(--act);text-underline-offset:4px;padding:10px 6px}
+.link:hover{text-decoration-thickness:3px}
+.why{font:500 13px/18px Figtree;color:var(--ink2);max-width:264px;margin:0 4px}
+.why b{color:var(--ink);font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border-radius:8px;font:600 12px/1 Figtree;white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.crit{color:var(--crit);background:var(--critbg)}.hold{color:var(--hold);background:var(--holdbg)}
+/* side */
+.side{display:flex;flex-direction:column;gap:16px}
+.panel{background:#fff;border:1px solid var(--line);border-radius:20px;padding:23px}
+.panel h3{font:600 17px/24px Figtree;letter-spacing:-.01em;margin:0}
+.panel .meta{margin:2px 0 0;font-size:13px;line-height:18px;color:var(--ink2)}
+dl{margin:16px 0 0}
+dl div{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-top:1px solid var(--line)}
+dt{color:var(--ink2)}dd{margin:0;font-weight:500;font-variant-numeric:tabular-nums}
+dl .total{padding-top:12px}dl .total dt{color:var(--ink);font-weight:600}dl .total dd{font:700 20px/24px Figtree;letter-spacing:-.01em}
+.rule{margin:8px 0 0;font-size:13px;line-height:19px;color:var(--ink2);text-wrap:pretty}
+.sign{margin:16px 0 0;padding-top:14px;border-top:1px solid var(--line);font-weight:600;text-wrap:balance}
+.left{margin:14px 0 0;display:flex;align-items:baseline;gap:8px}
+.left b{font:700 26px/30px Figtree;letter-spacing:-.02em;font-variant-numeric:tabular-nums}.left span{color:var(--ink2)}
+.meter{display:flex;gap:2px;height:10px;margin:14px 0 4px}
+.meter i{border-radius:3px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px;vertical-align:-1px}
+.c1{background:var(--ink)}.c2{background:#A89A8F}.c3{background:var(--off)}.sw.c3{box-shadow:inset 0 0 0 1px #DDD0C3}
+.foot{margin:10px 0 0;font-size:12px;line-height:16px;color:var(--ink2)}
+</style>
+</head>
+<body>
+<header class="bar">
+  <a class="mark" href="#">Eve</a>
+  <button class="switch" aria-label="Switch event"><span><b>Cal Hacks 13.0</b><small>Oct 24–26, 2026 · UC Berkeley</small></span><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6.5 8 9.5l3-3"/></svg></button>
+  <nav aria-label="Main">
+    <a href="#" aria-current="page">Inbox <span class="count">7</span></a><a href="#">Claims</a><a href="#">Prizes</a><a href="#">Payouts</a><a href="#">People</a><a href="#">Budget</a><a href="#">Sponsor</a><a href="#">Audit trail</a><a href="#">Filings</a><a href="#">Agent</a><a href="#">Settings</a>
+  </nav>
+  <div class="end">
+    <span class="sample">Sample data</span>
+    <div class="me"><span class="av" aria-hidden="true">DW</span><span><b>Dana Whitfield</b><small>Organizer</small></span></div>
+  </div>
+</header>
+<main>
+  <section aria-labelledby="inbox-title">
+    <div class="head"><h1 id="inbox-title">Inbox</h1><span class="now">Sunday, Oct 26 · <b>1:42 PM</b> · Batch release 2:00 PM · Closing 3:00 PM</span></div>
+    <p class="lede">7 items need you. Eve auto-approved 23 in-policy claims today (<span class="num">$4,812.60</span>).</p>
+    <div class="tools">
+      <div class="seg" role="tablist" aria-label="Filter"><a href="#" aria-current="true">All <i>7</i></a><a href="#">Approvals <i>3</i></a><a href="#">Holds <i>2</i></a><a href="#">Exceptions <i>2</i></a></div>
+      <label class="search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><input type="search" placeholder="Search inbox" aria-label="Search inbox"></label>
+      <button class="sort">Sort: Urgency <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6.5 8 9.5l3-3"/></svg></button>
+    </div>
+    <div class="list">
+      <article class="item">
+        <div class="top"><h2>Jordan's bank details changed right before payout</h2><span class="pill crit">Payout frozen</span><span class="amt">$1,500.00</span></div>
+        <p>Jordan Okafor (2nd place, Best Hardware Hack) switched CAD account ••4471 to ••9902 at 1:24 PM, 36 minutes before release. Eve froze the payout and emailed Jordan's original address to confirm.</p>
+        <div class="acts"><button class="btn go">Keep frozen</button><button class="btn">Mark verified</button><a class="link" href="#">View evidence</a><span class="due">Before the 2:00 PM release<br><b>18 min left</b></span></div>
+      </article>
+      <article class="item">
+        <div class="top"><h2>Priya won a MacBook Air and lives in Canada</h2><span class="pill hold">W-8BEN not signed</span><span class="amt">$1,299.00</span></div>
+        <p>First Overall · Toronto, ON. Shipping and duty run about $214, so Eve suggests the cash equivalent.</p>
+        <div class="acts"><button class="btn go">Accept cash equivalent</button><button class="btn">Compare options</button><button class="btn">Ask Priya</button><span class="due">Before closing, 3:00 PM<br><b>1 h 18 min left</b></span></div>
+      </article>
+      <article class="item">
+        <div class="top"><h2>Payout batch #4 is ready to release</h2><span class="amt">$12,450.00</span></div>
+        <p class="num">18 payouts · $12,450.00 gross · $1,124.70 withheld for tax · about $38.20 in fees</p>
+        <div class="acts"><button class="btn" disabled><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>Release batch</button><span class="why">You requested this batch, so <b>Ari Novak</b> (controller) releases it.</span><button class="btn go">Remind Ari</button><span class="due">Release at 2:00 PM<br><b>18 min left</b></span></div>
+      </article>
+      <article class="item">
+        <div class="top"><h2>Marcus's flight is over the $300 auto-approve limit</h2><span class="amt">$495.12</span></div>
+        <p>YYZ → SFO, Air Canada economy. CA$679.40 at ECB 0.72876 (Oct 3), within 1% of the $500 Canada cap.</p>
+        <div class="acts"><button class="btn go">Approve</button><button class="btn">Reject</button><button class="btn">Ask for info</button><span class="due">All 5 checks passed<br><b>Due Oct 28</b></span></div>
+      </article>
+      <article class="item">
+        <div class="top"><h2>Sponsor paid $970.00 on a $1,000.00 request</h2><span class="amt">$970.00</span></div>
+        <p>Packet SP-0112 · Bayview Community Foundation. Their remittance shows a $30.00 wire fee taken out.</p>
+        <div class="acts"><button class="btn go">Accept with fee</button><button class="btn">Query sponsor</button><span class="due">Reconciliation exception<br><b>Due Oct 31</b></span></div>
+      </article>
+    </div>
+  </section>
+  <aside class="side" aria-label="Summaries">
+    <section class="panel">
+      <h3>Priya's prize, explained</h3>
+      <p class="meta">MacBook Air · First Overall · as cash equivalent</p>
+      <dl>
+        <div><dt>Prize value (fair market)</dt><dd>$1,299.00</dd></div>
+        <div><dt>Tax withheld, 30% default</dt><dd>−$389.70</dd></div>
+        <div><dt>Fees</dt><dd>$0.00</dd></div>
+        <div class="total"><dt>Priya gets, estimated</dt><dd>$909.30</dd></div>
+      </dl>
+      <p class="rule">Rule v2: US payer to a non-US individual, prize income, 30% by default. Canada's treaty rate isn't verified yet, so Eve used the default.</p>
+      <p class="sign">Eve prepares and explains. A human controller signs.</p>
+    </section>
+    <section class="panel">
+      <h3>Travel budget</h3>
+      <div class="left"><b>$12,380</b><span>left of <span class="num">$60,000</span></span></div>
+      <div class="meter" role="img" aria-label="Spent 64%, committed 15%, left 21%"><i class="c1" style="flex:38420"></i><i class="c2" style="flex:9200"></i><i class="c3" style="flex:12380"></i></div>
+      <dl>
+        <div><dt><span class="sw c1"></span>Spent</dt><dd>$38,420</dd></div>
+        <div><dt><span class="sw c2"></span>Committed</dt><dd>$9,200</dd></div>
+        <div><dt><span class="sw c3"></span>Left</dt><dd>$12,380</dd></div>
+      </dl>
+      <p class="foot">Committed means approved but not paid yet.</p>
+    </section>
+  </aside>
+</main>
+</body>
+</html>

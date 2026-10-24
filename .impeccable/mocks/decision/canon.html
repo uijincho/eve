@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inbox · Eve</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F9FAFB;--sf:#FFFFFF;--bd:#E5E7EB;--bd2:#D1D5DB;--tx:#111827;--tx2:#374151;--mu:#6B7280;--ac:#2563EB;--ac2:#1D4ED8;--acw:#EFF6FF;--hv:#F3F4F6}
+*{box-sizing:border-box}html,body{width:1440px;height:900px;overflow:hidden;margin:0}
+body{display:grid;grid-template-columns:240px 1fr;background:var(--bg);color:var(--tx);font:400 13px/20px Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-feature-settings:"cv11"}
+::selection{background:#DBEAFE;color:var(--tx)}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:6px}
+button,input{font:inherit;color:inherit}a{color:inherit;text-decoration:none}
+.num{font-variant-numeric:tabular-nums}
+.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.i.xs{width:12px;height:12px}
+/* sidebar */
+aside{background:var(--sf);border-right:1px solid var(--bd);display:flex;flex-direction:column;padding:16px 12px}
+.brand{display:flex;align-items:center;gap:8px;height:32px;padding:0 8px;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.sw{display:flex;align-items:center;gap:8px;width:100%;margin:12px 0 16px;padding:8px 10px;background:var(--sf);border:1px solid var(--bd);border-radius:8px;text-align:left;cursor:pointer}
+.sw:hover{background:var(--bg)}
+.sw b{display:block;font-weight:500;line-height:18px}.sw small{display:block;font-size:12px;line-height:16px;color:var(--mu)}
+.sw .i{margin-left:auto;color:var(--mu)}
+nav a{display:flex;align-items:center;gap:10px;height:32px;padding:0 8px;border-radius:6px;font-size:14px;font-weight:500;color:var(--tx2)}
+nav a .i{color:var(--mu)}
+nav a:hover{background:var(--hv);color:var(--tx)}nav a[aria-current]{background:var(--acw);color:var(--ac2)}
+nav a[aria-current] .i{color:var(--ac)}
+nav .ct{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--ac);color:#fff;font-size:12px;font-weight:600;line-height:20px;text-align:center}
+nav hr{border:0;border-top:1px solid var(--bd);margin:8px 8px}
+.foot{margin-top:auto}
+.tag{display:inline-flex;align-items:center;gap:6px;height:20px;margin:0 0 12px 8px;padding:0 8px;border-radius:10px;background:var(--hv);box-shadow:inset 0 0 0 1px var(--bd);color:#4B5563;font-size:12px;font-weight:500}
+.tag::before{content:"";width:6px;height:6px;border-radius:50%;background:#9CA3AF}
+.me{display:flex;align-items:center;gap:10px;padding:12px 8px 0;border-top:1px solid var(--bd)}
+.av{width:32px;height:32px;border-radius:50%;background:var(--hv);display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--tx2)}
+.me b{display:block;font-weight:500;line-height:18px}.me small{display:block;font-size:12px;line-height:16px;color:var(--mu)}
+.me .i{margin-left:auto;color:var(--mu)}
+/* main */
+main{padding:28px 24px 0;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:flex-start}
+h1{margin:0;font-size:24px;line-height:32px;font-weight:600;letter-spacing:-.02em}
+.ph p{margin:4px 0 0;font-size:14px;line-height:20px;color:var(--mu)}
+.ph .bar{display:flex;gap:8px;margin-top:2px}
+.btn{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--bd2);border-radius:6px;background:var(--sf);font-weight:500;white-space:nowrap;cursor:pointer}
+.btn:hover{background:var(--bg);border-color:#9CA3AF}
+.btn .i{color:var(--mu)}
+.btn.pri{background:var(--ac);border-color:var(--ac);color:#fff}.btn.pri .i{color:#fff}
+.btn.pri:hover{background:var(--ac2);border-color:var(--ac2)}
+.btn.sm{height:28px;padding:0 8px}.btn.ic{width:28px;padding:0}
+.btn:disabled{background:var(--bg);border-color:var(--bd);color:var(--mu);cursor:not-allowed}
+.btn:disabled .i{color:#9CA3AF}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:24px}
+.kpi{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:16px 20px}
+.kpi .l{display:flex;justify-content:space-between;align-items:center;font-weight:500;color:var(--mu)}
+.kpi .v{margin-top:4px;font-size:24px;line-height:32px;font-weight:600;letter-spacing:-.02em}
+.kpi .v small{font-size:13px;font-weight:400;letter-spacing:0;color:var(--mu)}
+.kpi .f{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;line-height:16px;color:var(--mu)}
+.dot{width:6px;height:6px;border-radius:50%;background:#B91C1C}
+.meter{flex:1;height:6px;border-radius:3px;background:#DBEAFE;overflow:hidden}.meter i{display:block;height:100%;border-radius:3px;background:var(--ac)}
+.pill{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:10px;font-size:12px;font-weight:500;line-height:20px;white-space:nowrap}
+.crit{color:#B91C1C;background:#FEF2F2;box-shadow:inset 0 0 0 1px #FECACA}
+.hold{color:#B45309;background:#FFFBEB;box-shadow:inset 0 0 0 1px #FDE68A}
+.appr{color:#1D4ED8;background:#EFF6FF;box-shadow:inset 0 0 0 1px #BFDBFE}
+.exc{color:#7C2D12;background:#FFF7ED;box-shadow:inset 0 0 0 1px #FED7AA}
+.neu{color:#4B5563;background:var(--hv);box-shadow:inset 0 0 0 1px var(--bd)}
+/* toolbar */
+.tb{display:flex;justify-content:space-between;align-items:center;height:48px;margin-top:20px;border-bottom:1px solid var(--bd)}
+.tabs{display:flex;gap:24px;height:100%}
+.tab{display:flex;align-items:center;gap:8px;height:100%;padding:0 2px;border:0;background:none;font-size:14px;font-weight:500;color:var(--mu);cursor:pointer}
+.tab:hover{color:var(--tx)}.tab span{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--hv);color:#4B5563;font-size:12px;line-height:20px}
+.tab[aria-selected=true]{color:var(--ac);box-shadow:inset 0 -2px 0 var(--ac)}
+.tab[aria-selected=true] span{background:var(--acw);color:var(--ac2)}
+.tools{display:flex;gap:8px}
+.search{position:relative}.search .i{position:absolute;left:10px;top:8px;color:var(--mu)}
+.search input{width:260px;height:32px;padding:0 10px 0 32px;border:1px solid var(--bd2);border-radius:6px;background:var(--sf);caret-color:var(--ac)}
+.search input::placeholder{color:var(--mu)}
+.search input:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px #DBEAFE}
+.btn .k{color:var(--mu);font-weight:400}
+/* table */
+.card{margin-top:16px;background:var(--sf);border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th{height:40px;padding:0 12px;background:var(--bg);border-bottom:1px solid var(--bd);font-size:12px;line-height:16px;font-weight:500;color:var(--mu);text-align:left;white-space:nowrap}
+th .sh{display:inline-flex;align-items:center;gap:4px;cursor:pointer}th .sh:hover{color:var(--tx)}
+td{padding:12px;border-bottom:1px solid var(--bd);vertical-align:top}tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:var(--bg)}
+tbody tr.sel td{background:var(--acw)}
+th:first-child,td:first-child{padding:12px 0 12px 16px}
+th:nth-child(2),td:nth-child(2){padding-left:0}
+th:last-child,td:last-child{padding-right:16px}
+th.r,td.r{text-align:right}th.r .sh{flex-direction:row-reverse}
+input[type=checkbox]{appearance:none;display:block;width:16px;height:16px;margin:2px 0 0;border:1px solid var(--bd2);border-radius:4px;background:var(--sf) center/12px no-repeat;cursor:pointer}
+th input[type=checkbox]{margin:0}input[type=checkbox]:hover{border-color:#9CA3AF}
+input[type=checkbox]:checked,input.mixed{background-color:var(--ac);border-color:var(--ac);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='white' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.2 5 8.5l4.5-5'/%3E%3C/svg%3E")}
+input.mixed{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' stroke='white' stroke-width='1.75' stroke-linecap='round'%3E%3Cpath d='M3 6h6'/%3E%3C/svg%3E")}
+.t{display:block;font-size:14px;font-weight:500;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+a.t:hover{text-decoration:underline;text-underline-offset:3px;text-decoration-color:#9CA3AF}
+.m{margin-top:2px;font-size:13px;line-height:18px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.s{margin-top:2px;font-size:12px;line-height:16px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sel .m,.sel .s{color:#4B5563}.a{font-weight:500}
+.s.due{color:#B91C1C;font-weight:500}
+.acts{display:flex;justify-content:flex-end;gap:6px;margin-top:5px}
+.tw{position:relative}
+.tip{position:absolute;right:0;top:calc(100% + 10px);padding:6px 10px;border-radius:6px;background:var(--tx);color:#F9FAFB;font-size:12px;line-height:16px;white-space:nowrap;z-index:1}
+.tip::before{content:"";position:absolute;right:56px;top:-4px;width:8px;height:8px;background:var(--tx);transform:rotate(45deg);border-radius:1px}
+tr.blk td{padding-bottom:46px}
+.tf{display:flex;justify-content:space-between;align-items:center;height:44px;padding:0 16px;border-top:1px solid var(--bd);font-size:12px;color:var(--mu)}
+.tf a{color:var(--ac);font-weight:500}.tf a:hover{text-decoration:underline;text-underline-offset:3px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-inbox" viewBox="0 0 16 16"><path d="M2 9h3.5l1 2h3l1-2H14M3.5 3.5h9L14 9v3.5H2V9z"/></symbol>
+<symbol id="i-claims" viewBox="0 0 16 16"><path d="M4 2h8v12l-2-1.2L8 14l-2-1.2L4 14zM6 5.5h4M6 8.5h4"/></symbol>
+<symbol id="i-prize" viewBox="0 0 16 16"><circle cx="8" cy="6" r="3.5"/><path d="M5.8 8.8 5 14l3-1.5 3 1.5-.8-5.2"/></symbol>
+<symbol id="i-pay" viewBox="0 0 16 16"><path d="M2.5 9v4.5h11V9M8 2.5V10M5 5.5l3-3 3 3"/></symbol>
+<symbol id="i-people" viewBox="0 0 16 16"><circle cx="6" cy="5.5" r="2.5"/><path d="M1.5 13.5C2 11 3.8 10 6 10s4 1 4.5 3.5M11 3.2a2.5 2.5 0 0 1 0 4.6M12.5 10.3c1.2.5 1.8 1.6 2 3.2"/></symbol>
+<symbol id="i-budget" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5V8h5.5"/></symbol>
+<symbol id="i-sponsor" viewBox="0 0 16 16"><path d="M2 6l6-3.5L14 6M3.5 6.5v5.5M6.5 6.5v5.5M9.5 6.5v5.5M12.5 6.5v5.5M2 13.5h12"/></symbol>
+<symbol id="i-audit" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.5"/></symbol>
+<symbol id="i-file" viewBox="0 0 16 16"><path d="M4 2h5l3 3v9H4zM9 2v3h3M6 8.5h4M6 11h4"/></symbol>
+<symbol id="i-agent" viewBox="0 0 16 16"><rect x="2.5" y="4.5" width="11" height="8.5" rx="2"/><path d="M8 2v2.5M6 8.5h.01M10 8.5h.01"/></symbol>
+<symbol id="i-set" viewBox="0 0 16 16"><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6"/><circle cx="10" cy="4.5" r="1.5"/><circle cx="6" cy="11.5" r="1.5"/></symbol>
+<symbol id="i-ud" viewBox="0 0 16 16"><path d="M5.5 6 8 3.5 10.5 6M5.5 10 8 12.5 10.5 10"/></symbol>
+<symbol id="i-down" viewBox="0 0 16 16"><path d="M4.5 6.5 8 10l3.5-3.5"/></symbol>
+<symbol id="i-search" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></symbol>
+<symbol id="i-dots" viewBox="0 0 16 16"><path d="M3.5 8h.01M8 8h.01M12.5 8h.01" stroke-width="2.25"/></symbol>
+<symbol id="i-lock" viewBox="0 0 16 16"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></symbol>
+<symbol id="i-dl" viewBox="0 0 16 16"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M2.5 13.5h11"/></symbol>
+<symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></symbol>
+</svg>
+<aside>
+  <div class="brand"><svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect width="20" height="20" rx="5" fill="#2563EB"/><path d="M6.5 6h7M6.5 10h5M6.5 14h7" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>Eve</div>
+  <button class="sw" aria-label="Switch event"><span><b>Cal Hacks 13.0</b><small>Oct 24–26, 2026</small><small>UC Berkeley</small></span><svg class="i"><use href="#i-ud"/></svg></button>
+  <nav aria-label="Primary">
+    <a href="#" aria-current="page"><svg class="i"><use href="#i-inbox"/></svg>Inbox<span class="ct num">7</span></a>
+    <a href="#"><svg class="i"><use href="#i-claims"/></svg>Claims</a><a href="#"><svg class="i"><use href="#i-prize"/></svg>Prizes</a>
+    <a href="#"><svg class="i"><use href="#i-pay"/></svg>Payouts</a><a href="#"><svg class="i"><use href="#i-people"/></svg>People</a>
+    <hr>
+    <a href="#"><svg class="i"><use href="#i-budget"/></svg>Budget</a><a href="#"><svg class="i"><use href="#i-sponsor"/></svg>Sponsor</a>
+    <a href="#"><svg class="i"><use href="#i-audit"/></svg>Audit trail</a><a href="#"><svg class="i"><use href="#i-file"/></svg>Filings</a>
+    <hr>
+    <a href="#"><svg class="i"><use href="#i-agent"/></svg>Agent</a><a href="#"><svg class="i"><use href="#i-set"/></svg>Settings</a>
+  </nav>
+  <div class="foot">
+    <span class="tag">Sample data</span>
+    <div class="me"><span class="av">DW</span><span><b>Dana Whitfield</b><small>Organizer</small></span><svg class="i"><use href="#i-ud"/></svg></div>
+  </div>
+</aside>
+<main>
+  <header class="ph">
+    <div><h1>Inbox</h1><p>7 items need you. Eve auto-approved 23 in-policy claims today (<span class="num">$4,812.60</span>).</p></div>
+    <div class="bar"><button class="btn"><svg class="i"><use href="#i-dl"/></svg>Export</button><button class="btn pri"><svg class="i"><use href="#i-plus"/></svg>New event</button></div>
+  </header>
+  <section class="kpis" aria-label="Summary">
+    <div class="kpi"><div class="l">Needs you</div><div class="v num">7</div><div class="f"><span class="dot"></span>2 due before the 2:00 PM release</div></div>
+    <div class="kpi"><div class="l">Auto-approved today</div><div class="v num">$4,812.60</div><div class="f">23 in-policy claims · 4 escalated</div></div>
+    <div class="kpi"><div class="l">Travel budget left</div><div class="v num">$12,380 <small>of $60,000</small></div><div class="f" title="$38,420 spent · $9,200 committed"><span class="meter" role="img" aria-label="79% used: $38,420 spent, $9,200 committed"><i style="width:79.4%"></i></span><span class="num">79% used</span></div></div>
+    <div class="kpi"><div class="l">Batch #4<span class="pill neu">Awaiting Ari</span></div><div class="v num">$12,450.00</div><div class="f">18 payouts · release at 2:00 PM</div></div>
+  </section>
+  <div class="tb">
+    <div class="tabs" role="tablist" aria-label="Filter inbox">
+      <button class="tab" role="tab" aria-selected="true">All<span class="num">7</span></button><button class="tab" role="tab" aria-selected="false">Approvals<span class="num">3</span></button>
+      <button class="tab" role="tab" aria-selected="false">Holds<span class="num">2</span></button><button class="tab" role="tab" aria-selected="false">Exceptions<span class="num">2</span></button>
+    </div>
+    <div class="tools"><label class="search"><span class="sr">Search inbox</span><svg class="i"><use href="#i-search"/></svg><input type="search" placeholder="Search items, people, amounts"></label><button class="btn"><span class="k">Sort:</span>Urgency<svg class="i"><use href="#i-down"/></svg></button></div>
+  </div>
+  <div class="card">
+    <table>
+      <colgroup><col style="width:44px"><col><col style="width:160px"><col style="width:92px"><col style="width:116px"><col style="width:96px"><col style="width:296px"></colgroup>
+      <thead><tr><th><input type="checkbox" class="mixed" aria-label="Select all"></th><th aria-sort="none"><span class="sh">Item<svg class="i xs"><use href="#i-ud"/></svg></span></th><th aria-sort="none"><span class="sh">Person<svg class="i xs"><use href="#i-ud"/></svg></span></th><th aria-sort="none"><span class="sh">Type<svg class="i xs"><use href="#i-ud"/></svg></span></th><th class="r" aria-sort="none"><span class="sh">Amount<svg class="i xs"><use href="#i-ud"/></svg></span></th><th aria-sort="none"><span class="sh">Due<svg class="i xs"><use href="#i-ud"/></svg></span></th><th><span class="sr">Actions</span></th></tr></thead>
+      <tbody>
+        <tr><td><input type="checkbox" aria-label="Select item"></td><td><a class="t" href="#">Payout frozen: bank details changed</a><div class="m">••4471 → ••9902 at 1:24 PM · confirmation emailed</div></td><td><div class="p">Jordan Okafor</div><div class="s">Best Hardware, 2nd</div></td><td><span class="pill crit">Critical</span></td><td class="r num"><div class="a">$1,500.00</div><div class="s">Prize payout</div></td><td><div class="a">2:00 PM</div><div class="s due">in 18 min</div></td>
+          <td><div class="acts"><button class="btn sm">Keep frozen</button><button class="btn sm">Mark verified</button><button class="btn sm ic" aria-label="More: View evidence"><svg class="i"><use href="#i-dots"/></svg></button></div></td></tr>
+        <tr class="sel"><td><input type="checkbox" checked aria-label="Select item"></td><td><a class="t" href="#">Prize to a winner in Canada: MacBook Air</a><div class="m">W-8BEN unsigned · Eve recommends cash equivalent</div></td><td><div class="p">Priya Raman</div><div class="s">1st Overall · Toronto</div></td><td><span class="pill appr">Approval</span></td><td class="r num"><div class="a">$1,299.00</div><div class="s">net ≈ $909.30</div></td><td><div class="a">3:00 PM</div><div class="s">in 1 h 18 min</div></td>
+          <td><div class="acts"><button class="btn sm">Accept recommendation</button><button class="btn sm ic" aria-label="More: Compare options, Ask winner"><svg class="i"><use href="#i-dots"/></svg></button></div></td></tr>
+        <tr class="blk"><td><input type="checkbox" aria-label="Select item"></td><td><a class="t" href="#">Payout batch #4 is ready for release</a><div class="m num">18 payouts · $1,124.70 withheld · est. fees $38.20</div></td><td><div class="p">Ari Novak</div><div class="s">Controller</div></td><td><span class="pill appr">Approval</span></td><td class="r num"><div class="a">$12,450.00</div><div class="s">gross</div></td><td><div class="a">2:00 PM</div><div class="s due">in 18 min</div></td>
+          <td><div class="acts"><span class="tw"><button class="btn sm" disabled aria-describedby="why" style="width:124px"><svg class="i"><use href="#i-lock"/></svg>Release batch</button><span class="tip" role="tooltip" id="why">You requested this batch. A controller must release it (Ari Novak).</span></span><button class="btn sm">Remind Ari</button><button class="btn sm ic" aria-label="More actions"><svg class="i"><use href="#i-dots"/></svg></button></div></td></tr>
+        <tr><td><input type="checkbox" aria-label="Select item"></td><td><a class="t" href="#">Travel claim above the $300 auto-approve limit</a><div class="m">YYZ → SFO, Air Canada · within 1% of $500 cap</div></td><td><div class="p">Marcus Lee</div><div class="s">Attendee · Travel</div></td><td><span class="pill appr">Approval</span></td><td class="r num"><div class="a">$495.12</div><div class="s">CA$679.40</div></td><td><div class="a">Oct 28</div><div class="s">in 2 days</div></td>
+          <td><div class="acts"><button class="btn sm">Approve</button><button class="btn sm">Reject</button><button class="btn sm ic" aria-label="More: Ask for info"><svg class="i"><use href="#i-dots"/></svg></button></div></td></tr>
+        <tr><td><input type="checkbox" aria-label="Select item"></td><td><a class="t" href="#">Sponsor paid $970.00 on a $1,000.00 request</a><div class="m num">Packet SP-0112 · $30.00 wire fee deducted</div></td><td><div class="p" title="Bayview Community Foundation">Bayview Community Foundation</div><div class="s">Fiscal sponsor</div></td><td><span class="pill exc">Exception</span></td><td class="r num"><div class="a">$970.00</div><div class="s">of $1,000.00</div></td><td><div class="a">Oct 31</div><div class="s">in 5 days</div></td>
+          <td><div class="acts"><button class="btn sm">Accept with fee</button><button class="btn sm">Query sponsor</button><button class="btn sm ic" aria-label="More actions"><svg class="i"><use href="#i-dots"/></svg></button></div></td></tr>
+        <tr><td><input type="checkbox" aria-label="Select item"></td><td><a class="t" href="#">W-8BEN expired; stipend on hold</a><div class="m">Lapsed Dec 31, 2025 · chased Oct 20, Oct 22</div></td><td><div class="p">Lukas Becker</div><div class="s">Judge · Munich, DE</div></td><td><span class="pill hold">Hold</span></td><td class="r num"><div class="a">$250.00</div><div class="s">Stipend</div></td><td><div class="a">Oct 29</div><div class="s">in 3 days</div></td>
+          <td><div class="acts"><button class="btn sm">Send now</button><button class="btn sm">View chase log</button><button class="btn sm ic" aria-label="More actions"><svg class="i"><use href="#i-dots"/></svg></button></div></td></tr>
+        <tr><td><input type="checkbox" aria-label="Select item"></td><td><a class="t" href="#">Duplicate receipt held</a><div class="m">Lyft, C-2231 and C-2240 · first one approved</div></td><td><div class="p">Sam Ortiz</div><div class="s">Attendee</div></td><td><span class="pill hold">Hold</span></td><td class="r num"><div class="a">$38.20</div><div class="s">Rideshare</div></td><td><div class="a">Nov 2</div><div class="s">in 7 days</div></td>
+          <td><div class="acts"><button class="btn sm">Reject duplicate</button><button class="btn sm">View both</button><button class="btn sm ic" aria-label="More actions"><svg class="i"><use href="#i-dots"/></svg></button></div></td></tr>
+      </tbody>
+    </table>
+    <div class="tf"><span>7 items · Sorted by urgency · As of Sun, Oct 26, 1:42 PM</span><a href="#">View 23 auto-approved claims</a></div>
+  </div>
+</main>
+</body>
+</html>

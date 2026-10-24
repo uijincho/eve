@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Eve · Inbox · Blue Hour</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--rail:#1C2042;--bg:#20244A;--up:#272C55;--line:#363C6E;--tx:#E9EBF7;--mu:#A9AED3;--w1:#7FA7F5;--w2:#9C9CF2;--w3:#B48CF0;--w4:#F08BA0;--w5:#F5A962;--crit:#FF7A85;--fill:#D9DCF3;--mid:#7177BE;--off:#7A80B0}
+*{box-sizing:border-box;margin:0;padding:0}html,body{width:1440px;height:900px;overflow:hidden}
+body{display:grid;grid-template-columns:232px 848px 360px;background:var(--bg);color:var(--tx);font:400 13px/18px "Hanken Grotesk",system-ui,sans-serif;-webkit-font-smoothing:antialiased;accent-color:var(--w1)}
+::selection{background:#454C92;color:#fff}:focus-visible{outline:2px solid var(--w1);outline-offset:2px;border-radius:6px}
+ul,ol{list-style:none}a{color:inherit;text-decoration:none}button,input{font:inherit;color:inherit}svg{flex:none}.n,.amt,.chip,.led td:last-child,.big,.scale{font-variant-numeric:tabular-nums}.mu{color:var(--mu)}
+/* rail */
+.rail{background:var(--rail);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 12px 12px}.brand{display:flex;align-items:center;justify-content:space-between;padding:2px 6px 14px 8px}
+.word{font-size:20px;line-height:28px;font-weight:700;letter-spacing:-.02em}.tag{font-size:12px;line-height:16px;color:var(--mu);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+.event{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;color:var(--tx)}
+.event span{flex:1}.event b,.me b{display:block;font-weight:600}.event small,.me small{display:block;font-size:12px;line-height:16px;color:var(--mu)}.nav{margin-top:16px;display:grid;gap:2px}
+.nav a{display:flex;justify-content:space-between;align-items:center;height:32px;padding:0 10px;border-radius:6px;color:var(--mu);font-weight:500}.nav a:hover{background:#232851;color:var(--tx)}
+.nav a[aria-current]{background:var(--up);color:var(--tx);font-weight:600}.nav .sep{height:1px;background:var(--line);margin:8px 10px}
+.count{font-size:12px;line-height:18px;font-weight:600;border-radius:9px;background:var(--line);padding:0 7px}.me{margin-top:auto;display:flex;align-items:center;gap:10px;padding:12px 8px 2px;border-top:1px solid var(--line)}
+.av{width:28px;height:28px;border-radius:50%;background:var(--line);display:grid;place-items:center;font-size:12px;font-weight:600}
+/* header */
+main{display:flex;flex-direction:column;min-width:0}.head{padding:22px 24px 0 28px;border-bottom:1px solid var(--line)}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:24px}
+h1{font-size:28px;line-height:34px;font-weight:700;letter-spacing:-.02em}.sub{color:var(--mu);margin-top:2px}
+.when{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:14px;line-height:20px;font-weight:600;margin-top:2px}.when b{color:var(--w4);font-weight:700}.when .mu{font-weight:500}
+.legend{display:flex;align-items:flex-end;justify-content:flex-end;gap:8px;margin-top:10px;font-size:12px;line-height:16px;color:var(--mu)}
+.legend ol{display:flex;gap:3px}.legend li{border-top:4px solid var(--c);padding:3px 6px 0 0}.bar{display:flex;justify-content:space-between;align-items:center;margin-top:12px;height:40px}.tabs{display:flex;align-self:stretch}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:0 10px;color:var(--mu);font-weight:500;cursor:pointer;position:relative;top:1px}
+.tabs button:first-child{padding-left:0}.tabs button:hover{color:var(--tx)}.tabs button span{margin-left:5px;color:var(--mu)}.tabs [aria-selected=true]{color:var(--tx);border-color:var(--tx);font-weight:600}
+.tools{display:flex;gap:8px;align-items:center}.search{display:flex;align-items:center;gap:6px;width:220px;height:30px;padding:0 10px;background:var(--rail);border:1px solid var(--line);border-radius:6px;color:var(--mu)}
+.search input{background:none;border:0;outline:0;width:100%;caret-color:var(--w1);color:var(--tx)}.search input::placeholder{color:var(--mu)}.search:focus-within{border-color:var(--w1)}
+.btn{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--tx);font-weight:500;cursor:pointer;white-space:nowrap}
+.btn:hover{background:#2E3463;border-color:#4A5190}.btn.pri{background:var(--tx);color:var(--rail);border-color:var(--tx);font-weight:600}.btn.pri:hover{background:#fff}
+.btn:disabled{color:var(--off);border-style:dashed;background:transparent;cursor:not-allowed}.sort{height:30px}
+/* ranked list: each row's left edge and due chip carry its deadline temperature */
+.row{position:relative;height:110px;padding:10px 24px 10px 28px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr 104px 112px;grid-template-rows:20px 18px 18px 33px;column-gap:16px;grid-template-areas:"t a d" "m a2 d2" "x . ." "k k k"}
+.row::before{content:"";position:absolute;left:0;top:0;bottom:-1px;width:4px;background:var(--c)}.row:hover{background:#232851}.row.sel{background:var(--up)}
+.t{grid-area:t;font-size:14px;line-height:20px;font-weight:600;display:flex;align-items:center;gap:8px;white-space:nowrap}.amt{grid-area:a;text-align:right;font-size:14px;line-height:20px;font-weight:600}.due{grid-area:d}
+.chip{display:inline-block;color:var(--c);background:color-mix(in srgb,var(--c) 15%,var(--bg));border-radius:5px;padding:0 7px;font-size:13px;line-height:20px;font-weight:600;white-space:nowrap}
+.m{grid-area:m;color:var(--mu)}.x{grid-area:x;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.a2,.d2{font-size:12px;color:var(--mu)}.a2 b,.sub b,.opt b{color:var(--tx);font-weight:500}.a2{grid-area:a2;text-align:right}.d2{grid-area:d2}.k{grid-area:k;display:flex;align-items:flex-end;gap:8px}
+.why{display:flex;align-items:center;gap:6px;color:var(--mu);height:26px;margin-right:4px}
+.crit{display:inline-flex;align-items:center;gap:4px;color:var(--crit);font-size:12px;line-height:18px;font-weight:600;border:1px solid color-mix(in srgb,var(--crit) 50%,transparent);border-radius:4px;padding:0 6px}
+/* detail pane */
+.pane{background:var(--up);border-left:1px solid var(--line);padding:22px 24px 16px;display:flex;flex-direction:column}.pane h2{font-size:20px;line-height:28px;font-weight:600;letter-spacing:-.01em}
+.pd{display:flex;align-items:center;gap:8px;margin-top:10px;color:var(--mu)}.sec{margin-top:18px}h3{font-size:14px;line-height:20px;font-weight:600;display:flex;justify-content:space-between;align-items:baseline}
+h3 small{font-size:12px;font-weight:400;color:var(--mu)}.lbl{display:flex;justify-content:space-between;margin-top:10px;font-size:12px;line-height:16px;color:var(--mu)}.lbl b{color:var(--tx);font-weight:600}
+.meter{position:relative;display:flex;gap:2px;height:12px;margin-top:6px;background:var(--bg);border-radius:3px}.meter i{display:block;height:100%}.meter i:first-child{border-radius:3px 0 0 3px}
+.cap{position:absolute;right:-1px;top:-5px;bottom:-5px;width:2px;background:var(--tx)}.scale{position:relative;height:18px;font-size:12px;line-height:16px;color:var(--mu)}
+.scale span{position:absolute;top:4px;transform:translateX(-50%)}.scale span:first-child{transform:none}.scale span:last-child{transform:translateX(-100%)}
+.scale span::before{content:"";position:absolute;left:50%;top:-4px;width:1px;height:3px;background:var(--line)}.led{width:100%;border-collapse:collapse;margin-top:6px}
+.led td{padding:3px 0;line-height:18px;vertical-align:baseline}.led td:first-child{color:var(--mu)}.led td:last-child{text-align:right;font-weight:500;color:var(--tx);white-space:nowrap}
+.led tr.tot td{border-top:1px solid var(--line);padding-top:6px;font-weight:600;color:var(--tx)}.led i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px;background:var(--s)}
+.opt td:first-child{color:var(--tx)}.opt td span{color:var(--mu);font-size:12px;margin-left:6px}.rule{display:grid;grid-template-columns:52px 1fr;gap:4px 12px;margin-top:8px}.rule dt{color:var(--mu)}
+.sign{display:flex;gap:8px;align-items:flex-start;margin-top:16px;color:var(--mu)}.acts{display:flex;gap:8px;margin-top:10px}.acts .btn{height:32px;padding:0 12px}
+.budget{margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}.big{font-size:20px;line-height:28px;font-weight:600;margin-top:4px}.big small{font-size:13px;font-weight:400;color:var(--mu);margin-left:6px}
+.agent{margin-top:auto;font-size:12px;line-height:16px;color:var(--mu)}
+</style>
+</head>
+<body>
+<nav class="rail" aria-label="Primary">
+  <div class="brand"><span class="word">Eve</span><span class="tag">Sample data</span></div>
+  <button class="event" aria-label="Switch event"><span><b>Cal Hacks 13.0</b><small>Oct 24–26, 2026</small><small>UC Berkeley</small></span><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m4 6 4 4 4-4"/></svg></button>
+  <ul class="nav">
+    <li><a href="#" aria-current="page">Inbox<span class="count n">7</span></a></li>
+    <li><a href="#">Claims</a></li><li><a href="#">Prizes</a></li><li><a href="#">Payouts</a></li><li><a href="#">People</a></li><li><a href="#">Budget</a></li><li><a href="#">Sponsor</a></li>
+    <li class="sep" role="separator"></li>
+    <li><a href="#">Audit trail</a></li><li><a href="#">Filings</a></li><li><a href="#">Agent</a></li><li><a href="#">Settings</a></li>
+  </ul>
+  <div class="me"><span class="av" aria-hidden="true">DW</span><span><b>Dana Whitfield</b><small>Organizer</small></span></div>
+</nav>
+
+<main>
+  <header class="head">
+    <div class="top">
+      <div><h1>Inbox</h1><p class="sub">7 items need you. Eve auto-approved 23 in-policy claims today (<b class="n">$4,812.60</b>).</p></div>
+      <div>
+        <p class="when"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 4.5V8l2.5 1.5"/></svg><span class="mu n">1:42 PM ·</span> Closing ceremony in <b class="n">1 h 18 min</b></p>
+        <div class="legend" aria-label="Due date scale, cool to warm">Due<ol><li style="--c:var(--w1)">over a week</li><li style="--c:var(--w2)">this week</li><li style="--c:var(--w3)">2 days</li><li style="--c:var(--w4)">today</li><li style="--c:var(--w5)">within the hour</li></ol></div>
+      </div>
+    </div>
+    <div class="bar">
+      <div class="tabs" role="tablist" aria-label="Filter inbox"><button role="tab" aria-selected="true">All<span class="n">7</span></button><button role="tab" aria-selected="false">Approvals<span class="n">3</span></button><button role="tab" aria-selected="false">Holds<span class="n">2</span></button><button role="tab" aria-selected="false">Exceptions<span class="n">2</span></button></div>
+      <div class="tools">
+        <label class="search"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><input type="search" placeholder="Search inbox" aria-label="Search inbox"></label>
+        <button class="btn sort">Sort: Urgency<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <ol class="list" aria-label="Items ranked by deadline, soonest first">
+    <li class="row" style="--c:var(--w5)">
+      <h2 class="t">Payout frozen: bank details changed <span class="crit"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>Frozen</span></h2>
+      <p class="amt">$1,500.00</p><p class="due"><span class="chip">18 min</span></p>
+      <p class="m">Jordan Okafor · 2nd place, Best Hardware Hack</p><p class="a2">payout</p><p class="d2">2:00 PM release</p>
+      <p class="x">CAD ••4471 changed to ••9902 at 1:24 PM. Eve emailed Jordan’s original address to confirm.</p>
+      <div class="k"><button class="btn">Keep frozen</button><button class="btn">Mark verified</button><button class="btn">View evidence</button></div>
+    </li>
+    <li class="row" style="--c:var(--w5)">
+      <h2 class="t">Payout batch #4 is ready for release</h2>
+      <p class="amt">$12,450.00</p><p class="due"><span class="chip">18 min</span></p>
+      <p class="m">18 payouts · requested by you · controller Ari Novak</p><p class="a2">gross</p><p class="d2">2:00 PM release</p>
+      <p class="x n">$1,124.70 withheld · est. fees $38.20 · scheduled for 2:00 PM</p>
+      <div class="k"><button class="btn" disabled aria-describedby="why4"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>Release batch</button><span class="why" id="why4">You requested this batch. A controller must release it (Ari Novak).</span><button class="btn">Remind Ari</button></div>
+    </li>
+    <li class="row sel" style="--c:var(--w4)" aria-current="true">
+      <h2 class="t">Prize to a winner in Canada: MacBook Air</h2>
+      <p class="amt">$1,299.00</p><p class="due"><span class="chip">1 h 18 min</span></p>
+      <p class="m">Priya Raman, Toronto, ON · First Overall</p><p class="a2">item FMV</p><p class="d2">3:00 PM ceremony</p>
+      <p class="x">W-8BEN sent 1:31 PM, not signed. Eve recommends cash equivalent, est. net <span class="n">$909.30</span>.</p>
+      <div class="k"><button class="btn">Accept recommendation</button><button class="btn">Compare options</button><button class="btn">Ask winner</button></div>
+    </li>
+    <li class="row" style="--c:var(--w3)">
+      <h2 class="t">Travel claim above the $300 auto-approve limit</h2>
+      <p class="amt">$495.12</p><p class="due"><span class="chip">Oct 28</span></p>
+      <p class="m">Marcus Lee · YYZ → SFO, Air Canada, economy · FX 0.72876 (ECB, Oct 3)</p><p class="a2 n"><b>CA$679.40</b></p><p class="d2">in 2 days</p>
+      <p class="x">Passed: name, dates, economy, under $500 cap, no duplicate. Flag: within 1% of cap.</p>
+      <div class="k"><button class="btn">Approve</button><button class="btn">Reject</button><button class="btn">Ask for info</button></div>
+    </li>
+    <li class="row" style="--c:var(--w2)">
+      <h2 class="t">W-8BEN expired; stipend on hold</h2>
+      <p class="amt">$250.00</p><p class="due"><span class="chip">Oct 29</span></p>
+      <p class="m">Lukas Becker, Munich, DE · Judge stipend</p><p class="a2">stipend</p><p class="d2">in 3 days</p>
+      <p class="x">Signed 2022, lapsed Dec 31, 2025. Eve chased Oct 20 and Oct 22; next chase Oct 29.</p>
+      <div class="k"><button class="btn">Send now</button><button class="btn">View chase log</button></div>
+    </li>
+    <li class="row" style="--c:var(--w2)">
+      <h2 class="t">Sponsor paid $970.00 on a $1,000.00 request</h2>
+      <p class="amt">$970.00</p><p class="due"><span class="chip">Oct 31</span></p>
+      <p class="m">Packet SP-0112 · Bayview Community Foundation (fiscal sponsor)</p><p class="a2 n">of <b>$1,000.00</b></p><p class="d2">in 5 days</p>
+      <p class="x">Remittance shows a $30.00 wire fee deducted. Reconciliation exception, not closed.</p>
+      <div class="k"><button class="btn">Accept with fee</button><button class="btn">Query sponsor</button></div>
+    </li>
+    <li class="row" style="--c:var(--w1)">
+      <h2 class="t">Duplicate receipt held</h2>
+      <p class="amt">$38.20</p><p class="due"><span class="chip">Nov 2</span></p>
+      <p class="m">Sam Ortiz · Lyft, submitted twice (C-2231, C-2240)</p><p class="a2">duplicate</p><p class="d2">in 7 days</p>
+      <p class="x">Eve approved C-2231 and held C-2240 as the duplicate.</p>
+      <div class="k"><button class="btn">Reject duplicate</button><button class="btn">View both</button></div>
+    </li>
+  </ol>
+</main>
+
+<aside class="pane" aria-label="Selected item">
+  <h2>Prize to a winner in Canada</h2>
+  <p class="mu">Priya Raman, Toronto, ON · First Overall</p>
+  <p class="pd" style="--c:var(--w4)"><span class="chip">1 h 18 min</span>Due before closing ceremony, 3:00 PM</p>
+
+  <section class="sec">
+    <h3>What Priya receives as cash<small>estimate</small></h3>
+    <div class="lbl"><span>Est. net <b class="n">$909.30</b></span><span>Withheld <b class="n">$389.70</b></span></div>
+    <div class="meter" role="img" aria-label="Of $1,299.00 gross: $909.30 estimated net, $389.70 withheld, $0.00 fees"><i style="width:70%;background:var(--fill)"></i><i style="flex:1;background:var(--mid);border-radius:0 3px 3px 0"></i></div>
+    <div class="scale" aria-hidden="true"><span style="left:0">$0</span><span style="left:38.49%">$500</span><span style="left:76.98%">$1,000</span><span style="left:100%">$1,299</span></div>
+    <table class="led">
+      <tr><td><i style="--s:transparent"></i>Gross, MacBook Air FMV</td><td>$1,299.00</td></tr>
+      <tr><td><i style="--s:var(--mid)"></i>Withholding, 30% default</td><td>−$389.70</td></tr>
+      <tr><td><i style="--s:transparent"></i>Fees</td><td>$0.00</td></tr>
+      <tr class="tot"><td><i style="--s:var(--fill)"></i>Est. net to Priya</td><td>$909.30</td></tr>
+    </table>
+  </section>
+
+  <dl class="rule sec"><dt>Rule</dt><dd>US → non-US individual, prize, 30% default, v2</dd><dt>Status</dt><dd>Canada treaty rate unverified. W-8BEN sent 1:31 PM, not signed yet.</dd></dl>
+
+  <section class="sec">
+    <h3>Eve recommends cash equivalent</h3>
+    <table class="led opt">
+      <tr><td>Ship it<span>shipping + duty, est.</span></td><td>$214</td></tr>
+      <tr><td>Buy local<span>at <b class="n">CA$1,849</b></span></td><td>≈ $1,338</td></tr>
+      <tr><td>Cash equivalent<span>net after withholding</span></td><td>$909.30</td></tr>
+    </table>
+  </section>
+
+  <p class="sign"><svg style="margin-top:2px" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 13.5h11"/><path d="M4 10.5 10.5 4 12 5.5 5.5 12H4z"/></svg>Eve prepares and explains. A human controller signs.</p>
+  <div class="acts"><button class="btn pri">Accept recommendation</button><button class="btn">Ask winner</button></div>
+
+  <section class="budget">
+    <h3>Travel budget<small>cap <span class="n" style="color:var(--tx)">$60,000</span></small></h3>
+    <p class="big">$47,620<small>spent and committed</small></p>
+    <div class="meter" style="margin-top:8px" role="img" aria-label="$38,420 spent, $9,200 committed, $12,380 remaining of $60,000 cap"><i style="width:64.03%;background:var(--fill)"></i><i style="width:15.33%;background:var(--mid)"></i><span class="cap"></span></div>
+    <table class="led" style="margin-top:10px">
+      <tr><td><i style="--s:var(--fill)"></i>Spent</td><td>$38,420</td></tr>
+      <tr><td><i style="--s:var(--mid)"></i>Committed</td><td>$9,200</td></tr>
+      <tr><td><i style="--s:var(--bg);outline:1px solid var(--line)"></i>Remaining</td><td>$12,380</td></tr>
+    </table>
+  </section>
+
+  <p class="agent">Agent today: 23 claims auto-approved · 4 escalated · 0 payouts released. The agent cannot release money.</p>
+</aside>
+</body>
+</html>

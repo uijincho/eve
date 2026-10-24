@@ -1,0 +1,199 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Blue Hour, Eve's design system. Documented at /design.
+ *
+ * One rule carries the system: the dusk hues mean time. They appear only on
+ * deadlines (due chips, the horizon). Structure is quiet indigo; state colour
+ * is limited to critical (coral) and passed (mint).
+ *
+ * Values here are mirrored in lib/design/tokens.ts for the /design page;
+ * tests/design.test.ts keeps the two in sync.
+ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-hanken);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-sans);
+
+  /* Eve tokens */
+  --color-rail: var(--rail);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-faint: var(--faint);
+  --color-positive: var(--positive);
+  --color-critical: var(--critical);
+  --color-dusk-1: var(--dusk-1);
+  --color-dusk-2: var(--dusk-2);
+  --color-dusk-3: var(--dusk-3);
+  --color-dusk-4: var(--dusk-4);
+  --color-dusk-5: var(--dusk-5);
+
+  /* shadcn semantic tokens */
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.25);
+  --radius-2xl: calc(var(--radius) * 1.5);
+  --radius-3xl: calc(var(--radius) * 2);
+  --radius-4xl: calc(var(--radius) * 2.5);
+
+  /* Type scale (Hanken Grotesk; its figures are tabular by default) */
+  --text-display: 2.5rem;
+  --text-display--line-height: 2.75rem;
+  --text-display--letter-spacing: -0.025em;
+  --text-display--font-weight: 600;
+  --text-title: 1.75rem;
+  --text-title--line-height: 2.125rem;
+  --text-title--letter-spacing: -0.02em;
+  --text-title--font-weight: 600;
+  --text-heading: 1.25rem;
+  --text-heading--line-height: 1.75rem;
+  --text-heading--letter-spacing: -0.01em;
+  --text-heading--font-weight: 600;
+  --text-subheading: 1rem;
+  --text-subheading--line-height: 1.5rem;
+  --text-subheading--font-weight: 600;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-small: 0.8125rem;
+  --text-small--line-height: 1.125rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+
+  --ease-dusk: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Structure: quiet indigo */
+  --rail: #191c3b;
+  --background: #1e2246;
+  --surface: #252a52;
+  --surface-hover: #2c3260;
+  --border: #343a6b;
+  --input: #626aa8;
+
+  /* Text */
+  --foreground: #eceef8;
+  --muted-foreground: #a7acd2;
+  --faint: #8b91be;
+
+  /* Time: the dusk scale, cool to warm. Deadlines only. */
+  --dusk-1: #62b6f2;
+  --dusk-2: #9d9bf6;
+  --dusk-3: #cf86e3;
+  --dusk-4: #f08ba0;
+  --dusk-5: #f5a962;
+
+  /* State */
+  --critical: #ff7a85;
+  --positive: #6fcf9e;
+
+  /* shadcn mapping */
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface-hover);
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);
+  --primary-foreground: var(--background);
+  --secondary: var(--surface-hover);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--surface);
+  --accent: var(--surface-hover);
+  --accent-foreground: var(--foreground);
+  --destructive: var(--critical);
+  --ring: #c3c7f0;
+  --chart-1: #eceef8;
+  --chart-2: #a7acd2;
+  --chart-3: #6e75a8;
+  --chart-4: #4a5185;
+  --chart-5: #343a6b;
+  --radius: 0.5rem;
+  --sidebar: var(--rail);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--foreground);
+  --sidebar-primary-foreground: var(--background);
+  --sidebar-accent: var(--surface);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    scrollbar-color: var(--border) transparent;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-background text-body text-foreground;
+    caret-color: var(--foreground);
+  }
+  ::selection {
+    background: #4a5185;
+    color: var(--foreground);
+  }
+  a {
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

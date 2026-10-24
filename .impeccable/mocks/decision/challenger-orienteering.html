@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Eve · Inbox · Course &amp; Controls</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--hl:#E4E3DE;--ln:#D9D7D0;--tx:#1D1B22;--t2:#5E5A66;--pu:#7B2CBF;--ol:#A5B36A;--olt:#6E7A35;--ye:#FFD24D;--br:#8C5A2B;--blt:#2F6E9E;--rd:#D2372D;--bc:'Barlow Condensed',sans-serif}
+*{box-sizing:border-box}html,body{width:1440px;height:900px;overflow:hidden;margin:0}
+body{background:#F7F7F5;color:var(--tx);font:400 13px/18px Barlow,sans-serif;-webkit-font-smoothing:antialiased;caret-color:var(--tx)}
+::selection{background:var(--tx);color:#fff}:focus-visible{outline:2px solid var(--tx);outline-offset:2px}
+p,h1,h2,h3,dl,dd{margin:0}.n{font-variant-numeric:tabular-nums}svg.i{width:12px;height:12px;flex:none}a{color:inherit}
+button{font:500 13px/1 Barlow,sans-serif;color:var(--tx);background:#fff;border:1px solid var(--ln);border-radius:6px;height:28px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+button:hover{border-color:#B9B6AE;background:#FBFBF9}button.k{border-color:var(--tx);font-weight:600}
+button.pri{background:var(--pu);border-color:var(--pu);color:#fff;font-weight:600;height:34px;padding:0 16px}button.pri:hover{background:#6A22A8}
+button:disabled{background:#F1F0EC;border-color:var(--hl);color:#6F6B76;cursor:not-allowed}
+.lnk{font-weight:500;text-decoration:underline;text-decoration-color:#C9C6BE;text-underline-offset:3px;margin-left:4px}.lnk:hover{text-decoration-color:var(--tx)}
+.top{height:56px;background:#fff;border-bottom:1px solid var(--hl);display:flex;align-items:center;gap:20px;padding:0 32px}
+.wm{font:700 28px/1 var(--bc);letter-spacing:-.01em;text-decoration:none;padding-bottom:2px}
+.ev{height:38px;padding:0 10px 0 12px;gap:12px;border-color:var(--hl);text-align:left;line-height:16px}
+.ev b{display:block;font-weight:600;font-size:14px}.ev small{display:block;font-size:12px;color:var(--t2)}
+nav{display:flex;align-self:stretch}nav a{display:flex;align-items:center;gap:6px;padding:0 10px;font:600 16px/1 var(--bc);letter-spacing:.01em;color:var(--t2);text-decoration:none;position:relative}nav a:hover{color:var(--tx)}
+nav a.on{color:var(--tx)}nav a.on::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:3px;background:var(--pu)}
+.ct{font:700 13px/18px var(--bc);min-width:20px;padding:0 6px;border-radius:9px;background:var(--pu);color:#fff;text-align:center}
+.sd{margin-left:auto;font-size:12px;line-height:20px;padding:0 8px;border:1px solid var(--hl);border-radius:4px;color:var(--t2)}
+.me{display:flex;align-items:center;gap:10px;line-height:16px}.me b{display:block;font-weight:600}.me small{display:block;font-size:12px;color:var(--t2)}
+.av{width:30px;height:30px;border-radius:50%;background:#ECEBE6;font:600 12px/30px Barlow;text-align:center}
+.ph{display:flex;justify-content:space-between;align-items:flex-end;padding:18px 32px 16px}
+h1{font:700 36px/38px var(--bc);letter-spacing:-.01em}
+.ph p{margin-top:2px;font-size:14px;line-height:20px;color:var(--t2)}
+.sch{display:flex}.sch div{padding:0 0 0 20px;margin-left:20px;border-left:1px solid var(--ln)}.sch div:first-child{border:0;margin:0;padding:0}
+.sch dt{font-size:12px;line-height:16px;color:var(--t2)}.sch dd{font:600 22px/26px var(--bc);font-variant-numeric:tabular-nums}
+main{display:grid;grid-template-columns:904px 448px;gap:24px;padding:0 32px}
+.sf{background:#fff;border:1px solid var(--hl);border-bottom:0;border-radius:12px 12px 0 0;height:780px;overflow:hidden}
+.tools{display:flex;align-items:center;gap:8px;height:50px;padding:0 16px;border-bottom:1px solid var(--hl)}
+.ft{display:flex;gap:2px;padding:3px;background:#F1F0EC;border-radius:8px;margin-right:auto}
+.ft a{height:28px;padding:0 12px;display:flex;align-items:center;gap:6px;border-radius:6px;color:var(--t2);font-weight:500;text-decoration:none}
+.ft a span{font:600 15px/1 var(--bc);font-variant-numeric:tabular-nums}
+.ft a.on{background:#fff;color:var(--tx);box-shadow:0 1px 2px rgba(29,27,34,.14)}
+.srch{display:flex;align-items:center;gap:8px;height:32px;width:220px;padding:0 10px;border:1px solid var(--ln);border-radius:6px;color:var(--t2)}
+.srch input{border:0;outline:0;font:inherit;color:var(--tx);flex:1;min-width:0;background:none}.srch input::placeholder{color:#6F6B76}
+.sort{height:32px}.sort b{font-weight:600}
+.it{display:grid;grid-template-columns:208px 1fr 124px;gap:20px;padding:10px 16px 11px;border-bottom:1px solid var(--hl)}
+.it:hover{background:#FBFBF9}.it.sel{background:#F3F2EE}
+.cdesc{margin:6px 0;font-size:12px;line-height:16px;color:var(--t2)}
+.bd h3{font:600 18px/20px var(--bc);letter-spacing:.005em}
+.bd p{margin-top:2px;color:var(--t2)}.bd p+p{margin-top:0}.bd p b{color:var(--tx);font-weight:600}
+.ac{display:flex;align-items:center;gap:8px;margin-top:8px}
+.mn{display:flex;flex-direction:column;align-items:flex-end;text-align:right}.amt{font:600 22px/24px var(--bc);font-variant-numeric:tabular-nums}.mn small{font-size:12px;line-height:16px;color:var(--t2)}.due{margin-top:10px;font-weight:600}
+.chip{display:inline-block;font:600 12px/20px Barlow;padding:0 7px;border-radius:4px}
+.chip.y{background:var(--ye)}.chip.r{background:var(--rd);color:#fff}.chip.q{box-shadow:inset 0 0 0 1px var(--ln)}
+.rf{font:600 13px/18px var(--bc);letter-spacing:.03em;color:var(--br)}
+.bl{color:var(--blt)}.ok{color:var(--olt);font-weight:500}
+.why{display:flex;align-items:center;gap:6px;color:var(--tx)}
+.chk{display:inline-flex;gap:12px;color:var(--olt);font-weight:500}.chk span{display:inline-flex;align-items:center;gap:4px}
+svg.ck{width:14px;height:14px}
+/* the course: start triangle, numbered controls, legs */
+.cr{display:flex;align-items:center;height:28px}
+.cr i{width:11px;height:2px;margin:0 3px;background:var(--pu);flex:none}
+.cr i.x{background:var(--rd);width:19px;position:relative}.cr i.x::after{content:"";position:absolute;left:7px;top:-5px;width:4px;height:12px;background:#fff;transform:skewX(-24deg)}
+b.c{display:inline-block;flex:none;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--pu);color:var(--pu);background:#fff;font:700 13px/17px var(--bc);text-align:center}
+b.c.p{background:var(--pu);color:#fff}b.c.s{outline:1.5px solid var(--pu);outline-offset:2px;margin:0 3px}
+svg.st{width:13px;height:13px;flex:none}
+.pn{padding:18px 24px}
+.pt{display:flex;justify-content:space-between;gap:16px}
+h2{font:600 24px/28px var(--bc);letter-spacing:-.005em}.pt p{margin-top:2px;color:var(--t2)}
+.bc{display:flex;align-items:center;margin:18px 22px 40px 4px}
+.bc i{flex:1;height:2px;background:var(--pu);margin:0 7px}.bc b.c{width:30px;height:30px;border-width:2px;font-size:17px;line-height:26px;position:relative}
+.bc b.c.s{outline-width:2px;outline-offset:3px;margin:0 4px}
+.bc b.c em{position:absolute;top:38px;left:50%;transform:translateX(-50%);font:500 12px/16px Barlow;font-style:normal;color:var(--t2);white-space:nowrap}
+.bc b.c.p em,.bc b.c.s em{color:var(--tx);font-weight:600}
+.bc svg.st{width:20px;height:20px}
+table{border-collapse:collapse;width:100%}
+.sheet caption{text-align:left;font:600 16px/20px var(--bc);padding-bottom:8px;caption-side:top}.sheet caption span{float:right;font:500 12px/20px Barlow;color:var(--t2)}
+.sheet th{font:600 12px/16px Barlow;color:var(--t2);text-align:left;padding:6px 8px;border-top:2px solid var(--tx);border-bottom:1px solid var(--tx)}
+.sheet td{padding:5px 8px;border-bottom:1px solid var(--hl);vertical-align:top;line-height:18px}
+.sheet td+td,.sheet th+th{border-left:1px solid var(--hl)}
+.sheet tr:nth-child(3) td{border-bottom:1.5px solid var(--tx)}.sheet tr:last-child td{border-bottom:2px solid var(--tx)}
+.sheet td:first-child{width:38px;padding:5px 8px}.sheet td:nth-child(2){font-weight:600;width:92px}
+.sheet small{display:block;font-size:12px;line-height:16px;color:var(--t2)}
+.rule{margin-top:10px;color:var(--t2);font-size:12px;line-height:17px}.rule .rf{font-size:13px;margin-right:4px}
+h3.sub{font:600 16px/20px var(--bc);margin-top:18px}.rec{margin-top:4px;color:var(--t2)}.bk{margin-top:10px}.bk td{padding:2px 0;line-height:18px}.bk td+td{text-align:right}
+.bk tr.net td{border-top:1px solid var(--tx);padding-top:7px;font-weight:600}.bk tr.net td+td{font:700 22px/24px var(--bc)}
+.pn .ac{margin-top:16px}.sig{margin-top:12px;padding-top:10px;border-top:1px solid var(--hl);display:flex;align-items:center;gap:8px;color:var(--t2)}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="st" viewBox="0 0 14 14"><path d="M7 1.6 12.6 12H1.4Z" fill="none" stroke="#7B2CBF" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+<symbol id="ck" viewBox="0 0 14 14"><circle cx="7" cy="7" r="7" fill="#A5B36A"/><path d="M4 7.2 6.1 9.2 10 4.9" fill="none" stroke="#1D1B22" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="lk" viewBox="0 0 12 12"><rect x="2.5" y="5.5" width="7" height="5" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+<symbol id="dn" viewBox="0 0 12 12"><path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="sr" viewBox="0 0 12 12"><circle cx="5.2" cy="5.2" r="3.6" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="m8 8 2.6 2.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></symbol>
+<symbol id="pn" viewBox="0 0 12 12"><path d="M2 10h2.2L10 4.2 7.8 2 2 7.8Z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></symbol>
+</svg>
+<header class="top">
+<a class="wm" href="#">Eve</a>
+<button class="ev"><span><b>Cal Hacks 13.0</b><small>Oct 24–26, 2026 · UC Berkeley</small></span><svg class="i"><use href="#dn"/></svg></button>
+<nav aria-label="Primary"><a class="on" aria-current="page" href="#">Inbox<span class="ct">7</span></a><a href="#">Claims</a><a href="#">Prizes</a><a href="#">Payouts</a><a href="#">People</a><a href="#">Budget</a><a href="#">Sponsor</a><a href="#">Audit trail</a><a href="#">Filings</a><a href="#">Agent</a><a href="#">Settings</a></nav>
+<span class="sd">Sample data</span>
+<div class="me"><span class="av">DW</span><span><b>Dana Whitfield</b><small>Organizer</small></span></div>
+</header>
+<section class="ph">
+<div><h1>Inbox</h1><p>7 items need you. Eve auto-approved 23 in-policy claims today (<span class="n">$4,812.60</span>).</p></div>
+<dl class="sch"><div><dt>Now · Sun Oct 26</dt><dd>1:42 PM</dd></div><div><dt>Batch release · in 18 min</dt><dd>2:00 PM</dd></div><div><dt>Closing ceremony</dt><dd>3:00 PM</dd></div></dl>
+</section>
+<main>
+<section class="sf" aria-label="Inbox items, ranked by urgency">
+<div class="tools">
+<div class="ft" role="tablist"><a class="on" role="tab" aria-selected="true" href="#">All <span>7</span></a><a role="tab" href="#">Approvals <span>3</span></a><a role="tab" href="#">Holds <span>2</span></a><a role="tab" href="#">Exceptions <span>2</span></a></div>
+<label class="srch"><svg class="i"><use href="#sr"/></svg><input placeholder="Search people, claims, payouts" aria-label="Search inbox"></label>
+<button class="sort">Sort: <b>Urgency</b><svg class="i"><use href="#dn"/></svg></button>
+</div>
+<article class="it">
+<div><div class="cr" aria-label="Course: controls 1 to 4 punched, leg to 5 broken"><svg class="st"><use href="#st"/></svg><i></i><b class="c p">1</b><i></i><b class="c p">2</b><i></i><b class="c p">3</b><i></i><b class="c p">4</b><i class="x"></i><b class="c">5</b></div>
+<p class="cdesc">Leg 4–5 cut · bank changed 1:24 PM</p><span class="chip r">Frozen</span></div>
+<div class="bd"><h3>Payout frozen: bank details changed</h3>
+<p><b>Jordan Okafor</b> · 2nd place, Best Hardware Hack. CAD account ••4471 changed to ••9902 at 1:24 PM. Eve emailed Jordan’s original address to confirm and froze the payout.</p>
+<div class="ac"><button class="k">Keep frozen</button><button>Mark verified</button><a class="lnk" href="#">View evidence</a></div></div>
+<div class="mn"><span class="amt">$1,500.00</span><small>Prize payout</small><span class="due">Before 2:00 PM</span><small>18 min</small></div>
+</article>
+<article class="it sel" aria-current="true">
+<div><div class="cr" aria-label="Course: 1 punched, stalled at 2"><svg class="st"><use href="#st"/></svg><i></i><b class="c p">1</b><i></i><b class="c s">2</b><i></i><b class="c">3</b><i></i><b class="c">4</b><i></i><b class="c">5</b></div>
+<p class="cdesc">Stalled at 2 · W-8BEN unsigned</p><span class="chip y">Waiting on Priya</span></div>
+<div class="bd"><h3>Prize to a winner in Canada: MacBook Air</h3>
+<p><b>Priya Raman</b> · First Overall, Toronto, ON. Eve recommends the cash equivalent: shipping + duty est. $214, buy-local CA$1,849 (≈ $1,338).</p>
+<div class="ac"><button class="k">Accept recommendation</button><button>Compare options</button><a class="lnk" href="#">Ask winner</a></div></div>
+<div class="mn"><span class="amt">$1,299.00</span><small>Item FMV</small><span class="due">Due 3:00 PM</span><small>1 h 18 min</small></div>
+</article>
+<article class="it">
+<div><div class="cr" aria-label="Course: 1 to 3 punched, stalled at 4"><svg class="st"><use href="#st"/></svg><i></i><b class="c p">1</b><i></i><b class="c p">2</b><i></i><b class="c p">3</b><i></i><b class="c s">4</b><i></i><b class="c">5</b></div>
+<p class="cdesc">Stalled at 4 · controller release</p><span class="chip y">Waiting on Ari Novak</span></div>
+<div class="bd"><h3>Payout batch #4 is ready for release</h3>
+<p class="n">18 payouts · $12,450.00 gross · $1,124.70 withheld · est. fees $38.20</p>
+<p class="why"><svg class="i"><use href="#lk"/></svg>You requested this batch. A controller must release it (Ari Novak). <span class="rf">REL-2P v1</span></p>
+<div class="ac"><button disabled title="You requested this batch. A controller must release it (Ari Novak)."><svg class="i"><use href="#lk"/></svg>Release batch</button><button class="k">Remind Ari</button></div></div>
+<div class="mn"><span class="amt">$12,450.00</span><small>Gross</small><span class="due">Due 2:00 PM</span><small>18 min</small></div>
+</article>
+<article class="it">
+<div><div class="cr" aria-label="Course: 1 to 3 punched, stalled at 4"><svg class="st"><use href="#st"/></svg><i></i><b class="c p">1</b><i></i><b class="c p">2</b><i></i><b class="c p">3</b><i></i><b class="c s">4</b><i></i><b class="c">5</b></div>
+<p class="cdesc">Stalled at 4 · over the $300 limit</p><span class="chip q">Flag: within 1% of cap</span></div>
+<div class="bd"><h3>Travel claim above the $300 auto-approve limit</h3>
+<p><b>Marcus Lee</b> · YYZ → SFO, Air Canada, economy · <span class="bl n">FX 0.72876 (ECB, Oct 3)</span></p>
+<p class="chk"><span><svg class="ck"><use href="#ck"/></svg>Name</span><span><svg class="ck"><use href="#ck"/></svg>Dates</span><span><svg class="ck"><use href="#ck"/></svg>Economy</span><span><svg class="ck"><use href="#ck"/></svg>Under $500 cap (Canada)</span><span><svg class="ck"><use href="#ck"/></svg>No duplicate</span></p>
+<div class="ac"><button class="k">Approve</button><button>Reject</button><a class="lnk" href="#">Ask for info</a></div></div>
+<div class="mn"><span class="amt">$495.12</span><small class="bl n">from CA$679.40</small><span class="due">Due Oct 28</span></div>
+</article>
+<article class="it">
+<div><div class="cr" aria-label="Inbound course: 1 and 2 punched, stalled at 3"><svg class="st"><use href="#st"/></svg><i></i><b class="c p">1</b><i></i><b class="c p">2</b><i></i><b class="c s">3</b><i></i><b class="c">4</b></div>
+<p class="cdesc">Inbound course · stalled at 3, Match</p><span class="chip q">Exception</span></div>
+<div class="bd"><h3>Sponsor paid $970.00 on a $1,000.00 request</h3>
+<p><b>Packet SP-0112</b> · Bayview Community Foundation (fiscal sponsor). <span class="bl">Remittance shows a $30.00 wire fee deducted.</span> Reconciliation exception, not closed.</p>
+<div class="ac"><button class="k">Accept with fee</button><button>Query sponsor</button></div></div>
+<div class="mn"><span class="amt">$970.00</span><small class="n">of $1,000.00</small><span class="due">Due Oct 31</span></div>
+</article>
+<article class="it">
+<div><div class="cr" aria-label="Course: 1 punched, stalled at 2"><svg class="st"><use href="#st"/></svg><i></i><b class="c p">1</b><i></i><b class="c s">2</b><i></i><b class="c">3</b><i></i><b class="c">4</b><i></i><b class="c">5</b></div>
+<p class="cdesc">Stalled at 2 · W-8BEN expired</p><span class="chip y">Waiting on Lukas</span></div>
+<div class="bd"><h3>W-8BEN expired; stipend on hold</h3>
+<p><b>Lukas Becker</b> · Munich, DE · Judge stipend. Form signed 2022, lapsed Dec 31, 2025. Eve chased Oct 20 and Oct 22; next chase Oct 29.</p>
+<div class="ac"><button class="k">Send now</button><a class="lnk" href="#">View chase log</a></div></div>
+<div class="mn"><span class="amt">$250.00</span><small>Judge stipend</small><span class="due">Due Oct 29</span></div>
+</article>
+</section>
+<aside class="sf pn" aria-label="Selected item: Priya Raman's prize">
+<div class="pt"><div><h2>Priya Raman · First Overall</h2><p>MacBook Air prize · Toronto, ON · Item FMV <span class="n">$1,299.00</span></p></div>
+<div class="mn"><span class="due" style="margin:4px 0 0">Due 3:00 PM</span><small>1 h 18 min</small></div></div>
+<div class="bc" aria-label="Prize course: 1 punched, stalled at 2, 3 to 5 ahead"><svg class="st"><use href="#st"/></svg><i></i><b class="c p">1<em>Profile</em></b><i></i><b class="c s">2<em>Tax form</em></b><i></i><b class="c">3<em>Withholding</em></b><i></i><b class="c">4<em>Approval</em></b><i></i><b class="c">5<em>Released</em></b></div>
+<table class="sheet"><caption>Control descriptions<span>Prize course · 5 controls</span></caption>
+<thead><tr><th>No.</th><th>Control</th><th>Status</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td><b class="c p">1</b></td><td>Profile</td><td class="ok"><span class="why" style="color:inherit"><svg class="ck"><use href="#ck"/></svg>Complete</span></td><td>Attendee portal</td></tr>
+<tr><td><b class="c s">2</b></td><td>Tax form</td><td><span class="chip y">W-8BEN unsigned</span><small>Sent 1:31 PM by Eve</small></td><td>Eve, emailed Priya</td></tr>
+<tr><td><b class="c">3</b></td><td>Withholding</td><td class="n">30% · −$389.70<small>Treaty rate unverified</small></td><td><span class="rf">WH-PRIZE-NR v2</span></td></tr>
+<tr><td><b class="c">4</b></td><td>Approval</td><td>Controller, Ari Novak<small>Two-person release</small></td><td><span class="rf">REL-2P v1</span></td></tr>
+<tr><td><b class="c">5</b></td><td>Released</td><td>After approval<small>Eve cannot release money</small></td><td class="bl">Payout rail</td></tr>
+</tbody></table>
+<p class="rule"><span class="rf">WH-PRIZE-NR v2</span>US → non-US individual, prize, 30% default</p>
+<h3 class="sub">Eve recommends the cash equivalent</h3>
+<p class="rec">Shipping + duty est. $214 · buy-local <span class="bl">CA$1,849 (≈ $1,338)</span>. Cash nets an estimated $909.30 after withholding.</p>
+<table class="bk n">
+<tr><td>Gross, cash equivalent</td><td>$1,299.00</td></tr>
+<tr><td>Withholding, 30% default</td><td>−$389.70</td></tr>
+<tr><td>Fees</td><td>$0.00</td></tr>
+<tr class="net"><td>Est. net to Priya</td><td>$909.30</td></tr>
+</table>
+<div class="ac"><button class="pri">Accept recommendation</button><button style="height:34px">Compare options</button><a class="lnk" href="#">Ask winner</a></div>
+<p class="sig"><svg class="i"><use href="#pn"/></svg>Eve prepares and explains. A human controller signs.</p>
+</aside>
+</main>
+</body></html>

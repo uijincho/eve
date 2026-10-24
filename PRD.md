@@ -403,7 +403,7 @@ Pick **Next.js (App Router)** for this weekend. TanStack Start is a good framewo
 | --- | --- | --- |
 | Framework | Next.js App Router, server actions, route handlers for webhooks | Two portals (attendee, organizer) in one app |
 | Language | TypeScript, strict | Shared types from DB to UI |
-| DB | Postgres on Neon or Supabase | Constraints, triggers, `numeric`, row-level locks |
+| DB | Postgres on PlanetScale (node-postgres; PgBouncer for the app, direct connection for migrations) | Constraints, triggers, `numeric`, row-level locks |
 | ORM | Drizzle + drizzle-kit migrations | Typed queries, raw SQL when the ledger needs it |
 | Validation | Zod everywhere (forms, API, LLM structured output) | One schema per object, reused by the agent's tools |
 | Auth | Better Auth (Drizzle adapter), magic link + Google | Roles: attendee, organizer, controller, auditor |
@@ -418,7 +418,7 @@ Pick **Next.js (App Router)** for this weekend. TanStack Start is a good framewo
 | Accounting | QuickBooks Online REST (sandbox) via `intuit-oauth` | Push bills and journal entries |
 | Notifications | Slack and Discord webhooks, Resend for email | Cheap and real |
 | Tests | Vitest | Tax engine and ledger run against the answer key |
-| Deploy | Vercel (app + Workflow) + Neon + E2B | Deploy Saturday morning, not Sunday |
+| Deploy | Vercel (app + Workflow) + PlanetScale + E2B | Deploy Saturday morning, not Sunday |
 
 **Computer use (stretch):** Vercel Workflow + E2B Desktop + Claude computer use. E2B over Vercel Sandbox because E2B ships a ready desktop environment with screenshot, mouse, keyboard, and live VNC streaming APIs; Vercel Sandbox is built for running code, so we'd have to assemble a virtual display and streaming ourselves. Set the sandbox timeout longer than the expected approval wait; if it expires, the workflow refills the form from the packet before submitting.
 
@@ -523,7 +523,7 @@ Build one thin path end to end first (a Canadian winner paid, with tax, ledger, 
 
 Everything else depends on this, so all four people do it together, then split.
 
-- Next.js repo, Neon database, Vercel project, Workflow DevKit installed, first deploy.
+- Next.js repo, PlanetScale Postgres database, Vercel project, Workflow DevKit installed, first deploy.
 - Drizzle schema for the core tables; the ledger balance trigger and append-only grants as a raw SQL migration.
 - Better Auth with the four roles; a role switcher in dev for testing.
 - Interfaces stubbed and merged: `PayoutProvider`, the rules table shape, agent tool signatures, `decision_log` writer.

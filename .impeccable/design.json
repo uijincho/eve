@@ -1,0 +1,584 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-24T09:00:09.251Z",
+  "title": "Design System: Eve",
+  "extensions": {
+    "colorMeta": {
+      "dusk-1": {
+        "role": "primary",
+        "displayName": "Last-Light Blue",
+        "canonical": "#62b6f2",
+        "tonalRamp": [
+          "oklch(15% 0.042 241.8)",
+          "oklch(26% 0.066 241.8)",
+          "oklch(37% 0.096 241.8)",
+          "oklch(48% 0.119 241.8)",
+          "oklch(59% 0.119 241.8)",
+          "oklch(70% 0.107 241.8)",
+          "oklch(82% 0.072 241.8)",
+          "oklch(95% 0.030 241.8)"
+        ]
+      },
+      "dusk-2": {
+        "role": "primary",
+        "displayName": "Periwinkle Dusk",
+        "canonical": "#9d9bf6",
+        "tonalRamp": [
+          "oklch(15% 0.046 283.7)",
+          "oklch(26% 0.072 283.7)",
+          "oklch(37% 0.104 283.7)",
+          "oklch(48% 0.131 283.7)",
+          "oklch(59% 0.131 283.7)",
+          "oklch(70% 0.117 283.7)",
+          "oklch(82% 0.078 283.7)",
+          "oklch(95% 0.033 283.7)"
+        ]
+      },
+      "dusk-3": {
+        "role": "primary",
+        "displayName": "Afterglow Violet",
+        "canonical": "#cf86e3",
+        "tonalRamp": [
+          "oklch(15% 0.053 318.8)",
+          "oklch(26% 0.083 318.8)",
+          "oklch(37% 0.121 318.8)",
+          "oklch(48% 0.151 318.8)",
+          "oklch(59% 0.151 318.8)",
+          "oklch(70% 0.136 318.8)",
+          "oklch(82% 0.091 318.8)",
+          "oklch(95% 0.038 318.8)"
+        ]
+      },
+      "dusk-4": {
+        "role": "primary",
+        "displayName": "Sunset Rose",
+        "canonical": "#f08ba0",
+        "tonalRamp": [
+          "oklch(15% 0.044 7.2)",
+          "oklch(26% 0.068 7.2)",
+          "oklch(37% 0.100 7.2)",
+          "oklch(48% 0.124 7.2)",
+          "oklch(59% 0.124 7.2)",
+          "oklch(70% 0.112 7.2)",
+          "oklch(82% 0.075 7.2)",
+          "oklch(95% 0.031 7.2)"
+        ]
+      },
+      "dusk-5": {
+        "role": "primary",
+        "displayName": "Apricot Horizon",
+        "canonical": "#f5a962",
+        "tonalRamp": [
+          "oklch(15% 0.044 62.4)",
+          "oklch(26% 0.069 62.4)",
+          "oklch(37% 0.100 62.4)",
+          "oklch(48% 0.125 62.4)",
+          "oklch(59% 0.125 62.4)",
+          "oklch(70% 0.113 62.4)",
+          "oklch(82% 0.075 62.4)",
+          "oklch(95% 0.031 62.4)"
+        ]
+      },
+      "critical": {
+        "role": "secondary",
+        "displayName": "Signal Coral",
+        "canonical": "#ff7a85",
+        "tonalRamp": [
+          "oklch(15% 0.057 16.8)",
+          "oklch(26% 0.089 16.8)",
+          "oklch(37% 0.130 16.8)",
+          "oklch(48% 0.162 16.8)",
+          "oklch(59% 0.162 16.8)",
+          "oklch(70% 0.146 16.8)",
+          "oklch(82% 0.097 16.8)",
+          "oklch(95% 0.041 16.8)"
+        ]
+      },
+      "positive": {
+        "role": "secondary",
+        "displayName": "Cleared Mint",
+        "canonical": "#6fcf9e",
+        "tonalRamp": [
+          "oklch(15% 0.041 159.8)",
+          "oklch(26% 0.064 159.8)",
+          "oklch(37% 0.093 159.8)",
+          "oklch(48% 0.116 159.8)",
+          "oklch(59% 0.116 159.8)",
+          "oklch(70% 0.105 159.8)",
+          "oklch(82% 0.070 159.8)",
+          "oklch(95% 0.029 159.8)"
+        ]
+      },
+      "rail": {
+        "role": "neutral",
+        "displayName": "Night Rail",
+        "canonical": "#191c3b",
+        "tonalRamp": [
+          "#191c3b",
+          "#252a52",
+          "#343a6b",
+          "#4a5185",
+          "#6e75a8",
+          "#8b91be",
+          "#c3c7f0",
+          "#eceef8"
+        ]
+      },
+      "background": {
+        "role": "neutral",
+        "displayName": "Deep Indigo Ground",
+        "canonical": "#1e2246",
+        "tonalRamp": [
+          "#191c3b",
+          "#252a52",
+          "#343a6b",
+          "#4a5185",
+          "#6e75a8",
+          "#8b91be",
+          "#c3c7f0",
+          "#eceef8"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Raised Indigo",
+        "canonical": "#252a52",
+        "tonalRamp": [
+          "#191c3b",
+          "#252a52",
+          "#343a6b",
+          "#4a5185",
+          "#6e75a8",
+          "#8b91be",
+          "#c3c7f0",
+          "#eceef8"
+        ]
+      },
+      "surface-hover": {
+        "role": "neutral",
+        "displayName": "Lifted Indigo",
+        "canonical": "#2c3260",
+        "tonalRamp": [
+          "#191c3b",
+          "#252a52",
+          "#343a6b",
+          "#4a5185",
+          "#6e75a8",
+          "#8b91be",
+          "#c3c7f0",
+          "#eceef8"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Hairline Indigo",
+        "canonical": "#343a6b",
+        "tonalRamp": [
+          "#191c3b",
+          "#252a52",
+          "#343a6b",
+          "#4a5185",
+          "#6e75a8",
+          "#8b91be",
+          "#c3c7f0",
+          "#eceef8"
+        ]
+      },
+      "input": {
+        "role": "neutral",
+        "displayName": "Field Edge",
+        "canonical": "#626aa8",
+        "tonalRamp": [
+          "#191c3b",
+          "#252a52",
+          "#343a6b",
+          "#4a5185",
+          "#6e75a8",
+          "#8b91be",
+          "#c3c7f0",
+          "#eceef8"
+        ]
+      },
+      "chart-3": {
+        "role": "neutral",
+        "displayName": "Dusk Slate",
+        "canonical": "#6e75a8",
+        "tonalRamp": [
+          "#191c3b",
+          "#252a52",
+          "#343a6b",
+          "#4a5185",
+          "#6e75a8",
+          "#8b91be",
+          "#c3c7f0",
+          "#eceef8"
+        ]
+      },
+      "chart-4": {
+        "role": "neutral",
+        "displayName": "Deep Slate",
+        "canonical": "#4a5185",
+        "tonalRamp": [
+          "#191c3b",
+          "#252a52",
+          "#343a6b",
+          "#4a5185",
+          "#6e75a8",
+          "#8b91be",
+          "#c3c7f0",
+          "#eceef8"
+        ]
+      },
+      "foreground": {
+        "role": "neutral",
+        "displayName": "Cool White",
+        "canonical": "#eceef8",
+        "tonalRamp": [
+          "#191c3b",
+          "#252a52",
+          "#343a6b",
+          "#4a5185",
+          "#6e75a8",
+          "#8b91be",
+          "#c3c7f0",
+          "#eceef8"
+        ]
+      },
+      "muted-foreground": {
+        "role": "neutral",
+        "displayName": "Haze Lavender",
+        "canonical": "#a7acd2",
+        "tonalRamp": [
+          "#191c3b",
+          "#252a52",
+          "#343a6b",
+          "#4a5185",
+          "#6e75a8",
+          "#8b91be",
+          "#c3c7f0",
+          "#eceef8"
+        ]
+      },
+      "faint": {
+        "role": "neutral",
+        "displayName": "Faint Lavender",
+        "canonical": "#8b91be",
+        "tonalRamp": [
+          "#191c3b",
+          "#252a52",
+          "#343a6b",
+          "#4a5185",
+          "#6e75a8",
+          "#8b91be",
+          "#c3c7f0",
+          "#eceef8"
+        ]
+      },
+      "ring": {
+        "role": "neutral",
+        "displayName": "Pale Halo",
+        "canonical": "#c3c7f0",
+        "tonalRamp": [
+          "#191c3b",
+          "#252a52",
+          "#343a6b",
+          "#4a5185",
+          "#6e75a8",
+          "#8b91be",
+          "#c3c7f0",
+          "#eceef8"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "A single defining title. Today only the design system page; Operate screens start at Title."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Page titles."
+      },
+      "heading": {
+        "displayName": "Heading",
+        "purpose": "Section and panel headings, and the wordmark."
+      },
+      "subheading": {
+        "displayName": "Subheading",
+        "purpose": "Group labels, dialog and detail-pane titles; at 400 in muted text, a lede."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default UI text. Row titles and key amounts at 600; buttons, tabs, and field labels at 500."
+      },
+      "small": {
+        "displayName": "Small",
+        "purpose": "Meta lines, help and error text, navigation links; due chips at 600."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Due context, axis labels, counts at 400; badges, truth labels, horizon labels at 500."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Geist Mono, for token names and hex values only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "float",
+        "value": "0 10px 15px -3px rgb(0 0 0 / 0.3), 0 4px 6px -4px rgb(0 0 0 / 0.3), 0 0 0 1px #343a6b",
+        "purpose": "Tooltips, popovers, and menus only. The page and everything attached to it is flat."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 3px color-mix(in oklab, #c3c7f0 50%, transparent)",
+        "purpose": "Controls on focus-visible, with the border turning Pale Halo."
+      },
+      {
+        "name": "focus-outline",
+        "value": "outline: 2px solid #c3c7f0; outline-offset: 2px",
+        "purpose": "Default focus-visible for every other focusable element."
+      },
+      {
+        "name": "invalid-ring",
+        "value": "0 0 0 3px color-mix(in oklab, #ff7a85 20%, transparent)",
+        "purpose": "Fields and buttons with aria-invalid, with a coral border."
+      },
+      {
+        "name": "horizon-halo",
+        "value": "0 0 0 2px #1e2246",
+        "purpose": "Ground-colour knockout around horizon marks so they cut out of the axis. Not elevation."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-dusk",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "The house curve: quick start, long settle. Row hover, horizon dimming and mark scale."
+      },
+      {
+        "name": "duration-hover",
+        "value": "150ms",
+        "purpose": "Row and link hover, evidence underline, nav and index colour changes."
+      },
+      {
+        "name": "duration-horizon",
+        "value": "200ms",
+        "purpose": "Horizon mark dimming (to 35%), active mark scale (150%), and label colour."
+      },
+      {
+        "name": "float-enter",
+        "value": "fade-in + zoom-in from 95%",
+        "purpose": "Tooltips, popovers, and menus entering; reversed on exit."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation-duration: 0.01ms; transition-duration: 0.01ms",
+        "purpose": "Applied globally under prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "horizon-labels",
+        "value": "560px"
+      },
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "md",
+        "value": "768px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one Cool White action per view. Disabled drops to the surface fill with faint text.",
+      "html": "<div class=\"ds-btn-primary-demo\"><button class=\"ds-btn-primary\">Approve</button><button class=\"ds-btn-primary\" disabled>Release batch</button></div>",
+      "css": ".ds-btn-primary-demo { display: flex; gap: 12px; align-items: center; } .ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; font-family: var(--font-hanken, \"Hanken Grotesk\"), ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary:focus-visible { outline: none; border-color: var(--ring, #c3c7f0); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, #c3c7f0) 50%, transparent); } .ds-btn-primary:active:not(:disabled) { transform: translateY(1px); } .ds-btn-primary:disabled { background: var(--surface, #252a52); color: var(--faint, #8b91be); border-color: transparent; cursor: not-allowed; } .ds-btn-primary { background: var(--foreground, #eceef8); color: var(--background, #1e2246); } .ds-btn-primary:hover:not(:disabled) { background: color-mix(in oklab, var(--foreground, #eceef8) 80%, transparent); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The first action in a row. Lifted Indigo fill; hover mixes in 5% Cool White.",
+      "html": "<button class=\"ds-btn-secondary\">Ask for info</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; font-family: var(--font-hanken, \"Hanken Grotesk\"), ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-secondary:focus-visible { outline: none; border-color: var(--ring, #c3c7f0); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, #c3c7f0) 50%, transparent); } .ds-btn-secondary:active:not(:disabled) { transform: translateY(1px); } .ds-btn-secondary:disabled { background: var(--surface, #252a52); color: var(--faint, #8b91be); border-color: transparent; cursor: not-allowed; } .ds-btn-secondary { background: var(--surface-hover, #2c3260); color: var(--foreground, #eceef8); } .ds-btn-secondary:hover:not(:disabled) { background: color-mix(in oklch, var(--surface-hover, #2c3260), var(--foreground, #eceef8) 5%); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Every action after the first in a row. No fill until hover.",
+      "html": "<button class=\"ds-btn-ghost\">View evidence</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; font-family: var(--font-hanken, \"Hanken Grotesk\"), ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-ghost:focus-visible { outline: none; border-color: var(--ring, #c3c7f0); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, #c3c7f0) 50%, transparent); } .ds-btn-ghost:active:not(:disabled) { transform: translateY(1px); } .ds-btn-ghost:disabled { background: var(--surface, #252a52); color: var(--faint, #8b91be); border-color: transparent; cursor: not-allowed; } .ds-btn-ghost { background: transparent; color: var(--foreground, #eceef8); } .ds-btn-ghost:hover:not(:disabled) { background: var(--surface, #252a52); }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Label above, help or a fix-it error below. Field Edge border; Pale Halo focus ring; coral when invalid.",
+      "html": "<div class=\"ds-field-grid\"><div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-f-name\">Legal name</label><input class=\"ds-input\" id=\"ds-f-name\" value=\"Priya Raman\"><p class=\"ds-field-help\">As it appears on your tax form.</p></div><div class=\"ds-field\"><label class=\"ds-field-label\" for=\"ds-f-dob\">Date of birth</label><input class=\"ds-input\" id=\"ds-f-dob\" value=\"2009-04-18\" aria-invalid=\"true\"><p class=\"ds-field-error\">Eve pays adults only. Attendees must be 18 by Oct 23, 2026.</p></div></div>",
+      "css": ".ds-field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px; font-family: var(--font-hanken, \"Hanken Grotesk\"), ui-sans-serif, system-ui, sans-serif; } .ds-field { display: flex; flex-direction: column; gap: 6px; } .ds-field-label { font-size: 0.8125rem; line-height: 1.125rem; font-weight: 500; color: var(--foreground, #eceef8); } .ds-input { height: 32px; width: 100%; padding: 4px 10px; border: 1px solid var(--input, #626aa8); border-radius: 8px; background: transparent; color: var(--foreground, #eceef8); font-family: inherit; font-size: 0.875rem; line-height: 1.25rem; outline: none; transition: border-color 150ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-input::placeholder { color: var(--muted-foreground, #a7acd2); } .ds-input:focus-visible { border-color: var(--ring, #c3c7f0); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, #c3c7f0) 50%, transparent); } .ds-input[aria-invalid=\"true\"] { border-color: var(--critical, #ff7a85); box-shadow: 0 0 0 3px color-mix(in oklab, var(--critical, #ff7a85) 20%, transparent); } .ds-field-help { margin: 0; font-size: 0.8125rem; line-height: 1.125rem; color: var(--muted-foreground, #a7acd2); } .ds-field-error { margin: 0; font-size: 0.8125rem; line-height: 1.125rem; color: var(--critical, #ff7a85); }"
+    },
+    {
+      "name": "Line Tabs",
+      "kind": "nav",
+      "refersTo": "tab-line",
+      "description": "Underlined filters with tabular counts. The only tab style in use.",
+      "html": "<div class=\"ds-tabs\" role=\"tablist\"><button class=\"ds-tab\" role=\"tab\" aria-selected=\"true\">All<span class=\"ds-tab-count\">7</span></button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Approvals<span class=\"ds-tab-count\">3</span></button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Holds<span class=\"ds-tab-count\">2</span></button><button class=\"ds-tab\" role=\"tab\" aria-selected=\"false\">Exceptions<span class=\"ds-tab-count\">2</span></button></div>",
+      "css": ".ds-tabs { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 3px; font-family: var(--font-hanken, \"Hanken Grotesk\"), ui-sans-serif, system-ui, sans-serif; } .ds-tab { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 100%; padding: 2px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: color-mix(in oklab, var(--foreground, #eceef8) 60%, transparent); font-family: inherit; font-size: 0.875rem; line-height: 1.25rem; font-weight: 500; white-space: nowrap; cursor: pointer; transition: color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-tab:hover, .ds-tab[aria-selected=\"true\"] { color: var(--foreground, #eceef8); } .ds-tab::after { content: \"\"; position: absolute; left: 0; right: 0; bottom: -5px; height: 2px; background: var(--foreground, #eceef8); opacity: 0; transition: opacity 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-tab[aria-selected=\"true\"]::after { opacity: 1; } .ds-tab:focus-visible { outline: none; border-color: var(--ring, #c3c7f0); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, #c3c7f0) 50%, transparent); } .ds-tab-count { font-size: 0.75rem; line-height: 1rem; font-weight: 400; font-variant-numeric: tabular-nums; color: var(--muted-foreground, #a7acd2); }"
+    },
+    {
+      "name": "State Badges",
+      "kind": "chip",
+      "refersTo": "badge-critical",
+      "description": "20px pills that carry state. Coral and mint on a 12% tint of themselves; outline and secondary for neutral states.",
+      "html": "<div class=\"ds-badges\"><span class=\"ds-badge ds-badge-critical\">Frozen</span><span class=\"ds-badge ds-badge-positive\">Paid</span><span class=\"ds-badge ds-badge-outline\">Held</span><span class=\"ds-badge ds-badge-secondary\">Draft</span></div>",
+      "css": ".ds-badges { display: flex; flex-wrap: wrap; gap: 8px; } .ds-badge { display: inline-flex; align-items: center; height: 20px; padding: 2px 8px; border: 1px solid transparent; border-radius: 9999px; font-family: var(--font-hanken, \"Hanken Grotesk\"), ui-sans-serif, system-ui, sans-serif; font-size: 0.75rem; line-height: 1rem; font-weight: 500; white-space: nowrap; } .ds-badge-critical { background: color-mix(in oklab, var(--critical, #ff7a85) 12%, transparent); color: var(--critical, #ff7a85); } .ds-badge-positive { background: color-mix(in oklab, var(--positive, #6fcf9e) 12%, transparent); color: var(--positive, #6fcf9e); } .ds-badge-outline { border-color: var(--border, #343a6b); color: var(--foreground, #eceef8); } .ds-badge-secondary { background: var(--surface-hover, #2c3260); color: var(--foreground, #eceef8); }"
+    },
+    {
+      "name": "Truth Labels",
+      "kind": "chip",
+      "refersTo": "truth-label",
+      "description": "Squared labels that say what is not real or not verified. Unverified rules get a dashed Field Edge border.",
+      "html": "<div class=\"ds-truths\"><span class=\"ds-truth\">Sample data</span><span class=\"ds-truth\">Test mode</span><span class=\"ds-truth\">Simulated</span><span class=\"ds-truth\">Estimate</span><span class=\"ds-truth ds-truth-unverified\">Unverified rule</span></div>",
+      "css": ".ds-truths { display: flex; flex-wrap: wrap; gap: 8px; } .ds-truth { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid var(--border, #343a6b); border-radius: 4px; font-family: var(--font-hanken, \"Hanken Grotesk\"), ui-sans-serif, system-ui, sans-serif; font-size: 0.75rem; line-height: 1rem; font-weight: 500; white-space: nowrap; color: var(--muted-foreground, #a7acd2); } .ds-truth-unverified { border-style: dashed; border-color: var(--input, #626aa8); }"
+    },
+    {
+      "name": "Due Chips",
+      "kind": "custom",
+      "refersTo": "dusk-5",
+      "description": "A deadline in its dusk band's hue, with what the deadline is beneath. The only place time gets a hue.",
+      "html": "<div class=\"ds-dues\"><span class=\"ds-due ds-due-5\"><time class=\"ds-due-time\" aria-label=\"Due in 18 minutes\"><span class=\"ds-due-dot\"></span>18 min</time><span class=\"ds-due-context\">2:00 PM release</span></span><span class=\"ds-due ds-due-4\"><time class=\"ds-due-time\" aria-label=\"Due in 5 hours\"><span class=\"ds-due-dot\"></span>5 h</time><span class=\"ds-due-context\">end of day</span></span><span class=\"ds-due ds-due-3\"><time class=\"ds-due-time\" aria-label=\"Due Oct 27\"><span class=\"ds-due-dot\"></span>Oct 27</time><span class=\"ds-due-context\">claims review</span></span><span class=\"ds-due ds-due-2\"><time class=\"ds-due-time\" aria-label=\"Due Oct 28\"><span class=\"ds-due-dot\"></span>Oct 28</time><span class=\"ds-due-context\">next chase</span></span><span class=\"ds-due ds-due-1\"><time class=\"ds-due-time\" aria-label=\"Due Nov 3\"><span class=\"ds-due-dot\"></span>Nov 3</time><span class=\"ds-due-context\">month-end close</span></span></div>",
+      "css": ".ds-dues { display: flex; flex-wrap: wrap; gap: 16px 40px; font-family: var(--font-hanken, \"Hanken Grotesk\"), ui-sans-serif, system-ui, sans-serif; } .ds-due { display: inline-flex; flex-direction: column; gap: 2px; } .ds-due-time { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; line-height: 1.125rem; font-weight: 600; white-space: nowrap; } .ds-due-dot { width: 6px; height: 6px; border-radius: 9999px; background: currentColor; } .ds-due-context { font-size: 0.75rem; line-height: 1rem; color: var(--muted-foreground, #a7acd2); } .ds-due-1 .ds-due-time { color: var(--dusk-1, #62b6f2); } .ds-due-2 .ds-due-time { color: var(--dusk-2, #9d9bf6); } .ds-due-3 .ds-due-time { color: var(--dusk-3, #cf86e3); } .ds-due-4 .ds-due-time { color: var(--dusk-4, #f08ba0); } .ds-due-5 .ds-due-time { color: var(--dusk-5, #f5a962); }"
+    },
+    {
+      "name": "Inbox Row",
+      "kind": "card",
+      "refersTo": "inbox-row",
+      "description": "One thing that needs a person, inside a hairline list. Hover lifts to surface; the first action is secondary, the rest ghost.",
+      "html": "<ul class=\"ds-inbox\"><li class=\"ds-row\"><div class=\"ds-row-main\"><div class=\"ds-row-head\"><h3 class=\"ds-row-title\">Payout frozen: bank details changed</h3><span class=\"ds-row-badge\">Frozen</span></div><p class=\"ds-row-meta\">Jordan Okafor · 2nd place, Best Hardware Hack</p><p class=\"ds-row-meta\">CAD account ••4471 changed to ••9902 at 1:24 PM. Eve emailed Jordan's original address to confirm.</p></div><div class=\"ds-row-amount\"><span class=\"ds-row-money\">$1,500.00</span><span class=\"ds-row-note\">payout</span></div><div class=\"ds-row-due\"><time class=\"ds-row-due-time\" aria-label=\"Due in 18 minutes\"><span class=\"ds-row-due-dot\"></span>18 min</time><span class=\"ds-row-note\">before 2:00 PM release</span></div><div class=\"ds-row-actions\"><button class=\"ds-row-btn ds-row-btn-secondary\">Keep frozen</button><button class=\"ds-row-btn\">Mark verified</button><button class=\"ds-row-btn\">View evidence</button></div></li><li class=\"ds-row\"><div class=\"ds-row-main\"><div class=\"ds-row-head\"><h3 class=\"ds-row-title\">Travel claim above the $300 auto-approve limit</h3></div><p class=\"ds-row-meta\">Marcus Lee · YYZ → SFO, Air Canada, economy</p><p class=\"ds-row-meta\">CA$679.40 at 0.72876 (ECB, Oct 3). All five checks passed; within 1% of the $500 cap.</p></div><div class=\"ds-row-amount\"><span class=\"ds-row-money\">$495.12</span><span class=\"ds-row-note\">from CA$679.40</span></div><div class=\"ds-row-due ds-row-due-3\"><time class=\"ds-row-due-time\" aria-label=\"Due Oct 27\"><span class=\"ds-row-due-dot\"></span>Oct 27</time><span class=\"ds-row-note\">claims review</span></div><div class=\"ds-row-actions\"><button class=\"ds-row-btn ds-row-btn-secondary\">Approve</button><button class=\"ds-row-btn\">Reject</button><button class=\"ds-row-btn\">Ask for info</button></div></li></ul>",
+      "css": ".ds-inbox { margin: 0; padding: 0; list-style: none; overflow: hidden; border: 1px solid var(--border, #343a6b); border-radius: 10px; background: var(--background, #1e2246); font-family: var(--font-hanken, \"Hanken Grotesk\"), ui-sans-serif, system-ui, sans-serif; font-size: 0.875rem; line-height: 1.25rem; color: var(--foreground, #eceef8); } .ds-row { display: grid; grid-template-columns: minmax(0, 1fr) 8rem 9rem; gap: 12px 24px; padding: 16px; border-bottom: 1px solid var(--border, #343a6b); transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-row:last-child { border-bottom: 0; } .ds-row:hover, .ds-row:focus-within { background: var(--surface, #252a52); } .ds-row-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; } .ds-row-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; } .ds-row-title { margin: 0; font-size: 0.875rem; line-height: 1.25rem; font-weight: 600; } .ds-row-badge { display: inline-flex; align-items: center; height: 20px; padding: 2px 8px; border-radius: 9999px; background: color-mix(in oklab, var(--critical, #ff7a85) 12%, transparent); color: var(--critical, #ff7a85); font-size: 0.75rem; line-height: 1rem; font-weight: 500; } .ds-row-meta { margin: 0; font-size: 0.8125rem; line-height: 1.125rem; color: var(--muted-foreground, #a7acd2); } .ds-row-amount, .ds-row-due { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; } .ds-row-money { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-row-note { font-size: 0.75rem; line-height: 1rem; color: var(--muted-foreground, #a7acd2); } .ds-row-due-time { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8125rem; line-height: 1.125rem; font-weight: 600; white-space: nowrap; color: var(--dusk-5, #f5a962); } .ds-row-due-3 .ds-row-due-time { color: var(--dusk-3, #cf86e3); } .ds-row-due-dot { width: 6px; height: 6px; border-radius: 9999px; background: currentColor; } .ds-row-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; } .ds-row-btn { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--foreground, #eceef8); font-family: inherit; font-size: 0.8rem; font-weight: 500; cursor: pointer; transition: background-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-row-btn:hover { background: var(--surface, #252a52); } .ds-row:hover .ds-row-btn:not(.ds-row-btn-secondary):hover { background: var(--surface-hover, #2c3260); } .ds-row-btn-secondary { background: var(--surface-hover, #2c3260); } .ds-row-btn-secondary:hover { background: color-mix(in oklch, var(--surface-hover, #2c3260), var(--foreground, #eceef8) 5%); } .ds-row-btn:focus-visible { outline: none; border-color: var(--ring, #c3c7f0); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring, #c3c7f0) 50%, transparent); }"
+    },
+    {
+      "name": "Horizon",
+      "kind": "custom",
+      "refersTo": "dusk-1",
+      "description": "The signature: every open deadline on one compressed, fully labelled line from now to two weeks out, keyed by the temperature scale beneath. Hover a mark to dim the rest.",
+      "html": "<div class=\"ds-hz-wrap\"><div class=\"ds-hz\"><div class=\"ds-hz-axis\"></div><span class=\"ds-hz-tick ds-hz-tick-now\" style=\"left: 0%\">Now 1:42 PM</span><span class=\"ds-hz-tick\" style=\"left: 14%\">1 h</span><span class=\"ds-hz-tick\" style=\"left: 28%\">6 h</span><span class=\"ds-hz-tick\" style=\"left: 42%\">1 day</span><span class=\"ds-hz-tick\" style=\"left: 56%\">2 days</span><span class=\"ds-hz-tick\" style=\"left: 80%\">1 week</span><span class=\"ds-hz-tick ds-hz-tick-end\" style=\"left: 100%\">2 weeks</span><span class=\"ds-hz-mark ds-hz-d5\" style=\"left: 4.2%\"><span class=\"ds-hz-stem ds-hz-lane0\"></span><span class=\"ds-hz-label ds-hz-lane0\">Batch #4</span><button class=\"ds-hz-dot\" aria-label=\"Batch #4. Due in 18 minutes\"></button></span><span class=\"ds-hz-mark ds-hz-d4\" style=\"left: 15.7%\"><span class=\"ds-hz-stem ds-hz-lane1\"></span><span class=\"ds-hz-label ds-hz-lane1\">Priya · prize</span><button class=\"ds-hz-dot\" aria-label=\"Priya · prize. Due in 1 hour 18 minutes\"></button></span><span class=\"ds-hz-mark ds-hz-d3\" style=\"left: 53.4%\"><span class=\"ds-hz-stem ds-hz-lane0\"></span><span class=\"ds-hz-label ds-hz-lane0\">Marcus · flight</span><button class=\"ds-hz-dot\" aria-label=\"Marcus · flight. Due Oct 27\"></button></span><span class=\"ds-hz-mark ds-hz-d1 ds-hz-flip\" style=\"left: 84.5%\"><span class=\"ds-hz-stem ds-hz-lane0\"></span><span class=\"ds-hz-label ds-hz-lane0\">Sam · duplicate</span><button class=\"ds-hz-dot\" aria-label=\"Sam · duplicate. Due Nov 3\"></button></span></div><div class=\"ds-hz-scale\"><span class=\"ds-hz-d5\"></span><span class=\"ds-hz-d4\"></span><span class=\"ds-hz-d3\"></span><span class=\"ds-hz-d2\"></span><span class=\"ds-hz-d1\"></span></div><div class=\"ds-hz-scale ds-hz-legend\"><span class=\"ds-hz-d5\">Under an hour</span><span class=\"ds-hz-d4\">Under a day</span><span class=\"ds-hz-d3\">Under 2 days</span><span class=\"ds-hz-d2\">Under a week</span><span class=\"ds-hz-d1\">A week or more</span></div></div>",
+      "css": ".ds-hz-wrap { display: flex; flex-direction: column; gap: 8px; min-width: 520px; font-family: var(--font-hanken, \"Hanken Grotesk\"), ui-sans-serif, system-ui, sans-serif; background: var(--background, #1e2246); } .ds-hz { position: relative; height: 90px; margin-bottom: 24px; } .ds-hz-axis { position: absolute; left: 0; right: 0; bottom: 28px; height: 1px; background: var(--input, #626aa8); } .ds-hz-tick { position: absolute; bottom: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; transform: translateX(-50%); font-size: 0.75rem; line-height: 1rem; color: var(--faint, #8b91be); white-space: nowrap; } .ds-hz-tick::before { content: \"\"; width: 1px; height: 6px; background: var(--input, #626aa8); } .ds-hz-tick-now { transform: none; align-items: flex-start; font-weight: 600; color: var(--foreground, #eceef8); } .ds-hz-tick-now::before { background: var(--foreground, #eceef8); } .ds-hz-tick-end { transform: translateX(-100%); align-items: flex-end; } .ds-hz-mark { position: absolute; bottom: 28px; transition: opacity 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-hz:has(.ds-hz-mark:hover) .ds-hz-mark:not(:hover) { opacity: 0.35; } .ds-hz-dot { position: absolute; bottom: -5px; left: -5px; width: 10px; height: 10px; padding: 0; border: 0; border-radius: 9999px; background: currentColor; box-shadow: 0 0 0 2px var(--background, #1e2246); cursor: pointer; transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-hz-mark:hover .ds-hz-dot, .ds-hz-dot:focus-visible { transform: scale(1.5); } .ds-hz-dot:focus-visible { outline: 2px solid var(--ring, #c3c7f0); outline-offset: 3px; } .ds-hz-stem { position: absolute; left: 0; bottom: 6px; width: 1px; background: currentColor; opacity: 0.5; } .ds-hz-stem.ds-hz-lane0 { height: 12px; } .ds-hz-stem.ds-hz-lane1 { height: 34px; } .ds-hz-label { position: absolute; left: 0; transform: translateX(-10px); padding: 0 4px; background: var(--background, #1e2246); font-size: 0.75rem; line-height: 1rem; font-weight: 500; white-space: nowrap; transition: color 200ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-hz-label.ds-hz-lane0 { bottom: 16px; } .ds-hz-label.ds-hz-lane1 { bottom: 38px; } .ds-hz-flip .ds-hz-label { left: auto; right: 0; transform: translateX(10px); } .ds-hz-mark:hover .ds-hz-label { color: var(--foreground, #eceef8); } .ds-hz-scale { display: grid; grid-template-columns: 14fr 28fr 14fr 24fr 20fr; gap: 2px; } .ds-hz-scale:not(.ds-hz-legend) > span { height: 4px; border-radius: 9999px; background: currentColor; } .ds-hz-legend { gap: 0; } .ds-hz-legend > span { padding-right: 8px; font-size: 0.75rem; line-height: 1rem; font-weight: 500; } .ds-hz-d1 { color: var(--dusk-1, #62b6f2); } .ds-hz-d2 { color: var(--dusk-2, #9d9bf6); } .ds-hz-d3 { color: var(--dusk-3, #cf86e3); } .ds-hz-d4 { color: var(--dusk-4, #f08ba0); } .ds-hz-d5 { color: var(--dusk-5, #f5a962); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Blue Hour",
+    "overview": "Eve is set at dusk. The ground is deep indigo, never black, and the structure is built from a short ladder of indigo steps that grow lighter as surfaces come forward. Against that quiet field, colour has exactly one job: telling you how soon something is due. Five dusk hues run from cool blue (a week or more) to warm apricot (under an hour), and they appear only on deadlines. Coral marks critical state and mint marks passed state. Nothing else is coloured.\n\nThe system is clean and minimalist by instruction and compact by necessity. Organizers work an inbox of money decisions, so controls are 32px tall, body text is 14px, rows are dense, and figures sit at full contrast in tabular columns. Depth comes from lightness steps and 1px hairlines; the page casts no shadows. The signature is the horizon, a single line from now to two weeks out where every open deadline lands as a dusk-coloured mark, with due chips carrying the same hues into rows and tables.\n\nBlue Hour refuses two category defaults by name: the white dashboard with a blue accent and KPI tiles, and the near-black dashboard with a single neon accent. Dark is the only theme; a light \"daylight\" theme is deferred until a screen needs one.",
+    "keyCharacteristics": [
+      "Deep indigo ground (never black) with lighter indigo steps for raised and selected surfaces.",
+      "Colour means time: dusk hues appear on deadlines and nowhere else.",
+      "Coral (critical) and mint (positive) are the only other hues.",
+      "One typeface, Hanken Grotesk, at every size; hierarchy from size and weight (400, 500, 600).",
+      "Flat page: hairline borders and tonal steps, with shadows reserved for floating layers.",
+      "Compact density on a 4px rhythm; full-contrast tabular figures.",
+      "Honesty is visible: truth labels, traced evidence, and blocked actions that say why."
+    ],
+    "rules": [
+      {
+        "name": "The Colour Means Time Rule",
+        "body": "Dusk hues appear only on deadlines: due chips, horizon marks, and the temperature scale that keys them. If something has a hue, it is due. Never use a dusk hue for a link, button, icon, chart series, or decoration.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two States Rule",
+        "body": "Coral and mint are the only other hues, and they mark state, never emphasis. Every other distinction is made with indigo lightness and text weight.",
+        "section": "colors"
+      },
+      {
+        "name": "The Faint Floor Rule",
+        "body": "Faint text sits on the ground or the rail (5.0:1 and 5.4:1). The disabled button label on surface is the one exception, at exactly 4.5:1. Faint never goes on surface-hover, where it falls to 4.0:1.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Family Rule",
+        "body": "Hanken Grotesk at every size. Hierarchy comes from the seven-step scale and three weights (400, 500, 600). There is no bold, no uppercase, and no letter-spaced label style.",
+        "section": "typography"
+      },
+      {
+        "name": "The Figures Rule",
+        "body": "Every amount renders through the Money component: tabular figures, full-contrast Cool White, right-aligned in columns, a true minus sign (−) for deductions, and an \"est.\" prefix in Haze Lavender for estimates. Amounts are stored as integer minor units and never formatted through floats.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Page Rule",
+        "body": "Panels, cards, rows, and containers never cast shadows. If a surface needs to separate, step it up the indigo ladder or give it a hairline.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Halo Rule",
+        "body": "Horizon marks wear a 2px ring in the ground colour so they cut cleanly out of the axis line. It is a knockout, not a shadow.",
+        "section": "elevation"
+      },
+      {
+        "name": "The One Primary Rule",
+        "body": "One Cool White button per view. In a row, the first action is secondary and the rest are ghost; in a detail pane, the primary spans the pane's width.",
+        "section": "components"
+      },
+      {
+        "name": "The Truth Label Rule",
+        "body": "Anything that is not real money, real data, or a verified rule carries a truth label beside it. Simulation is never implied by tone or colour alone.",
+        "section": "components"
+      },
+      {
+        "name": "The Fixed Scale Rule",
+        "body": "Each bar uses one scale, and bars meant for comparison share it. Net is visibly what is left of gross; remaining sits against the cap.",
+        "section": "components"
+      },
+      {
+        "name": "The Evidence Rule",
+        "body": "Every amount Eve derives can be opened to its source. A figure without evidence is a figure the user typed.",
+        "section": "components"
+      },
+      {
+        "name": "The Says-Why Rule",
+        "body": "A blocked action is never hidden and never disabled silently. The reason names the rule and the person who can act (\"Ari Novak is the controller\").",
+        "section": "components"
+      }
+    ],
+    "dos": [
+      "Do reserve the five dusk hues for deadlines, keyed by time remaining: under an hour (and overdue), under a day, under 2 days, under a week, a week or more.",
+      "Do build depth from the indigo ladder (rail, ground, surface, surface-hover) and 1px hairlines.",
+      "Do use surface for hover and surface-hover for selection, so a selected row always reads one step above a hovered one.",
+      "Do render every amount through Money: tabular, Cool White, right-aligned, true minus, \"est.\" for estimates.",
+      "Do keep one Cool White primary per view; make a row's first action secondary and the rest ghost.",
+      "Do put a truth label on anything sample, test-mode, simulated, estimated, or unverified.",
+      "Do keep blocked actions visible, disabled but focusable, with the reason beside them.",
+      "Do keep loading skeletons at the real component's geometry.",
+      "Do keep the shadow for floating layers only, with the Float recipe and a hairline ring."
+    ],
+    "donts": [
+      "Don't use a dusk hue on anything that is not a deadline: no dusk buttons, links, icons, chart series, selection, or focus rings.",
+      "Don't introduce a brand accent colour. Blue Hour rejects the white dashboard with a blue accent and KPI tiles, and the near-black dashboard with a single neon accent.",
+      "Don't go darker than Night Rail (#191c3b) or use black for any surface.",
+      "Don't put shadows on panels, cards, rows, or containers.",
+      "Don't place Faint Lavender text on surface-hover or anything lighter.",
+      "Don't fade disabled buttons with opacity; use the Raised Indigo fill and Faint Lavender text.",
+      "Don't fill a destructive button with solid coral; use coral text on a coral tint.",
+      "Don't add bold weights, uppercase labels, or letter-spaced captions; the scale and three weights carry the hierarchy.",
+      "Don't add a second display face; Geist Mono is for code and token names only.",
+      "Don't write dark: variants or a light theme as if a theme switch exists; Blue Hour is the only theme until a daylight theme is designed."
+    ]
+  }
+}
