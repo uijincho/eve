@@ -160,7 +160,7 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   for (const p of expired) planted.push({ scenario: "Expired W-8BEN", objectType: "person", objectId: p.id, expected: "hold", description: `${p.name}'s W-8BEN lapsed Dec 31, 2025.` });
   for (const p of w9foreign) planted.push({ scenario: "W-9 from a foreign address", objectType: "person", objectId: p.id, expected: "hold", description: `${p.name} submitted a W-9 with a non-US address and citizenship.` });
   planted.push({ scenario: "Unverified treaty claim", objectType: "person", objectId: treaty.id, expected: "hold", description: `${treaty.name} claimed the Canada treaty rate, which is not verified.` });
-  for (const p of threshold) planted.push({ scenario: "Crosses $2,000 across two payments", objectType: "person", objectId: p.id, expected: "reportable", code: "1099", description: `${p.name} was paid $1,500 earlier this year; a $600 prize crosses the 1099-MISC threshold.` });
+  for (const p of threshold) planted.push({ scenario: "Crosses $2,000 across two payments", objectType: "person", objectId: p.id, expected: "reportable", code: "1099-MISC", description: `${p.name} was paid $1,500 earlier this year; a $600 prize crosses the 1099-MISC threshold.` });
   for (const p of [jordan, bankSecond]) planted.push({ scenario: "Bank details changed before payout", objectType: "person", objectId: p.id, expected: "freeze", description: `${p.name}'s bank details change after a payout was proposed.` });
 
   await tx.insert(s.person).values(people.map((p) => { const row: Partial<P> = { ...p }; delete row.airport; delete row.form; delete row.tin; return row as PersonRow; }));
