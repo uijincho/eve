@@ -15,7 +15,7 @@ import * as s from "@/lib/db/schema";
 
 import { iso, loadOrgEvent, str, toAward, toClaim, toEvent, toOrg, toPayout, toPerson, type MethodRow, type ProfileRow } from "./core";
 import { loadRules } from "./payouts";
-import { computeScoreboard, lastScoreboardRun } from "./scoreboard";
+import { loadScoreboardView } from "./scoreboard-view";
 import { openSecret } from "./vault";
 
 const DECISION_LIMIT = 300;
@@ -101,9 +101,9 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
   }
 
   const personas: C.Actor[] = members.map((m) => ({ id: m.id, name: m.name, email: m.email, role: m.role, personId: m.personId ?? undefined }));
-  const scoreboard: C.Scoreboard = self
+  const scoreboard: C.Scoreboard = self || !org.isDemo
     ? { total: 0, evaluated: 0, caught: 0, missed: 0, falsePositives: 0, wrongfulPayouts: 0, results: [] }
-    : { ...(await computeScoreboard(db, orgId)), lastRunAt: iso(await lastScoreboardRun(db, orgId)) };
+    : await loadScoreboardView(db, orgId);
 
   return {
     actor: { id: actor.memberId, name: actor.name, email: actor.email, role: actor.role, personId: actor.personId ?? undefined },
