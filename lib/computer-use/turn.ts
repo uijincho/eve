@@ -88,6 +88,19 @@ function prepareMessages(state: AgentState) {
   state.operatorNote = null;
 }
 
+/**
+ * Adds the fresh screenshot to the last result that is not an error. The API rejects images in an
+ * error result, and a blocked action is followed by skipped ones that are all errors. With no
+ * successful result, the screenshot is left out and Claude takes its own next turn.
+ */
+export function attachScreenshot(results: BetaToolResultBlockParam[], shot: string): boolean {
+  const target = [...results].reverse().find((r) => !r.is_error);
+  if (!target) return false;
+  const content = typeof target.content === "string" ? [{ type: "text" as const, text: target.content }] : [...(target.content ?? [])];
+  target.content = [...content, { type: "image", source: { type: "base64", media_type: "image/png", data: shot } }];
+  return true;
+}
+
 function toolResult(id: string, content: BetaToolResultBlockParam["content"], opts: { computer?: boolean; error?: boolean } = {}): BetaToolResultBlockParam {
   return { type: "tool_result", tool_use_id: id, content, ...(opts.error ? { is_error: true } : {}), ...(opts.computer ? { toolset_name: "computer" } : {}) };
 }
@@ -193,14 +206,10 @@ export async function runAgentTurn(desktop: Sandbox, state: AgentState, secret: 
   }
 
   // Every turn ends with a fresh screenshot. When the batch did not end with one, it rides along
-  // on the last result so the model sees the same screen without another turn.
+  // on a result so the model sees the same screen without another turn.
   await sleep(SETTLE_MS);
   const shot = lastShot ?? await capture(desktop);
-  if (results.length > 0 && !lastShot) {
-    const last = results[results.length - 1];
-    const content = typeof last.content === "string" ? [{ type: "text" as const, text: last.content }] : [...(last.content ?? [])];
-    last.content = [...content, { type: "image", source: { type: "base64", media_type: "image/png", data: shot } }];
-  }
+  if (!lastShot) attachScreenshot(results, shot);
   const pageAfter = (await currentPage(desktop)).page;
   const events = await portalEvents(desktop);
   const portalSaid = events.slice(state.seenEvents);
