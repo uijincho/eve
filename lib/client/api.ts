@@ -72,12 +72,17 @@ export async function switchPersona(personaId: string): Promise<ActionResult> {
   return { ok: true, message: "Switched sample persona" };
 }
 
-export type UploadedDocument = { id: string; name: string; url: string };
+export type UploadedDocument = { id: string; name: string; url: string; sha256?: string };
 
-export async function uploadDocument(file: File): Promise<UploadedDocument> {
+export async function uploadDocument(
+  file: File,
+  opts: { kind?: "receipt" | "upload"; personId?: string } = {},
+): Promise<UploadedDocument> {
   if (fixtureEnabled()) throw new ApiError("Fixture mode: uploads are not sent", 0);
   const form = new FormData();
   form.append("file", file);
+  if (opts.kind) form.append("kind", opts.kind);
+  if (opts.personId) form.append("personId", opts.personId);
   const res = await fetch("/api/documents", {
     method: "POST",
     credentials: "same-origin",
@@ -91,7 +96,7 @@ export function documentUrl(id: string): string {
   return `/api/documents/${encodeURIComponent(id)}`;
 }
 
-export type ExportType = "ledger" | "claims" | "payouts" | "filings" | "packet";
+export type ExportType = "ledger" | "claims" | "payouts" | "filings" | "packet" | "filing";
 
 export function exportUrl(type: ExportType, id?: string): string {
   const q = new URLSearchParams({ type });

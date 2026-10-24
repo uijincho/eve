@@ -4,7 +4,8 @@
 import type { ActionResult, AppAction, AppSnapshot, Decision } from "@/lib/contracts";
 
 export function fixtureEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_EVE_FIXTURE === "1";
+  // Never in a production build, and never as a fallback when the API fails.
+  return process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_EVE_FIXTURE === "1";
 }
 
 export function fixtureAction(action: AppAction): ActionResult {

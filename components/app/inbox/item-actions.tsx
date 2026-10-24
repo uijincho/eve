@@ -5,9 +5,11 @@ import { cn } from "cn";
 import { ActionButton } from "@/components/app/action-button";
 import { LinkButton } from "@/components/app/link-button";
 import { ReasonAction } from "@/components/app/reason-action";
+import { VerifyCode } from "@/components/app/verify-code";
 import { Button } from "@/components/ui/button";
 import type { AppSnapshot } from "@/lib/contracts";
 import {
+  canControl,
   canManage,
   canRelease,
   canReview,
@@ -79,17 +81,7 @@ export function ItemActions({
       if (p.status === "frozen") {
         return (
           <div className={wrap}>
-            <ReasonAction
-              label="Mark verified"
-              submitLabel="Confirm and unfreeze"
-              pendingLabel="Verifying"
-              variant="secondary"
-              primary={pane}
-              prompt={`How did ${p.personName.split(" ")[0]} confirm the new account through the original channel?`}
-              placeholder="Replied from original email at 1:31 PM confirming ••9902"
-              permission={manage}
-              build={(r) => payloads.payoutVerify(p.id, r)}
-            />
+            <VerifyCode personId={p.personId} personName={p.personName} permission={manage} primary={pane} />
             {evidence}
           </div>
         );
@@ -97,7 +89,7 @@ export function ItemActions({
       if (p.status === "failed" || p.status === "returned") {
         return (
           <div className={wrap}>
-            <ActionButton variant={first} size={pane ? "default" : "sm"} wide={pane} label="Retry payout" pendingLabel="Retrying" permission={manage} call={payloads.payoutRetry(p.id)} />
+            <ActionButton variant={first} size={pane ? "default" : "sm"} wide={pane} label="Retry payout" pendingLabel="Retrying" permission={canControl(actor, snapshot)} call={payloads.payoutRetry(p.id)} />
             {evidence}
           </div>
         );
@@ -197,10 +189,10 @@ export function ItemActions({
             label="Accept with fee"
             pendingLabel="Reconciling"
             permission={manage}
-            call={payloads.sponsorReconcile(k.id, "accept_fee", "Wire fee accepted as bank charge")}
+            call={payloads.sponsorReconcile(k.id, { acceptShortfall: true, note: "Shortfall accepted as the sponsor wire fee" })}
           />
           {manage.allowed ? (
-            <ReasonAction label="Query sponsor" submitLabel="Send query" pendingLabel="Sending" prompt="What should Eve ask the sponsor?" build={(r) => payloads.sponsorReconcile(k.id, "query", r)} />
+            <ReasonAction label="Add a note" submitLabel="Save note" pendingLabel="Saving" prompt="Note for the reconciliation record (the exception stays open)" build={(r) => payloads.sponsorReconcile(k.id, { note: r })} />
           ) : null}
         </div>
       );

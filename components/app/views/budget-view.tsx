@@ -85,7 +85,7 @@ function BudgetRow({ line: b, snapshot }: { line: BudgetLine; snapshot: AppSnaps
                 setError("Enter an amount like 60000.00");
                 return null;
               }
-              return payloads.budgetUpdate(b.id, minor);
+              return payloads.budgetUpdate({ id: b.id, name: b.name, capMinor: minor, fundingSource: b.fundingSource });
             }}
           />
           <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>

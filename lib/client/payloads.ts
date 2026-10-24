@@ -11,6 +11,18 @@ const call = (action: AppAction, payload: Record<string, unknown>): ActionCall =
 
 export type ReviewDecision = "approve" | "reject" | "needs_info";
 
+export type PersonInput = {
+  name: string;
+  email: string;
+  country: string;
+  citizenship?: string;
+  dateOfBirth: string;
+  address?: string;
+  role?: string;
+  payoutCurrency?: string;
+};
+
+// Mirrors lib/server/action-schemas.ts (strict objects: unknown keys are rejected).
 export const payloads = {
   claimReview: (id: string, decision: ReviewDecision, reason: string) =>
     call("claim.review", { id, decision, reason }),
@@ -27,69 +39,79 @@ export const payloads = {
     origin?: string;
     cabin?: string;
     personId?: string;
+    idempotencyKey?: string;
   }) => call("claim.submit", stripEmpty(fields)),
 
   awardCreate: (fields: {
-    personId: string;
+    personId?: string;
+    teamPersonIds?: string[];
     track: string;
     title: string;
     kind: Award["kind"];
     amountMinor: string;
-    currency: string;
-    teamId?: string;
+    currency?: string;
+    dueAt?: string;
   }) => call("award.create", stripEmpty(fields)),
-  awardChoose: (id: string, fulfillment: Award["fulfillment"]) =>
+  awardChoose: (id: string, fulfillment: Exclude<Award["fulfillment"], "undecided">) =>
     call("award.choose", { id, fulfillment }),
-  awardSplit: (id: string, shares: { personId: string; bps: number }[]) =>
-    call("award.split", { id, shares }),
+  awardSplit: (teamId: string, splits: { personId: string; bps: number }[]) =>
+    call("award.split", { teamId, splits }),
   awardConfirm: (id: string) => call("award.confirm", { id }),
 
   payoutPropose: (sourceId: string, sourceType: "claim" | "award") =>
     call("payout.propose", { sourceId, sourceType }),
   payoutRelease: (ids: string[]) =>
     ids.length === 1 ? call("payout.release", { id: ids[0] }) : call("payout.release", { ids }),
-  payoutVerify: (id: string, confirmation: string, channel = "original email") =>
-    call("payout.verify", { id, confirmation, channel }),
+  /** `id` is the person id (or pending method id); `code` is the 6-digit code sent to the original email. */
+  payoutVerify: (id: string, code: string, decision: "confirm" | "reject" = "confirm") =>
+    call("payout.verify", { id, confirmation: code, decision }),
   payoutRetry: (id: string) => call("payout.retry", { id }),
-  payoutBankChange: (personId: string, last4: string, currency: string) =>
-    call("payout.bankChange", { personId, last4, currency }),
+  payoutBankChange: (personId: string, last4: string, currency: string, requestedVia: "portal" | "email" | "phone" = "portal") =>
+    call("payout.bankChange", { personId, last4, currency, requestedVia }),
 
   taxSubmit: (fields: {
     personId: string;
     form: Person["taxForm"];
     signature: string;
     tin?: string;
-    legalName?: string;
-    citizenship?: string;
-    country?: string;
-    address?: string;
-    dateOfBirth?: string;
     treatyCountry?: string;
-  }) => call("tax.submit", stripEmpty(fields)),
-  personUpdate: (id: string, fields: Partial<Pick<Person, "name" | "country" | "citizenship" | "dateOfBirth" | "address" | "payoutCurrency">>) =>
-    call("person.update", { id, ...stripEmpty(fields) }),
-  peopleImport: (csv: string, documentId?: string) =>
-    call("people.import", stripEmpty({ csv, documentId })),
+    treatyArticle?: string;
+  }) => call("tax.submit", { ...stripEmpty(fields), certify: true }),
+  personUpdate: (
+    id: string,
+    fields: Partial<Pick<Person, "name" | "country" | "citizenship" | "dateOfBirth" | "address" | "role" | "payoutCurrency">>,
+  ) => call("person.update", { id, ...stripEmpty(fields) }),
+  peopleImport: (people: PersonInput[]) =>
+    call("people.import", { people: people.map((p) => stripEmpty(p)) }),
 
   sponsorCreate: (payoutId: string) => call("sponsor.create", { payoutId }),
   sponsorSubmit: (id: string) => call("sponsor.submit", { id }),
-  sponsorReconcile: (id: string, resolution: "accept_fee" | "query" | "match", note: string) =>
-    call("sponsor.reconcile", { id, resolution, note }),
+  sponsorReconcile: (id: string, fields: { acceptShortfall?: boolean; paidMinor?: string; note?: string }) =>
+    call("sponsor.reconcile", { id, ...stripEmpty(fields) }),
 
   orgUpdate: (fields: Record<string, unknown>) => call("org.update", stripEmpty(fields)),
   eventUpdate: (fields: Record<string, unknown>) => call("event.update", stripEmpty(fields)),
-  budgetUpdate: (id: string, capMinor: string) => call("budget.update", { id, capMinor }),
-  periodLock: (reason: string) => call("period.lock", { reason }),
+  budgetUpdate: (line: { id?: string; name: string; capMinor: string; fundingSource: string; category?: string }) =>
+    call("budget.update", stripEmpty(line)),
+  periodLock: (period: string) => call("period.lock", { period }),
   filingsGenerate: (year: number) => call("filings.generate", { year }),
 
-  agentRun: (scope = "all") => call("agent.run", { scope }),
+  agentRun: (kind: "claims" | "chase" | "all" = "all") => call("agent.run", { kind }),
   demoRun: () => call("demo.run", {}),
   demoReset: () => call("demo.reset", {}),
 
-  flightSearch: (fields: { personId?: string; origin: string; departDate: string; returnDate: string }) =>
+  flightSearch: (fields: { origin: string; date?: string; personId?: string }) =>
     call("flight.search", stripEmpty(fields)),
-  flightRequest: (fields: { personId?: string; offerId: string; amountMinor: string; currency: string; summary: string }) =>
-    call("flight.request", stripEmpty(fields)),
+  flightRequest: (fields: {
+    offerId: string;
+    origin: string;
+    carrier: string;
+    departAt: string;
+    amountMinor: string;
+    currency?: string;
+    cabin?: string;
+    personId?: string;
+  }) => call("flight.request", stripEmpty(fields)),
 };
 
 function stripEmpty<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {

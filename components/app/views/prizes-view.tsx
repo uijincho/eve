@@ -223,7 +223,7 @@ function TeamSplit({ award, team, snapshot }: { award: Award; team: Award[]; sna
         permission={manage}
         call={() =>
           total === 10000
-            ? payloads.awardSplit(award.id, team.map((t) => ({ personId: t.personId, bps: Math.round(Number(shares[t.personId] || 0) * 100) })))
+            ? payloads.awardSplit(award.teamId!, team.map((t) => ({ personId: t.personId, bps: Math.round(Number(shares[t.personId] || 0) * 100) })))
             : null
         }
       />
@@ -238,7 +238,7 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<Award["kind"]>("item");
   const [amount, setAmount] = useState("");
-  const [teamId, setTeamId] = useState("");
+  const [team, setTeam] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
@@ -252,22 +252,31 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
         e.preventDefault();
         const minor = toMinor(amount);
         const next: Record<string, string> = {};
-        if (!personId) next.person = "Choose the winner.";
+        if (!personId && team.length < 2) next.person = team.length === 1 ? "A team needs at least two members, or choose one winner." : "Choose the winner.";
         if (!track.trim()) next.track = "Name the track, like First Overall.";
         if (!title.trim()) next.title = kind === "item" ? "Name the item, like MacBook Air." : "Name the prize.";
         if (!minor || minor === "0") next.amount = kind === "item" ? "Enter the item's fair market value in USD." : "Enter the cash amount in USD.";
         setErrors(next);
         if (Object.keys(next).length) return;
         setPending(true);
-        const r = await act(payloads.awardCreate({ personId, track: track.trim(), title: title.trim(), kind, amountMinor: minor!, currency: "USD", teamId: teamId.trim() || undefined }));
+        const r = await act(
+          payloads.awardCreate({
+            ...(team.length >= 2 ? { teamPersonIds: team } : { personId }),
+            track: track.trim(),
+            title: title.trim(),
+            kind,
+            amountMinor: minor!,
+            currency: "USD",
+          }),
+        );
         setPending(false);
         setResult(r);
         if (r.ok) onCreated(typeof r.data?.id === "string" ? r.data.id : null);
       }}
     >
-      <Field label="Winner" error={errors.person} help={person ? `${person.country} resident · ${person.taxForm} ${person.taxStatus}` : "Winners are linked to their tax profile."}>
+      <Field label={team.length >= 2 ? "Winner (team selected below)" : "Winner"} error={errors.person} help={person ? `${person.country} resident · ${person.taxForm} ${person.taxStatus}` : "Winners are linked to their tax profile."}>
         {(p) => (
-          <NativeSelect {...p} value={personId} onChange={(e) => setPersonId(e.target.value)}>
+          <NativeSelect {...p} value={personId} disabled={team.length >= 2} onChange={(e) => setPersonId(e.target.value)}>
             <option value="">Choose a person</option>
             {s.people.filter((x) => x.adult).map((x) => (
               <option key={x.id} value={x.id}>
@@ -296,9 +305,25 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
           {(p) => <Input {...p} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1,299.00" />}
         </Field>
       </div>
-      <Field label="Team (optional)" help="Winners sharing a team split evenly unless the team agrees otherwise.">
-        {(p) => <Input {...p} value={teamId} onChange={(e) => setTeamId(e.target.value)} placeholder="team-aurora" />}
-      </Field>
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="text-small font-medium">Team prize (optional)</legend>
+        <p className="text-small text-muted-foreground">
+          Choose every member to split it evenly; each member confirms. Leave empty for a single winner.
+        </p>
+        <div className="flex max-h-40 flex-col gap-1 overflow-y-auto overscroll-contain rounded-lg border p-2">
+          {s.people.filter((x) => x.adult).map((x) => (
+            <label key={x.id} className="flex items-center gap-2 text-small">
+              <input
+                type="checkbox"
+                className="size-4 accent-foreground"
+                checked={team.includes(x.id)}
+                onChange={(e) => setTeam((t) => (e.target.checked ? [...t, x.id] : t.filter((y) => y !== x.id)))}
+              />
+              {x.name} · {x.country}
+            </label>
+          ))}
+        </div>
+      </fieldset>
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" aria-busy={pending || undefined} disabled={pending}>
           {pending ? "Saving winner" : "Save winner"}

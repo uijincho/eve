@@ -112,8 +112,8 @@ function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snaps
           <ActionButton wide size="default" variant="default" label="Submit to sponsor" pendingLabel="Submitting" permission={manage} call={payloads.sponsorSubmit(k.id)} />
         ) : k.status === "exception" || k.status === "questioned" ? (
           <>
-            <ActionButton wide size="default" variant="default" label="Accept with fee" pendingLabel="Reconciling" permission={manage} call={payloads.sponsorReconcile(k.id, "accept_fee", "Difference accepted as sponsor wire fee")} />
-            {manage.allowed ? <ReasonAction label="Query sponsor" submitLabel="Send query" pendingLabel="Sending" prompt="What should Eve ask the sponsor?" build={(r) => payloads.sponsorReconcile(k.id, "query", r)} /> : null}
+            <ActionButton wide size="default" variant="default" label="Accept with fee" pendingLabel="Reconciling" permission={manage} call={payloads.sponsorReconcile(k.id, { acceptShortfall: true, note: "Shortfall accepted as the sponsor wire fee" })} />
+            {manage.allowed ? <ReasonAction label="Add a note" submitLabel="Save note" pendingLabel="Saving" prompt="Note for the reconciliation record (the exception stays open)" build={(r) => payloads.sponsorReconcile(k.id, { note: r })} /> : null}
           </>
         ) : null}
       </div>

@@ -80,6 +80,15 @@ export function EveProvider({ children }: { children: React.ReactNode }) {
   const act = useCallback(
     async (call: ActionCall) => {
       const result = await runAction(call.action, call.payload);
+      // Successful mutations return the fresh snapshot; use it instead of a second request.
+      const fresh = result.data?.snapshot as AppSnapshot | undefined;
+      if (fresh && typeof fresh === "object" && "actor" in fresh) {
+        setSnapshot(fresh);
+        setError(null);
+        const { snapshot: _omit, ...rest } = result.data ?? {};
+        void _omit;
+        return { ...result, data: rest };
+      }
       await refresh();
       return result;
     },

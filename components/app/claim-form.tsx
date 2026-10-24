@@ -16,8 +16,8 @@ import { big } from "@/lib/client/derive";
 import { payloads, toMinor } from "@/lib/client/payloads";
 import { useEve, useLivePolling } from "@/lib/client/use-eve";
 
-const ACCEPT = "image/png,image/jpeg,image/webp,image/heic,application/pdf";
-const MAX_BYTES = 10 * 1024 * 1024;
+const ACCEPT = "image/png,image/jpeg,image/webp,application/pdf";
+const MAX_BYTES = 8 * 1024 * 1024;
 
 /**
  * Upload a receipt (image or PDF) and submit a claim. Fields left blank are
@@ -56,7 +56,7 @@ export function ClaimForm({
     e.preventDefault();
     const next: Record<string, string> = {};
     if (!file && !amount) next.file = "Attach a receipt, or type the amount and merchant.";
-    if (file && file.size > MAX_BYTES) next.file = "That file is over 10 MB. Export a smaller PDF or photo.";
+    if (file && file.size > MAX_BYTES) next.file = "That file is over 8 MB. Export a smaller PDF or photo.";
     const minor = amount ? toMinor(amount) : undefined;
     if (amount && !minor) next.amount = "Enter an amount like 495.12.";
     if (!file && !merchant) next.merchant = "Name the merchant, or attach the receipt.";
@@ -70,7 +70,7 @@ export function ClaimForm({
     if (file) {
       setPhase("uploading");
       try {
-        documentId = (await uploadDocument(file)).id;
+        documentId = (await uploadDocument(file, { kind: "receipt", personId: personId || undefined })).id;
       } catch (err) {
         setPhase("idle");
         setResult({ ok: false, message: err instanceof ApiError ? `Upload failed: ${err.message}` : "Upload failed. Try again." });
@@ -91,6 +91,7 @@ export function ClaimForm({
         origin: type === "travel" ? origin.toUpperCase() || undefined : undefined,
         cabin: type === "travel" ? cabin || undefined : undefined,
         category: type === "travel" ? "Travel" : undefined,
+        idempotencyKey: crypto.randomUUID(),
       }),
     );
     setPhase("idle");
@@ -155,7 +156,7 @@ export function ClaimForm({
           <span className="min-w-0 flex-1 truncate">
             {file ? file.name : "Choose a photo or PDF"}
           </span>
-          <span className="text-caption text-muted-foreground">PDF, JPG, PNG · 10 MB</span>
+          <span className="text-caption text-muted-foreground">PDF, JPG, PNG, WebP · 8 MB</span>
           <input
             ref={fileRef}
             id={fileId}

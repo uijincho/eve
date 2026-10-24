@@ -9,7 +9,7 @@ import { EvidenceSheet } from "@/components/app/evidence-sheet";
 import { PayoutBreakdown } from "@/components/app/inbox/item-detail";
 import { LinkButton } from "@/components/app/link-button";
 import { PageFrame } from "@/components/app/page-frame";
-import { ReasonAction } from "@/components/app/reason-action";
+import { VerifyCode } from "@/components/app/verify-code";
 import { Sheet } from "@/components/app/sheet";
 import { EmptyState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -18,7 +18,7 @@ import { Money } from "@/components/eve/money";
 import { Button } from "@/components/ui/button";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
 import { exportUrl } from "@/lib/client/api";
-import { big, canManage, canRelease, sumMinor, type Permission } from "@/lib/client/derive";
+import { big, canControl, canManage, canRelease, sumMinor, type Permission } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -191,17 +191,9 @@ function PayoutDetail({ payout: p, snapshot: s, onEvidence }: { payout: Payout; 
       <PayoutBreakdown payout={p} />
       <div className="flex flex-col gap-2 border-t pt-4">
         {p.status === "frozen" ? (
-          <ReasonAction
-            primary
-            label="Mark verified"
-            submitLabel="Confirm and unfreeze"
-            pendingLabel="Verifying"
-            prompt={`How did ${p.personName.split(" ")[0]} confirm the new account through the original channel?`}
-            permission={manage}
-            build={(r) => payloads.payoutVerify(p.id, r)}
-          />
+          <VerifyCode personId={p.personId} personName={p.personName} permission={manage} primary />
         ) : p.status === "failed" || p.status === "returned" ? (
-          <ActionButton wide size="default" variant="default" label="Retry payout" pendingLabel="Retrying" permission={manage} call={payloads.payoutRetry(p.id)} />
+          <ActionButton wide size="default" variant="default" label="Retry payout" pendingLabel="Retrying" permission={canControl(s.actor, s)} call={payloads.payoutRetry(p.id)} />
         ) : p.status === "proposed" || p.status === "approved" || p.status === "held" ? (
           <ActionButton wide size="default" variant="default" label="Release payout" pendingLabel="Releasing" permission={release} call={payloads.payoutRelease([p.id])} />
         ) : null}
