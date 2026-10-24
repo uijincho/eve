@@ -7,8 +7,8 @@ import { useMemo, useState } from "react";
 import { EvidenceSheet } from "@/components/app/evidence-sheet";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import type { Decision } from "@/lib/contracts";
-import { groupRuns, objectLabel, runCounters, type Run } from "@/lib/client/derive";
+import type { AppSnapshot, Decision } from "@/lib/contracts";
+import { groupRuns, objectLabel, runCounters, runLine, runSubject, type Run } from "@/lib/client/derive";
 import { fmtTime } from "@/lib/client/format";
 import { useEve, useLivePolling } from "@/lib/client/use-eve";
 
@@ -81,7 +81,7 @@ export function AgentFeed({ variant = "rail", limit }: { variant?: "rail" | "pag
       {shown.length ? (
         <ol aria-label="Agent runs" aria-live="polite" className="flex flex-col divide-y rounded-xl border">
           {shown.map((run) => (
-            <RunEntry key={run.runId} run={run} onStep={setEvidence} />
+            <RunEntry key={run.runId} run={run} onStep={setEvidence} snapshot={snapshot} />
           ))}
         </ol>
       ) : (
@@ -110,7 +110,7 @@ function Counter({ label, value }: { label: string; value: number }) {
   );
 }
 
-function RunEntry({ run, onStep }: { run: Run; onStep: (d: Decision) => void }) {
+function RunEntry({ run, onStep, snapshot }: { run: Run; onStep: (d: Decision) => void; snapshot: AppSnapshot }) {
   const live = run.status === "running";
   const [open, setOpen] = useState(live);
   const expanded = open || live;
@@ -128,10 +128,8 @@ function RunEntry({ run, onStep }: { run: Run; onStep: (d: Decision) => void }) 
           className={cn("mt-0.5 size-3.5 text-muted-foreground transition-transform duration-150", expanded && "rotate-90")}
         />
         <span className="flex min-w-0 flex-col">
-          <span className="truncate text-small font-medium">
-            {objectLabel(run)}
-          </span>
-          {!expanded ? <span className="truncate text-caption text-muted-foreground">{last.summary}</span> : null}
+          <span className="truncate text-small font-medium">{runSubject(run, snapshot)}</span>
+          {!expanded ? <span className="truncate text-caption text-muted-foreground" title={last.summary}>{runLine(run, snapshot)}</span> : null}
         </span>
         <RunStatus run={run} />
       </button>

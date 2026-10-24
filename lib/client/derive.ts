@@ -67,7 +67,7 @@ export function payoutSource(s: Pick<AppSnapshot, "awards" | "claims">, p: Pick<
 const OBJECT_LABEL: Record<string, string> = {
   payout: "Payout", claim: "Claim", award: "Prize", packet: "Sponsor packet", sponsor_packet: "Sponsor packet",
   person: "Person", period: "Period", filing: "Filing", org: "Settings", event: "Event", budget: "Budget",
-  invitation: "Invitation", people: "People import", member: "Team", tax_profile: "Tax form", payout_method: "Payout account",
+  invitation: "Invitation", people: "People import", filings: "Filing drafts", member: "Team", tax_profile: "Tax form", payout_method: "Payout account",
 };
 
 /** "Priya Raman · Payout" for an agent run or decision, instead of its database id. */
@@ -514,6 +514,52 @@ export type Run = {
   steps: Decision[];
 };
 
+const firstSentence = (t: string) => (t.match(/^.*?[.!?](\s|$)/)?.[0] ?? t).trim();
+
+/**
+ * The agent rail's subject for a run: who or what it is about, plus the amount
+ * or count, in sentence case ("Quinn Davis · payout $600.00", "Filing drafts 2026").
+ */
+export function runSubject(run: Run, s: Pick<AppSnapshot, "payouts" | "packets">): string {
+  const last = run.steps[run.steps.length - 1];
+  if (run.objectType === "filings") {
+    const year = run.steps.map((d) => d.facts?.year).find(Boolean);
+    return `Filing drafts${year ? ` ${String(year)}` : ""}`;
+  }
+  if (run.objectType === "payout") {
+    const p = s.payouts.find((x) => x.id === run.objectId);
+    const who = run.personName || p?.personName || "Payout";
+    return p ? `${who} · payout ${fmtPlain(payoutValue(p), p.currency)}` : `${who} · payout`;
+  }
+  if (run.objectType === "packet" || run.objectType === "sponsor_packet") {
+    const k = s.packets.find((x) => x.id === run.objectId);
+    return k ? `Sponsor packet · ${k.personName} ${fmtPlain(big(k.requestedMinor), "USD")}` : "Sponsor packet";
+  }
+  void last;
+  return objectLabel(run);
+}
+
+/** A short line that survives truncation: what happened last, not the full explanation. */
+export function runLine(run: Run, s: Pick<AppSnapshot, "payouts">): string {
+  const last = run.steps[run.steps.length - 1];
+  const p = run.objectType === "payout" ? s.payouts.find((x) => x.id === run.objectId) : undefined;
+  const amount = p ? ` ${fmtPlain(payoutValue(p), p.currency)}` : "";
+  if (run.objectType === "filings") {
+    const count = Number(last.facts?.count ?? NaN);
+    if (Number.isFinite(count)) return count === 0 ? "No new filings to draft" : `Drafted ${count} ${count === 1 ? "filing" : "filings"}`;
+  }
+  switch (last.tool) {
+    case "waitForController":
+      return last.status === "waiting" ? `Awaiting controller release${amount}` : last.status === "escalated" ? `Release stopped: ${firstSentence(last.summary)}` : "Release request closed; quote changed";
+    case "queueControllerRelease":
+      return `Release queued${amount}`;
+    case "executePayout":
+      return last.status === "done" ? (/^Released/.test(last.summary) ? firstSentence(last.summary).replace(/ via simulated provider.*$/, "").replace(/\.$/, "") : `Release approved${amount}`) : firstSentence(last.summary);
+    default:
+      return firstSentence(last.summary).replace(/(\d+) filing\(s\)/, (_, n) => `${n} ${n === "1" ? "filing" : "filings"}`);
+  }
+}
+
 export function groupRuns(decisions: Decision[]): Run[] {
   const runs = new Map<string, Decision[]>();
   for (const d of decisions) {
@@ -529,7 +575,8 @@ export function groupRuns(decisions: Decision[]): Run[] {
         runId,
         objectId: last.objectId,
         objectType: last.objectType,
-        personName: last.personName,
+        // The newest step can lack a person (a workflow resume); use any step that names one.
+        personName: last.personName || [...sorted].reverse().find((d) => d.personName)?.personName || "",
         status: last.status,
         startedAt: sorted[0].createdAt,
         updatedAt: last.createdAt,

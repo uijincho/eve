@@ -26,7 +26,7 @@ export function PortalPrizes() {
               return (
                 <Section key={a.id} title={awardName(a)} aside={<span className="inline-flex items-center gap-2"><StatusBadge status={a.status} />{a.status === "paid" ? null : <DueChip due={a.dueAt} now={s.now} align="end" />}</span>}>
                   <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_16rem]">
-                    <PrizeComparison snapshot={s} award={a} person={me} payout={payout} />
+                    <PrizeComparison snapshot={s} award={a} person={me} payout={payout} self />
                     <div className="flex flex-col gap-4">
                       {me.taxStatus !== "valid" ? (
                         <div className="flex flex-col gap-2 rounded-lg border p-3">

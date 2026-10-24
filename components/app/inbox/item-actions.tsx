@@ -32,21 +32,24 @@ export function ItemActions({
   snapshot,
   layout,
   onEvidence,
+  showEvidence = true,
 }: {
   item: InboxItem;
   snapshot: AppSnapshot;
   layout: "row" | "pane";
   onEvidence: () => void;
+  /** Phone rows open Details, which carries the evidence link, so they leave it out to stay on one line. */
+  showEvidence?: boolean;
 }) {
   const { actor } = snapshot;
   const pane = layout === "pane";
   const first = pane ? ("default" as const) : ("secondary" as const);
   const wrap = cn("flex flex-wrap items-center gap-2", pane && "flex-col items-start");
-  const evidence = (
+  const evidence = showEvidence ? (
     <Button size="sm" variant="ghost" onClick={onEvidence}>
       View evidence
     </Button>
-  );
+  ) : null;
   const ref = item.ref;
 
   switch (ref.kind) {

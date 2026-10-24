@@ -16,8 +16,11 @@ export function PrizeComparison({
   award,
   person,
   payout,
+  self,
   className,
 }: {
+  /** The recipient is reading about their own prize: speak to them, not about them. */
+  self?: boolean;
   snapshot: AppSnapshot;
   award: Award;
   person?: Person;
@@ -29,6 +32,7 @@ export function PrizeComparison({
   const o = prizeOptions(snapshot, award, person, inKind ? undefined : payout);
   const rule = inKind ? (snapshot.rules.find((r) => r.id === payout.ruleId && r.version === payout.ruleVersion) ?? o.rule) : o.rule;
   const first = award.personName.split(" ")[0];
+  const them = self ? "you" : first;
   const fees = payout ? payoutFees(payout) : { recipient: 0n, org: 0n };
   const fee = fees.recipient;
   const ruleSource = rule
@@ -39,14 +43,14 @@ export function PrizeComparison({
     <div className={cn("flex flex-col gap-6", className)}>
       <section className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className="font-semibold">{inKind ? `What ${first} received, as reported income` : `What ${first} receives as cash`}</h3>
+          <h3 className="font-semibold">{inKind ? `What ${them} received, as reported income` : `What ${them} ${self ? "receive" : "receives"} as cash`}</h3>
           {inKind ? <TruthLabel kind="simulated" /> : o.fromPayout ? null : <TruthLabel kind="estimate" />}
         </div>
         <BreakdownBar
           grossMinor={Number(inKind ? BigInt(payout.grossMinor) : o.gross)}
           currency={inKind ? payout.currency : o.currency}
           estimate={!inKind && !o.fromPayout}
-          netLabel={inKind ? `Item value delivered to ${first}` : `${o.fromPayout ? "Net" : "Est. net"} to ${first}`}
+          netLabel={inKind ? `Item value delivered to ${them}` : `${o.fromPayout ? "Net" : "Est. net"} to ${them}`}
           deductions={[
             {
               label: inKind ? "Withholding the organization pays on top" : rule ? `Withholding, ${fmtRate(rule.rateBps)}` : "Withholding",
@@ -110,7 +114,7 @@ export function PrizeComparison({
             </Option>
           </dl>
           <p className="text-small text-muted-foreground">
-            The item&rsquo;s fair market value counts toward {first}&rsquo;s reportable prize total either way.
+            The item&rsquo;s fair market value counts toward {self ? "your" : `${first}’s`} reportable prize total either way.
           </p>
         </section>
       ) : null}

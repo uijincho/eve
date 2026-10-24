@@ -6,8 +6,8 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/app/status-badge";
 import { DueChip } from "@/components/eve/due-chip";
 import { Money } from "@/components/eve/money";
-import type { AppSnapshot, Person } from "@/lib/contracts";
-import { awardName, big, prizeOptions, payoutSource, providerLabel, isInKind, payoutValue, claimReasonText } from "@/lib/client/derive";
+import type { AppSnapshot, Award, Person } from "@/lib/contracts";
+import { awardName, big, prizeOptions, payoutSource, providerLabel, isInKind, payoutValue, claimReasonText, FULFILLMENT_LABEL, fmtPlain } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 
 import { PortalFrame } from "./portal-frame";
@@ -23,7 +23,7 @@ function todos(s: AppSnapshot, me: Person): Todo[] {
   if (frozen) list.push({ id: "frozen", title: "Confirm your new bank details", detail: "Enter the code we sent to your original email. Your payout is frozen until then.", href: "/portal/payouts", dueAt: frozen.dueAt, critical: "Frozen" });
   if (!me.payoutLast4) list.push({ id: "bank", title: "Add a payout account", detail: `Choose where to receive money, in ${me.payoutCurrency || "your currency"}.`, href: "/portal/payouts" });
   for (const a of s.awards.filter((x) => x.personId === me.id)) {
-    if (a.kind === "item" && a.fulfillment === "undecided") list.push({ id: `a-${a.id}`, title: `Choose how to receive your ${a.title}`, detail: a.recommendation || "Ship it, buy it locally, or take cash.", href: "/portal/prizes", dueAt: a.dueAt });
+    if (a.kind === "item" && a.fulfillment === "undecided") list.push({ id: `a-${a.id}`, title: `Choose how to receive your ${a.title}`, detail: prizeTaskLine(s, a, me), href: "/portal/prizes", dueAt: a.dueAt });
     if (a.teamId && !a.splitConfirmed) list.push({ id: `s-${a.id}`, title: "Confirm your team's split", detail: `${a.track}: every member confirms before payment.`, href: "/portal/prizes", dueAt: a.dueAt });
   }
   for (const c of s.claims.filter((x) => x.personId === me.id && x.status === "needs_info"))
@@ -118,4 +118,12 @@ export function PortalOverview() {
       }}
     </PortalFrame>
   );
+}
+
+/** One line for the to-do list; the full reasoning stays on Prizes. */
+function prizeTaskLine(s: AppSnapshot, a: Award, me: Person): string {
+  const o = prizeOptions(s, a, me);
+  const pick = o.recommended === "undecided" ? null : FULFILLMENT_LABEL[o.recommended].toLowerCase();
+  const cash = fmtPlain(o.cashNet, o.currency);
+  return pick ? `Eve recommends: ${pick} · est. ${cash} cash value` : `Ship it, buy it locally, or take est. ${cash} in cash`;
 }

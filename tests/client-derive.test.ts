@@ -260,3 +260,21 @@ describe("failed checks", () => {
     expect(item.detail).toBe("Also: Over the $300.00 auto-approve limit: $423.81.");
   });
 });
+
+describe("agent rail lines", () => {
+  it("names each run's subject and says what happened in a line that survives truncation", async () => {
+    const { groupRuns, runSubject, runLine } = await import("@/lib/client/derive");
+    const d = (over: Partial<AppSnapshot["decisions"][number]>) =>
+      ({ id: Math.random().toString(36), runId: "r1", objectId: "pay_q", objectType: "payout", personName: "", action: "", summary: "", actor: "", facts: {}, status: "done", tool: "", createdAt: "2026-10-24T10:00:00Z", ...over }) as AppSnapshot["decisions"][number];
+    const payout = { ...s.payouts[1], id: "pay_q", personName: "Quinn Davis", grossMinor: "60000", withholdingMinor: "0", netMinor: "60000", currency: "USD" };
+    const [run] = groupRuns([
+      d({ personName: "Quinn Davis", tool: "waitForController", status: "waiting", summary: "This exact payout quote is waiting for a controller.", createdAt: "2026-10-24T10:00:00Z" }),
+      d({ tool: "waitForController", status: "waiting", summary: "Still waiting.", createdAt: "2026-10-24T10:01:00Z" }),
+    ]);
+    expect(runSubject(run, { payouts: [payout], packets: [] })).toBe("Quinn Davis · payout $600.00");
+    expect(runLine(run, { payouts: [payout] })).toBe("Awaiting controller release $600.00");
+    const [filings] = groupRuns([d({ runId: "f", objectType: "filings", objectId: "2026", tool: "draftFilings", summary: "Drafted 0 filing(s) for 2026.", facts: { year: 2026, count: 0 } })]);
+    expect(runSubject(filings, { payouts: [], packets: [] })).toBe("Filing drafts 2026");
+    expect(runLine(filings, { payouts: [] })).toBe("No new filings to draft");
+  });
+});
