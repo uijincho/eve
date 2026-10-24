@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestOrg, dropTestOrg, eq, hasDatabase } from "./helpers";
-import { advanceTaxChase } from "../../lib/agent/automation";
+import { advanceTaxChase, getChaseCandidates } from "../../lib/agent/automation";
 import { getDb } from "../../lib/db";
 import * as s from "../../lib/db/schema";
 import { newId } from "../../lib/db/ids";
@@ -18,6 +18,14 @@ describe.skipIf(!hasDatabase)("durable tax chase persistence", { timeout: 60_000
     generation = `${person.createdAt.getTime()}:missing`;
   }, 60_000);
   afterAll(async () => { if (orgId) await dropTestOrg(orgId); }, 60_000);
+
+  it("starts onboarding before any award and excludes minors", async () => {
+    const minorId = newId("ptest");
+    await db.insert(s.person).values({ id: minorId, orgId, name: "Synthetic Minor", email: "minor@example.test", country: "US", citizenship: "US", dateOfBirth: "2015-01-01", adult: false });
+    const targets = await getChaseCandidates(orgId);
+    expect(targets.map((target) => target.personId)).toEqual([personId]);
+    expect((await advanceTaxChase({ orgId, personId: minorId, generation: "unused" }, 0, "minor-test")).noticeIds).toHaveLength(0);
+  });
 
   it("deduplicates concurrent stages and records the next actual schedule", async () => {
     const target = { orgId, personId, generation };
@@ -43,5 +51,17 @@ describe.skipIf(!hasDatabase)("durable tax chase persistence", { timeout: 60_000
     const result = await advanceTaxChase({ orgId, personId, generation }, 2, "workflow-test-a");
     expect(result.complete).toBe(true);
     expect(result.noticeIds).toHaveLength(0);
+  });
+  it("starts a new generation when an existing signed form becomes invalid", async () => {
+    expect(await getChaseCandidates(orgId)).toHaveLength(0);
+    await db.update(s.taxProfile).set({ status: "review" }).where(eq(s.taxProfile.personId, personId));
+    const [target] = await getChaseCandidates(orgId);
+    expect(target.personId).toBe(personId);
+    const firstGeneration = target.generation;
+    await advanceTaxChase(target, 10, "profile-review-first");
+    expect(await getChaseCandidates(orgId)).toHaveLength(0);
+    await db.update(s.taxProfile).set({ status: "expired" }).where(eq(s.taxProfile.personId, personId));
+    const [expired] = await getChaseCandidates(orgId);
+    expect(expired.generation).not.toBe(firstGeneration);
   });
 });

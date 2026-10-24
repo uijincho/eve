@@ -25,7 +25,9 @@ With `EVE_DEMO_MODE=true`, `/login` offers sample organizer, controller, auditor
 3. Inspect the persisted gross, withholding, fees and net. Switch to the controller to release the proposal. The organizer and agent cannot release it.
 4. Inspect the decision evidence, payout status and ledger export. Generate filing drafts from **Filings**.
 5. Inspect Jordan's frozen bank change. Verification belongs to the original contact channel; confirming it still requires a fresh controller release.
-6. Run the event review in **Agent** and inspect the measured scoreboard. Its values reflect current database state, so earlier interaction changes the result. The demo reset clears only the fictional organization.
+6. Run the event review in **Agent** and inspect the measured scoreboard. It shows the last evaluated run, with its timestamp; later interactions change the next run's result. The demo reset clears only the fictional organization.
+
+A real attendee can enroll their first simulated payout account in the portal. Replacing an account, or entering one as staff, requires confirmation through the original email; without a configured email provider, that change remains frozen. Importing adult attendees starts tax-form reminders; organizers share the portal invitation links from People.
 
 The shared sample event may already contain completed demo actions. Reset only when nobody else is using it. Real organizations are excluded from reset.
 

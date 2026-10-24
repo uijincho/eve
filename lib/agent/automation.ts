@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/db";
 import * as s from "@/lib/db/schema";
@@ -12,7 +12,8 @@ export interface ChaseTarget { orgId: string; personId: string; generation: stri
 export interface ChaseAdvance { complete: boolean; noticeIds: string[]; reason: string }
 
 function generationFor(person: typeof s.person.$inferSelect, profile?: typeof s.taxProfile.$inferSelect): string {
-  return `${person.createdAt.getTime()}:${profile?.id ?? "missing"}`;
+  const form = profile ? `${profile.id}:${profile.status}:${profile.signedAt?.getTime() ?? "unsigned"}:${profile.expiresAt?.getTime() ?? "no-expiry"}` : "missing";
+  return `${person.createdAt.getTime()}:${form}`;
 }
 
 export function taxNeedsAttention(profile: { status: string; signedAt: Date | null; expiresAt: Date | null } | undefined, now = new Date()): "missing" | "expired" | "review" | "expiring" | null {
@@ -26,22 +27,21 @@ export function taxNeedsAttention(profile: { status: string; signedAt: Date | nu
 /** Only internal callers may choose an organization. No PII enters workflow arguments. */
 export async function getChaseCandidates(orgId: string): Promise<ChaseTarget[]> {
   const db = getDb();
-  const [people, profiles, awards, payouts, notices] = await Promise.all([
+  const [people, profiles, notices] = await Promise.all([
     db.select().from(s.person).where(eq(s.person.orgId, orgId)),
     db.select().from(s.taxProfile).where(and(eq(s.taxProfile.orgId, orgId), isNull(s.taxProfile.supersededAt))),
-    db.select({ personId: s.award.personId }).from(s.award).where(and(eq(s.award.orgId, orgId), inArray(s.award.status, ["draft", "needs_form", "ready", "proposed"]))),
-    db.select({ personId: s.payout.personId }).from(s.payout).where(and(eq(s.payout.orgId, orgId), inArray(s.payout.status, ["held", "proposed", "frozen"]))),
     db.select({ id: s.notice.id }).from(s.notice).where(eq(s.notice.orgId, orgId)),
   ]);
-  const awaiting = new Set([...awards, ...payouts].map((row) => row.personId));
   const byPerson = new Map(profiles.map((profile) => [profile.personId, profile]));
   const noticeIds = new Set(notices.map((notice) => notice.id));
   return people.flatMap((person) => {
+    if (!person.adult) return [];
     const profile = byPerson.get(person.id);
     const attention = taxNeedsAttention(profile);
     const generation = generationFor(person, profile);
     if (noticeIds.has(`ntc_${idFor(`tax:${orgId}:${person.id}:${generation}:10:portal`)}`)) return [];
-    return attention && (awaiting.has(person.id) || attention === "expiring")
+    // Import starts tax onboarding before a winner or payout exists.
+    return attention
       ? [{ orgId, personId: person.id, generation }] : [];
   });
 }
@@ -54,6 +54,7 @@ export async function advanceTaxChase(target: ChaseTarget, day: number, runId: s
     if (!org) return { complete: true, noticeIds: [], reason: "Organization no longer exists." };
     const [person] = await tx.select().from(s.person).where(and(eq(s.person.id, target.personId), eq(s.person.orgId, target.orgId))).for("no key update");
     if (!person) return { complete: true, noticeIds: [], reason: "Person no longer exists." };
+    if (!person.adult) return { complete: true, noticeIds: [], reason: "This person is under 18 at the event. Tax onboarding and payments remain blocked." };
     const [profile] = await tx.select().from(s.taxProfile).where(and(eq(s.taxProfile.personId, person.id), isNull(s.taxProfile.supersededAt)));
     if (generationFor(person, profile) !== target.generation) return { complete: true, noticeIds: [], reason: "A newer profile or demo reset superseded this reminder." };
     const attention = taxNeedsAttention(profile);
@@ -67,7 +68,7 @@ export async function advanceTaxChase(target: ChaseTarget, day: number, runId: s
     const title = attention === "expiring" ? "Your tax form expires soon" : "Your tax form needs attention";
     const body = attention === "expiring"
       ? "Please renew your tax form in Eve before it expires. Your existing form remains usable until its expiry date."
-      : "Open your Eve portal to complete or correct your tax form. Payment remains on hold until the form is valid. Do not send tax identifiers by email.";
+      : "Open your Eve portal to complete or correct your tax form. Ask the organizer for a portal invitation if you do not have access yet. Prizes and stipends require a valid form before payment. Do not send tax identifiers by email.";
     const noticeRows: typeof s.notice.$inferInsert[] = [
       { id: portalId, orgId: target.orgId, personId: person.id, channel: "portal", title, body, status: "sent" },
       { id: emailId, orgId: target.orgId, personId: person.id, channel: "email", title, body, status: "queued" },

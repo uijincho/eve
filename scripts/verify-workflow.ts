@@ -90,6 +90,16 @@ async function main() {
       return runs.some((row) => row.status === "done") ? true : null;
     }, "automatic review completion");
     console.log("Entering a winner triggered a durable payout proposal without pressing Run Eve; money stayed behind controller approval.");
+    const imported = await action(organizerId, "people.import", { people: [{ name: "Synthetic Imported Attendee", email: "imported@example.test", country: "CA", citizenship: "CA", dateOfBirth: "2000-01-01" }] });
+    assert.equal(imported.status, 200, imported.body.message);
+    const [newPerson] = await db.select().from(s.person).where(and(eq(s.person.orgId, orgId), eq(s.person.email, "imported@example.test")));
+    await until(async () => {
+      const [notice] = await db.select().from(s.notice).where(and(eq(s.notice.orgId, orgId), eq(s.notice.personId, newPerson.id), eq(s.notice.channel, "portal")));
+      return notice ?? null;
+    }, "automatic imported-attendee onboarding");
+    const unawarded = await db.select().from(s.payout).where(and(eq(s.payout.orgId, orgId), eq(s.payout.personId, newPerson.id)));
+    assert.equal(unawarded.length, 0);
+    console.log("Importing an adult started a durable tax-form reminder before any prize or payout existed.");
   } finally {
     await db.transaction((tx) => purgeOrg(tx, orgId, { deleteOrg: true }));
     await db.$pool.end();
