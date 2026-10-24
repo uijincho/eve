@@ -27,6 +27,8 @@ The benchmark records the last evaluated run. Your actions change the sample sta
 - Combined suite: **238 tests passed across 32 files**, including real Postgres tests. Typecheck and lint passed. The preview production build passed at source `1e36ec1`.
 - [Deployed account acceptance](preview-account-acceptance.md): 56 HTTPS checks against the earlier `8d8ec80` preview.
 - [Deployed Workflow acceptance](preview-workflow-acceptance.md): 21 HTTPS checks proving automatic proposal, controller release, settlement and idempotent replay against that earlier preview.
+- [Current preview financial acceptance](preview-financial-acceptance.md): 31 checks over 34 HTTPS requests at `1e36ec1`. Two $1,500 prizes for a December 2025 event were paid under 2026 rules, withholding $0 and $360, with a $3,000 / $360 1099-MISC draft and four balanced journals.
+- [Independent financial review, round 3](review-financial-r3.md): no high or medium findings on `81c4d73`; the two low Canadian threshold findings are tracked in the implementation record.
 - [Implementation record](../IMPLEMENTATION.md) tracks later independent reviews and deployment validation. [Requirement coverage](requirement-coverage.md) records the implemented scope and remaining work.
 
 ## Boundaries to keep visible
