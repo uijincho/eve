@@ -45,3 +45,26 @@ export function initials(name: string): string {
     .map((p) => p[0]?.toUpperCase())
     .join("");
 }
+
+/** ISO instant to a datetime-local value in the browser's zone. */
+export function toLocalInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** datetime-local value back to an ISO instant, or undefined when blank. */
+export function fromLocalInput(v: string): string | undefined {
+  if (!v) return undefined;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
+/** Integer minor units to an editable decimal string ("129900" -> "1299.00"). */
+export function minorToInput(minor?: string | null): string {
+  if (!minor) return "";
+  const n = BigInt(minor);
+  return `${n / 100n}.${(n % 100n).toString().padStart(2, "0")}`;
+}
