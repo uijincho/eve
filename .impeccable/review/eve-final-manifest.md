@@ -1,6 +1,6 @@
 # Eve final captures
 
-Source: root `main` at `680aeca`, served by the root dev server at `http://localhost:3000`, against the settled shared demo produced by `pnpm verify:demo --reset` (300 people, 160 claims, 25 awards; 40/40 caught, 0 false positives, 0 wrongful payouts). Captured 2026-10-24 about 12:05 UTC with headless Chromium (playwright-core 1.58, chrome-headless-shell 1248), after two T3 preview snapshot timeouts. Nothing was mutated: each capture only set a demo persona cookie and navigated.
+Source: UI source `8fc803e` (finish-review round 1 fixes, on top of `a9a46ec`), served by a freshly started dev server with a cleared `.next` cache at `http://localhost:3210` from the UI worktree, against the same settled shared demo database produced by `pnpm verify:demo --reset` (300 people, 160 claims, 25 awards; 40/40 caught, 0 false positives, 0 wrongful payouts). The root server on `:3000` was serving a stale CSS chunk at the time, so it was not used. Captured 2026-10-24 about 12:25 UTC with headless Chromium (playwright-core 1.58, chrome-headless-shell 1248), after two T3 preview snapshot timeouts. Nothing was mutated: each capture only set a demo persona cookie and navigated.
 
 Every capture waited for its route's ready text, then 2.5 s to settle, and starts at the top of the page. Desktop captures use device scale 1; mobile captures use an iPhone-class 390 x 844 viewport at device scale 2, so their files are 780 px wide.
 
@@ -24,6 +24,5 @@ Notes for the reviewer:
 
 - Prize detail is a fixed sheet over the prize list, so it is captured at the viewport. A full-page capture showed the sheet's overlay over only the first screen and cut the mobile sheet mid-panel; those were rejected. It shows Priya Raman's unresolved First Overall MacBook Air (needs form, fulfilment undecided, payout locked until the W-8BEN is signed).
 - The round "N" badge in the lower left of every capture is the Next.js development indicator from the dev server, not part of the product.
-- One portal desktop capture showed a transient development "1 Issue" badge during the persona switch; it did not reproduce on two clean loads and was recaptured clean.
-- Settings shows the Team section's real demo-mode response: member lists need a real account, so the sample organization shows "Sign in with your account to view members."
+- Settings shows the Team section's neutral sample-organization note (no member list, invitations off).
 - The pinned Blue Hour reference (`critique-reference-blue-hour.png`) and the mock are unchanged.
