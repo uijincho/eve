@@ -70,8 +70,11 @@ async function main() {
     assert.equal(replay.status, 200);
     const approvals = await db.select().from(s.approval).where(eq(s.approval.orgId, orgId));
     const journals = await db.select().from(s.journalEntry).where(eq(s.journalEntry.orgId, orgId));
+    const requests = await db.select().from(s.decisionLog).where(and(eq(s.decisionLog.orgId, orgId), eq(s.decisionLog.tool, "queueControllerRelease")));
     assert.equal(approvals.length, 2);
     assert.equal(journals.length, 4);
+    assert.equal(requests.length, 2);
+    assert(requests.every((request) => request.actorRole === "controller" && request.facts.approverId === controllerId));
     console.log("Controller hooks paid the two-payout batch once; retry produced no extra approvals or journals. All money simulated.");
     const entered = await action(organizerId, "award.create", { personId, track: "Automatic event", title: "Winner-entry trigger", kind: "cash", amountMinor: "25000" });
     assert.equal(entered.status, 200, entered.body.message);

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { getHookByToken, resumeHook, start } from "workflow/api";
 import { HookNotFoundError } from "workflow/errors";
@@ -5,7 +6,7 @@ import { HookNotFoundError } from "workflow/errors";
 import type { ActorContext } from "@/lib/auth/session";
 import type { ActionResult } from "@/lib/contracts";
 import { getDb } from "@/lib/db";
-import { payout, person } from "@/lib/db/schema";
+import { decisionLog, payout, person } from "@/lib/db/schema";
 import { payoutApprovalWorkflow } from "@/workflows/payout-approval";
 import { approvalToken, assertControllerApproval, loadApprovalTarget, payoutQuoteFingerprint, type ApprovalTarget } from "./payout-approval";
 
@@ -48,7 +49,27 @@ export async function queueControllerRelease(actor: ActorContext, ids: string[])
     try { assertControllerApproval(actor, row, recipient.email); }
     catch (error) { failed.push({ payoutId: id, reason: (error as Error).message }); return; }
     const target = { orgId: actor.orgId, payoutId: row.id, quoteFingerprint: payoutQuoteFingerprint(row) };
-    try { queued.push({ payoutId: id, runId: await resumeRegistered(target, actor.memberId) }); }
+    try {
+      const submittedAt = new Date();
+      const runId = await resumeRegistered(target, actor.memberId);
+      queued.push({ payoutId: id, runId });
+      // Distinguish a controller's submitted approval from a workflow that
+      // is merely waiting for one. The UI must still allow the latter.
+      const eventId = createHash("sha256").update(`${runId}:controller-queued:${actor.memberId}`).digest("hex").slice(0, 32);
+      try {
+        await getDb().insert(decisionLog).values({
+          id: `dec_${eventId}`, orgId: actor.orgId, runId, objectType: "payout", objectId: id, createdAt: submittedAt,
+          personId: row.personId, action: "Controller approval submitted",
+          summary: "The controller submitted this quote for final checks. The payment is not complete until settlement is recorded.",
+          actor: actor.name, actorRole: actor.role, status: "running", tool: "queueControllerRelease",
+          facts: { quoteFingerprint: target.quoteFingerprint, approverId: actor.memberId },
+        }).onConflictDoNothing();
+      } catch {
+        // The hook is already resumed. A feed write must not misreport that
+        // committed request as rejected; execution records its own evidence.
+        console.warn("[workflow] Release request queued; activity update unavailable.");
+      }
+    }
     catch {
       const [latest] = await getDb().select({ status: payout.status }).from(payout).where(and(eq(payout.id, id), eq(payout.orgId, actor.orgId)));
       if (latest?.status === "paid") completed.push(id);
