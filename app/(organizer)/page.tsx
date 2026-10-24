@@ -1,10 +1,10 @@
-// Organizer inbox. The PRD makes the inbox the organizer home page, so it
-// lives at `/`. Placeholder until the queue is built.
+import type { Metadata } from "next";
+
+import { InboxView } from "@/components/app/inbox/inbox-view";
+
+export const metadata: Metadata = { title: "Inbox · Eve" };
+
+// The PRD makes the inbox the organizer's home page.
 export default function InboxPage() {
-  return (
-    <main>
-      <h1>Eve</h1>
-      <h2>Inbox</h2>
-    </main>
-  );
+  return <InboxView />;
 }

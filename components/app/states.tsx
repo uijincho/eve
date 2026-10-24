@@ -1,0 +1,60 @@
+"use client";
+
+import { RotateCwIcon } from "lucide-react";
+
+import { LinkButton } from "@/components/app/link-button";
+import { Button } from "@/components/ui/button";
+import type { ApiError } from "@/lib/client/api";
+
+/** Row skeletons at the geometry of a real list row. */
+export function ListSkeleton({ rows = 5, label = "Loading" }: { rows?: number; label?: string }) {
+  return (
+    <div role="status" aria-label={label} className="overflow-hidden rounded-xl border">
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} aria-hidden className="grid grid-cols-[minmax(0,1fr)_6rem] gap-6 border-b px-4 py-4 last:border-b-0">
+          <div className="flex flex-col gap-2 py-0.5">
+            <span className="h-3.5 w-2/5 animate-pulse rounded-sm bg-surface-hover" />
+            <span className="h-3 w-3/5 animate-pulse rounded-sm bg-surface" />
+          </div>
+          <span className="h-3.5 w-16 animate-pulse justify-self-end rounded-sm bg-surface-hover" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ErrorState({ error, onRetry }: { error: ApiError; onRetry?: () => void }) {
+  const signedOut = error.status === 401 || error.status === 403;
+  return (
+    <div role="alert" className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-input px-5 py-6">
+      <p className="font-semibold">{signedOut ? "Choose a sample persona to continue" : "Eve could not load this page"}</p>
+      <p className="max-w-[56ch] text-small text-muted-foreground">
+        {signedOut
+          ? "This demo needs a sample session. Pick an organizer, controller, attendee, or auditor persona."
+          : `${error.message}. Your data is unchanged; try again in a moment.`}
+      </p>
+      <div className="flex gap-2">
+        {signedOut ? (
+          <LinkButton size="sm" variant="secondary" href="/login">
+            Choose a persona
+          </LinkButton>
+        ) : null}
+        {onRetry ? (
+          <Button size="sm" variant="ghost" onClick={onRetry}>
+            <RotateCwIcon aria-hidden />
+            Try again
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export function EmptyState({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-dashed border-input px-5 py-8">
+      <p className="font-semibold">{title}</p>
+      <p className="mt-1 max-w-[60ch] text-small text-muted-foreground">{children}</p>
+    </div>
+  );
+}

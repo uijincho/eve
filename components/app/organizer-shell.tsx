@@ -1,0 +1,189 @@
+"use client";
+
+import { cn } from "cn";
+import { MenuIcon } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useMemo, useState } from "react";
+
+import { PersonaSwitcher } from "@/components/app/persona-switcher";
+import { Sheet } from "@/components/app/sheet";
+import { TruthLabel } from "@/components/eve/truth-label";
+import { Button } from "@/components/ui/button";
+import { buildInbox } from "@/lib/client/derive";
+import { fmtDate } from "@/lib/client/format";
+import { useEve } from "@/lib/client/use-eve";
+
+type NavItem = { href: string; label: string; count?: (n: Counts) => number };
+type Counts = { inbox: number; claims: number; payouts: number; prizes: number; sponsor: number };
+
+const PRIMARY: NavItem[] = [
+  { href: "/", label: "Inbox", count: (n) => n.inbox },
+  { href: "/claims", label: "Claims", count: (n) => n.claims },
+  { href: "/prizes", label: "Prizes", count: (n) => n.prizes },
+  { href: "/payouts", label: "Payouts", count: (n) => n.payouts },
+  { href: "/people", label: "People" },
+  { href: "/budget", label: "Budget" },
+  { href: "/sponsor", label: "Sponsor", count: (n) => n.sponsor },
+];
+const SECONDARY: NavItem[] = [
+  { href: "/audit", label: "Audit trail" },
+  { href: "/filings", label: "Filings" },
+  { href: "/agent", label: "Agent" },
+  { href: "/settings", label: "Settings" },
+];
+const SETUP: NavItem[] = [
+  { href: "/setup", label: "Organization setup" },
+  { href: "/events/new", label: "Event setup" },
+];
+
+export function OrganizerShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const { snapshot } = useEve();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const counts = useMemo<Counts | null>(() => {
+    if (!snapshot) return null;
+    return {
+      inbox: buildInbox(snapshot).length,
+      claims: snapshot.claims.filter((c) => c.status === "escalated" || c.status === "needs_info").length,
+      prizes: snapshot.awards.filter((a) => a.status !== "paid" && a.status !== "proposed").length,
+      payouts: snapshot.payouts.filter((p) => ["proposed", "approved", "frozen", "failed", "held"].includes(p.status)).length,
+      sponsor: snapshot.packets.filter((p) => p.status === "exception" || p.status === "questioned").length,
+    };
+  }, [snapshot]);
+
+  const current = [...PRIMARY, ...SECONDARY, ...SETUP].find((n) => isCurrent(pathname, n.href));
+  const attendeeHere = snapshot?.actor.role === "attendee";
+
+  const nav = (onNavigate?: () => void) => (
+    <nav aria-label="Organizer" className="flex flex-col gap-0.5">
+      {PRIMARY.filter((n) => n.href !== "/sponsor" || snapshot?.org.mode !== "direct").map((n) => (
+        <NavLink key={n.href} item={n} counts={counts} pathname={pathname} onNavigate={onNavigate} />
+      ))}
+      <hr className="mx-2 my-2 border-border" />
+      {SECONDARY.map((n) => (
+        <NavLink key={n.href} item={n} counts={counts} pathname={pathname} onNavigate={onNavigate} />
+      ))}
+      <hr className="mx-2 my-2 border-border" />
+      {SETUP.map((n) => (
+        <NavLink key={n.href} item={n} counts={counts} pathname={pathname} onNavigate={onNavigate} />
+      ))}
+    </nav>
+  );
+
+  const eventCard = snapshot ? (
+    <div className="flex flex-col rounded-lg border bg-background px-2.5 py-2">
+      <span className="text-small font-semibold">{snapshot.event.name}</span>
+      <span className="text-caption text-muted-foreground">
+        {fmtDate(snapshot.event.startsAt)} to {fmtDate(snapshot.event.endsAt, true)}
+      </span>
+      <span className="text-caption text-muted-foreground">{snapshot.event.venue}</span>
+    </div>
+  ) : (
+    <div aria-hidden className="h-[4.25rem] animate-pulse rounded-lg bg-surface" />
+  );
+
+  return (
+    <div className="flex min-h-dvh flex-col xl:grid xl:grid-cols-[11rem_minmax(0,1fr)]">
+      <a
+        href="#main"
+        className="sr-only z-50 rounded-md bg-foreground px-3 py-2 text-background focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+      >
+        Skip to content
+      </a>
+
+      {/* Wide: the rail. */}
+      <aside className="sticky top-0 hidden h-dvh flex-col gap-4 overflow-y-auto border-r bg-rail px-3 pt-4 pb-3 xl:flex">
+        <Brand demo={snapshot?.demo} />
+        {eventCard}
+        {nav()}
+        <div className="mt-auto border-t pt-3">
+          <PersonaSwitcher />
+        </div>
+      </aside>
+
+      {/* Narrow: a top bar with the same navigation in a sheet. */}
+      <header className="sticky top-0 z-30 flex h-12 items-center gap-2 border-b bg-rail px-2 xl:hidden">
+        <Button variant="ghost" size="icon" aria-label="Open navigation" onClick={() => setMenuOpen(true)}>
+          <MenuIcon aria-hidden />
+        </Button>
+        <Brand demo={snapshot?.demo} compact />
+        <span aria-hidden className="text-border">/</span>
+        <span className="truncate text-small font-medium">{current?.label ?? ""}</span>
+        {counts && current?.href !== "/" && counts.inbox ? (
+          <Link
+            href="/"
+            className="ml-auto rounded-md px-2 py-1 text-small text-muted-foreground hover:text-foreground"
+          >
+            Inbox <span className="tabular-nums text-foreground">{counts.inbox}</span>
+          </Link>
+        ) : null}
+      </header>
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="Eve" side="left" description={snapshot?.event.name}>
+        <div className="flex flex-col gap-4">
+          {nav(() => setMenuOpen(false))}
+          <div className="border-t pt-3">
+            <PersonaSwitcher />
+          </div>
+        </div>
+      </Sheet>
+
+      <div id="main" className="flex min-w-0 flex-1 flex-col">
+        {attendeeHere ? (
+          <p role="note" className="border-b bg-surface px-4 py-2 text-small text-muted-foreground sm:px-6">
+            Your sample persona is an attendee, so organizer data is hidden.{" "}
+            <Link href="/portal" className="font-medium text-foreground underline">
+              Open your portal
+            </Link>
+          </p>
+        ) : null}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Brand({ demo, compact }: { demo?: boolean; compact?: boolean }) {
+  return (
+    <div className={cn("flex items-center justify-between gap-2", !compact && "px-1")}>
+      <Link href="/" className={cn("rounded-md font-semibold tracking-[-0.01em]", compact ? "text-subheading" : "text-heading")}>
+        Eve
+      </Link>
+      {demo && !compact ? <TruthLabel kind="sample" /> : null}
+    </div>
+  );
+}
+
+function isCurrent(pathname: string, href: string) {
+  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function NavLink({
+  item,
+  counts,
+  pathname,
+  onNavigate,
+}: {
+  item: NavItem;
+  counts: Counts | null;
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const active = isCurrent(pathname, item.href);
+  const n = counts && item.count ? item.count(counts) : 0;
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex min-h-8 items-center justify-between rounded-md px-2 py-1.5 text-small transition-colors duration-150 hover:text-foreground",
+        active ? "bg-surface font-medium text-foreground" : "text-muted-foreground",
+      )}
+    >
+      {item.label}
+      {n ? <span className="text-caption tabular-nums text-muted-foreground">{n}</span> : null}
+    </Link>
+  );
+}
