@@ -18,7 +18,7 @@ import type { Check, FareReview } from "@/lib/contracts";
 import type { Executor } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
-import { FARE_FLAG_CODES, fareQuestion } from "@/lib/engines/fare-anomaly";
+import { FARE_FLAG_CODES, fareQuestion, type MarketSnapshot } from "@/lib/engines/fare-anomaly";
 import { destinationFor } from "@/lib/flights";
 
 import {
@@ -115,6 +115,8 @@ export function evaluate(input: {
   budget?: { name: string; remainingMinor: bigint };
   /** Travel claims from the same event and origin, for the peer fare check. Omitted, the check does not run. */
   farePeers?: ClaimRow[];
+  /** Market snapshots for the claim's route. Omitted, the market check does not run. */
+  fareSnapshots?: MarketSnapshot[];
 }): { checks: Check[]; status: ClaimRow["status"]; reason: string; fareReview?: FareReview } {
   const { claim, person, org, event } = input;
   const ev = (claim.extracted ?? {}) as Partial<ClaimEvidence>;
@@ -129,6 +131,7 @@ export function evaluate(input: {
     asOf: claim.createdAt.toISOString(),
     // Org bookings are priced by a server-verified offer, not chosen by the attendee.
     fareCandidates: claim.category === ORG_BOOKED_FLIGHT ? undefined : input.farePeers?.map((c) => toClaim(c, "")),
+    fareSnapshots: claim.category === ORG_BOOKED_FLIGHT ? undefined : input.fareSnapshots,
   });
   const checks = [...result.checks];
   const trusted = ev.source === "trusted_fixture" || ev.source === "org_booking";
@@ -161,11 +164,12 @@ export function evaluate(input: {
   const fareOnly = failed.some((c) => FARE_FLAG_CODES.has(c.code)) && failed.every((c) => FARE_FLAG_CODES.has(c.code) || NEEDS_A_PERSON.has(c.code));
   if (fareOnly && !ev.fareReview && status === "escalated") {
     const route = claim.origin ? `${claim.origin.trim().toUpperCase()} → ${destinationFor(event.venue).airport}` : "flight";
-    const fare = result.fare;
+    const { fare, fareMarket: market } = result;
     const fareReview: FareReview = {
-      question: fareQuestion({ usdMinor: claim.usdMinor, capMinor: event.travelCapMinor, route, evidence: fare }),
+      question: fareQuestion({ usdMinor: claim.usdMinor, capMinor: event.travelCapMinor, route, evidence: fare, market }),
       askedAt: claim.createdAt.toISOString(), route,
       ...(fare ? { peerCount: fare.peerCount, medianMinor: fare.medianMinor, percentileMinor: fare.percentileMinor } : {}),
+      ...(market ? { market: { basis: market.basis, referenceMinor: market.referenceMinor, capturedOn: market.capturedOn, source: market.source, truth: market.truth, ...(market.priceOnDateMinor ? { priceOnDateMinor: market.priceOnDateMinor } : {}) } } : {}),
     };
     const first = person.name.split(" ")[0];
     return { checks, status: "needs_info", reason: `The fare looks high, so Eve asked ${first} about it before a person decides. ${failed.filter((c) => FARE_FLAG_CODES.has(c.code)).map((c) => c.detail).join(" ")}`, fareReview };
@@ -178,6 +182,21 @@ async function farePeersFor(db: Executor, claim: Pick<ClaimRow, "orgId" | "event
   if (claim.type !== "travel" || !claim.origin?.trim()) return undefined;
   return db.select().from(s.claim).where(and(eq(s.claim.orgId, claim.orgId), eq(s.claim.eventId, claim.eventId), eq(s.claim.type, "travel"),
     sql`upper(trim(${s.claim.origin})) = ${claim.origin.trim().toUpperCase()}`));
+}
+
+/** Stored market snapshots in the engine's shape. */
+export function toMarketSnapshots(rows: (typeof s.fareSnapshot.$inferSelect)[]): MarketSnapshot[] {
+  return rows.map((r) => ({
+    kind: r.kind, capturedOn: r.capturedOn, source: r.source, truth: r.truth, history: r.history,
+    ...(r.typicalHighMinor != null ? { typicalHighMinor: r.typicalHighMinor.toString() } : {}),
+    ...(r.lowestMinor != null ? { lowestMinor: r.lowestMinor.toString() } : {}),
+  }));
+}
+
+async function fareSnapshotsFor(db: Executor, claim: Pick<ClaimRow, "eventId" | "type" | "origin">): Promise<MarketSnapshot[] | undefined> {
+  if (claim.type !== "travel" || !claim.origin?.trim()) return undefined;
+  const rows = await db.select().from(s.fareSnapshot).where(and(eq(s.fareSnapshot.eventId, claim.eventId), eq(s.fareSnapshot.origin, claim.origin.trim().toUpperCase())));
+  return toMarketSnapshots(rows);
 }
 
 async function claimsForChecks(db: Executor, orgId: string, claim: Pick<ClaimRow, "personId" | "receiptHash">) {
@@ -197,7 +216,8 @@ async function applyEvaluation(tx: Executor, actor: ActorContext, claim: ClaimRo
   // Claims are in USD books; a non-USD org's limits and travel cap are converted, never compared raw.
   const books = await limitsInBooks(tx, org, event);
   const farePeers = await farePeersFor(tx, claim);
-  const result = evaluate({ claim, person, org: books.org, event: books.event, existing: rows, personNames: names, budget: budget ? { name: budget.name, remainingMinor: budget.remainingMinor } : undefined, farePeers });
+  const fareSnapshots = await fareSnapshotsFor(tx, claim);
+  const result = evaluate({ claim, person, org: books.org, event: books.event, existing: rows, personNames: names, budget: budget ? { name: budget.name, remainingMinor: budget.remainingMinor } : undefined, farePeers, fareSnapshots });
   if (claim.category === ORG_BOOKED_FLIGHT && result.status === "approved") {
     // The agent never buys tickets: an organizer approves every org booking.
     result.status = "escalated";

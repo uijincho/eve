@@ -200,6 +200,22 @@ function FareReviewPanel({ claim: c }: { claim: Claim }) {
             <dd className="text-right"><Money amountMinor={big(r.percentileMinor ?? "0")} /></dd>
           </>
         ) : null}
+        {r.market ? (
+          <>
+            <dt className="text-muted-foreground">{r.market.basis === "typical_high" ? "Market typical high" : "Cheapest tracked fare"} ({r.market.capturedOn})</dt>
+            <dd className="text-right">
+              <Evidence source={`${r.market.source === "serpapi" ? "Google Flights via SerpApi" : r.market.source === "duffel_test" ? "Duffel test mode" : "Simulated fare table"} · ${r.market.truth}`}>
+                <Money amountMinor={big(r.market.referenceMinor)} />
+              </Evidence>
+            </dd>
+            {r.market.priceOnDateMinor ? (
+              <>
+                <dt className="text-muted-foreground">Lowest on the booking date</dt>
+                <dd className="text-right"><Money amountMinor={big(r.market.priceOnDateMinor)} /></dd>
+              </>
+            ) : null}
+          </>
+        ) : null}
       </dl>
       <p><span className="font-medium">Eve asked {first}:</span> {r.question}</p>
       {r.explanation ? (

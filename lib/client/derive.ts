@@ -282,6 +282,8 @@ export function failedCheckText(c: Pick<Check, "code" | "label" | "detail">): st
       return `Close to the travel cap: ${d.replace(/^Within/, "within")}`;
     case "fare_peer":
       return `High for the route: ${stripDot(d.split(". Flag for review")[0])}`;
+    case "fare_market":
+      return `High for the market: ${stripDot(d.split(". Flag for review")[0])}`;
     case "adult": {
       const age = /^Age (\d+)/.exec(d);
       return age ? `Under 18 at event start: age ${age[1]}` : d;
@@ -310,7 +312,7 @@ export function failedCheckText(c: Pick<Check, "code" | "label" | "detail">): st
 }
 
 /** Most decisive failures first, so a row title leads with what matters most. */
-const CHECK_PRIORITY = ["adult", "duplicate", "name_match", "evidence", "cap", "cabin", "booking_deadline", "travel_dates", "budget", "agent_limit", "fare_peer", "cap_hugging", "receipt"];
+const CHECK_PRIORITY = ["adult", "duplicate", "name_match", "evidence", "cap", "cabin", "booking_deadline", "travel_dates", "budget", "agent_limit", "fare_peer", "fare_market", "cap_hugging", "receipt"];
 
 export function failedChecks(c: Pick<Claim, "checks">): Check[] {
   const rank = (k: Check) => { const i = CHECK_PRIORITY.indexOf(k.code); return i === -1 ? CHECK_PRIORITY.length : i; };

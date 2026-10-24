@@ -7,6 +7,7 @@ import { actionSchemas } from "@/lib/server/action-schemas";
 import { queueControllerRelease } from "@/lib/agent/release";
 import { queueAgentRun, queueChangedAwards, startPendingApprovals, startTaxChases } from "@/lib/agent/triggers";
 import { deliverBankVerification } from "@/lib/server/bank-verification-delivery";
+import { captureFareInsights } from "@/lib/server/fares";
 
 export const maxDuration = 120;
 
@@ -64,6 +65,16 @@ export async function POST(request: Request) {
       ]);
       if (launched.some((r) => r.status === "rejected")) console.warn("[workflow] A follow-up start will be retried by the scheduled sweep.");
     });
+  }
+  if (result.ok && action === "flight.search") {
+    // Market snapshot for the fare check, taken while the travel dates are still upcoming. Network call: outside the response and any transaction.
+    const origin = (payload as { origin?: unknown }).origin;
+    if (typeof origin === "string") {
+      after(async () => {
+        try { await captureFareInsights(actor.orgId, origin); }
+        catch { console.warn("[fares] Price insights snapshot failed; the nightly tracker still records fares."); }
+      });
+    }
   }
   if (result.ok && action !== "flight.search") {
     // demo.reset may have replaced the actor's org data; persona ids are stable.

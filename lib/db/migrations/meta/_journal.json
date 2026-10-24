@@ -43,6 +43,13 @@
       "when": 1792840939734,
       "tag": "0005_sponsor_packet_fee_bearer",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792862107655,
+      "tag": "0006_fare_snapshot",
+      "breakpoints": true
     }
   ]
 }

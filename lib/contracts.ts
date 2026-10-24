@@ -36,6 +36,8 @@ export interface Check { code: string; label: string; passed: boolean; detail: s
 export interface FareReview {
   question: string; askedAt: string; route: string;
   peerCount?: number; medianMinor?: Minor; percentileMinor?: Minor;
+  /** Market price compared with: Google's typical high, or the tracked cheapest fare. */
+  market?: { basis: "typical_high" | "cheapest"; referenceMinor: Minor; capturedOn: string; source: string; truth: string; priceOnDateMinor?: Minor };
   explanation?: string; explainedAt?: string;
 }
 export interface Claim {

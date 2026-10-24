@@ -27,6 +27,7 @@ export async function purgeOrg(tx: Executor, orgId: string, opts: { deleteOrg?: 
   await tx.delete(s.payout).where(eq(s.payout.orgId, orgId));
   await tx.delete(s.award).where(eq(s.award.orgId, orgId));
   await tx.delete(s.claim).where(eq(s.claim.orgId, orgId));
+  await tx.delete(s.fareSnapshot).where(eq(s.fareSnapshot.orgId, orgId));
   await tx.delete(s.budgetLine).where(eq(s.budgetLine.orgId, orgId));
   await tx.delete(s.journalLine).where(inArray(s.journalLine.entryId, entryIds));
   await tx.delete(s.journalEntry).where(and(eq(s.journalEntry.orgId, orgId), isNotNull(s.journalEntry.reversesEntryId)));

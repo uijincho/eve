@@ -295,6 +295,33 @@ export const fxRate = pgTable("fx_rate", {
   source: text("source").notNull(),
 }, (t) => [primaryKey({ columns: [t.rateDate, t.base, t.quote] })]);
 
+/**
+ * Market fares for the fare anomaly check, one row per event, route, kind and
+ * day. `insights` rows hold a typical price range and history (SerpApi Google
+ * Flights or the simulated fixture), taken when an attendee searches flights;
+ * `cheapest` rows are the nightly tracker's lowest economy fare. USD minor.
+ */
+export const fareSnapshot = pgTable("fare_snapshot", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  eventId: text("event_id").notNull().references(() => event.id, { onDelete: "cascade" }),
+  origin: text("origin").notNull(),
+  destination: text("destination").notNull(),
+  kind: text("kind", { enum: ["insights", "cheapest"] }).notNull(),
+  capturedOn: date("captured_on", { mode: "string" }).notNull(),
+  source: text("source").notNull(),
+  truth: text("truth").notNull(),
+  typicalLowMinor: money("typical_low_minor"),
+  typicalHighMinor: money("typical_high_minor"),
+  lowestMinor: money("lowest_minor"),
+  priceLevel: text("price_level"),
+  history: jsonb("history").$type<{ date: string; minor: string }[]>().notNull().default([]),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("fare_snapshot_day_uq").on(t.eventId, t.origin, t.kind, t.capturedOn),
+  index("fare_snapshot_org_idx").on(t.orgId),
+]);
+
 // ------------------------------------------------------------ Money objects
 
 export const budgetLine = pgTable("budget_line", {

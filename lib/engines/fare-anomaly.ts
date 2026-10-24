@@ -1,7 +1,9 @@
 // Fare anomaly check: is a travel claim unusually expensive for its route?
 // Deterministic and flag-only: a failing check sends the claim to a person,
-// it never rejects. Phase 1 compares against other attendees' claims on the
-// same route for the same event (no market data needed).
+// it never rejects. Two comparisons: other attendees' fares on the same
+// route for the same event (needs no market data), and the market price on
+// the booking date from stored snapshots (Google Flights insights or the
+// nightly cheapest-fare tracker).
 import type { Check, Claim } from "@/lib/contracts";
 import { formatMoney } from "@/lib/design/money";
 
@@ -14,12 +16,18 @@ export interface FarePolicy {
   peerPercentile: number;
   /** How far above that percentile, in basis points, a fare must be to flag. */
   peerMarginBps: number;
+  /** How far above the market's typical high, in basis points, a fare must be to flag. */
+  marketMarginBps: number;
+  /** Without a typical range, how far above the tracked cheapest fare a fare must be to flag. */
+  cheapestMarginBps: number;
 }
 
 export const DEFAULT_FARE_POLICY: FarePolicy = {
   minPeers: 5,
   peerPercentile: 75,
   peerMarginBps: 2_000,
+  marketMarginBps: 2_500,
+  cheapestMarginBps: 6_000,
 };
 
 export interface FareEvidence {
@@ -96,13 +104,87 @@ export function checkFare(input: { claim: Claim; usdMinor: bigint; candidates: r
 }
 
 /** The one question the agent asks an attendee about a flagged fare. */
-export function fareQuestion(input: { usdMinor: bigint; capMinor: bigint; route: string; evidence?: FareEvidence }): string {
+export function fareQuestion(input: { usdMinor: bigint; capMinor: bigint; route: string; evidence?: FareEvidence; market?: MarketEvidence }): string {
   const paid = formatMoney(input.usdMinor);
   const reasons = "A late acceptance, a nonstop or a checked bag are all fine reasons.";
-  const delta = input.evidence?.flagged ? BigInt(input.evidence.deltaMinor) : 0n;
-  if (delta > 0n) {
-    const about = formatMoney(((delta + 50n) / 100n) * 100n).replace(/\.00$/, "");
-    return `Your ${input.route} fare (${paid}) is about ${about} above what most attendees on that route paid (up to ${formatMoney(BigInt(input.evidence!.percentileMinor))}). Anything we should know? ${reasons}`;
+  const about = (delta: bigint) => formatMoney(((delta + 50n) / 100n) * 100n).replace(/\.00$/, "");
+  if (input.evidence?.flagged && BigInt(input.evidence.deltaMinor) > 0n) {
+    return `Your ${input.route} fare (${paid}) is about ${about(BigInt(input.evidence.deltaMinor))} above what most attendees on that route paid (up to ${formatMoney(BigInt(input.evidence.percentileMinor))}). Anything we should know? ${reasons}`;
+  }
+  if (input.market?.flagged && BigInt(input.market.deltaMinor) > 0n) {
+    const ref = formatMoney(BigInt(input.market.referenceMinor));
+    const basis = input.market.basis === "typical_high" ? `the typical price for that route around your booking date (up to ${ref})` : `the cheapest fare tracked for that route around your booking date (${ref})`;
+    return `Your ${input.route} fare (${paid}) is about ${about(BigInt(input.market.deltaMinor))} above ${basis}. Anything we should know? ${reasons}`;
   }
   return `Your ${input.route} fare (${paid}) is close to the ${formatMoney(input.capMinor)} travel cap. Anything we should know? ${reasons}`;
+}
+
+/** A stored market snapshot for the claim's route (USD minor). */
+export interface MarketSnapshot {
+  kind: "insights" | "cheapest";
+  capturedOn: string;
+  source: string;
+  truth: string;
+  typicalHighMinor?: string;
+  lowestMinor?: string;
+  history?: { date: string; minor: string }[];
+}
+
+export interface MarketEvidence {
+  basis: "typical_high" | "cheapest";
+  capturedOn: string;
+  source: string;
+  truth: string;
+  /** The market price compared with: Google's typical high, or the tracked cheapest fare. */
+  referenceMinor: string;
+  /** Lowest price on the booking date, when the snapshot's history has it. */
+  priceOnDateMinor?: string;
+  deltaMinor: string;
+  flagged: boolean;
+}
+
+const SOURCE_NAME: Record<string, string> = { serpapi: "Google Flights via SerpApi", fixture: "simulated fare table", duffel_test: "Duffel test mode" };
+
+/** The snapshot closest to the booking date: the latest taken on or before it, else the earliest after it. */
+function nearest<T extends { capturedOn: string }>(rows: readonly T[], day: string): T | undefined {
+  const sorted = [...rows].sort((a, b) => a.capturedOn.localeCompare(b.capturedOn));
+  return sorted.filter((r) => r.capturedOn <= day).pop() ?? sorted[0];
+}
+
+/**
+ * Market comparison on the booking date. Uses Google's typical high when an
+ * insights snapshot exists, otherwise the nightly tracker's cheapest fare
+ * with a wider margin. No snapshot, no check.
+ */
+export function checkFareMarket(input: { usdMinor: bigint; purchasedAt: string; snapshots: readonly MarketSnapshot[]; policy?: Partial<FarePolicy> }): { check?: Check; evidence?: MarketEvidence } {
+  const policy = { ...DEFAULT_FARE_POLICY, ...input.policy };
+  const day = input.purchasedAt.slice(0, 10);
+  const insights = nearest(input.snapshots.filter((r) => r.kind === "insights" && r.typicalHighMinor), day);
+  const cheapest = insights ? undefined : nearest(input.snapshots.filter((r) => r.kind === "cheapest" && r.lowestMinor), day);
+  const snap = insights ?? cheapest;
+  if (!snap) return {};
+  let reference: bigint;
+  try {
+    reference = parseMinor(insights ? snap.typicalHighMinor! : snap.lowestMinor!, "referenceMinor");
+  } catch {
+    return {};
+  }
+  if (reference <= 0n) return {};
+  const margin = BigInt(10_000 + (insights ? policy.marketMarginBps : policy.cheapestMarginBps));
+  const flagged = input.usdMinor * 10_000n > reference * margin;
+  const onDate = snap.history?.find((h) => h.date === day)?.minor;
+  const aboveBps = ((input.usdMinor - reference) * 10_000n) / reference;
+  const what = insights ? `the typical high of ${formatMoney(reference)}` : `the cheapest tracked fare of ${formatMoney(reference)}`;
+  const where = `${SOURCE_NAME[snap.source] ?? snap.source}, ${snap.capturedOn}; ${snap.truth}`;
+  const dated = onDate ? `; lowest on the booking date ${formatMoney(BigInt(onDate))}` : "";
+  const detail = flagged
+    ? `${formatMoney(input.usdMinor)} is ${aboveBps / 100n}% above ${what} (${where}${dated}). Flag for review; there may be a good reason.`
+    : `${formatMoney(input.usdMinor)} against ${what} (${where}${dated}).`;
+  return {
+    check: { code: "fare_market", label: "Fare in line with the market", passed: !flagged, detail },
+    evidence: {
+      basis: insights ? "typical_high" : "cheapest", capturedOn: snap.capturedOn, source: snap.source, truth: snap.truth,
+      referenceMinor: reference.toString(), ...(onDate ? { priceOnDateMinor: onDate } : {}), deltaMinor: (input.usdMinor - reference).toString(), flagged,
+    },
+  };
 }

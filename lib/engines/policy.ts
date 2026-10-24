@@ -4,7 +4,7 @@
 import type { Check, Claim, EventRecord, Organization, Person } from "@/lib/contracts";
 import { formatMoney } from "@/lib/design/money";
 
-import { checkFare, type FareEvidence, type FarePolicy } from "./fare-anomaly";
+import { checkFare, checkFareMarket, type FareEvidence, type FarePolicy, type MarketEvidence, type MarketSnapshot } from "./fare-anomaly";
 import { EngineError, convertMinor, currencyExponent, parseMinor, parseRate } from "./money";
 
 export interface ClaimPolicy {
@@ -39,6 +39,8 @@ export interface CheckClaimInput {
    * the fare check does not run (e.g. org bookings priced by a verified offer).
    */
   fareCandidates?: Claim[];
+  /** Market snapshots for the claim's route. Omitted, the market check does not run. */
+  fareSnapshots?: MarketSnapshot[];
   farePolicy?: Partial<FarePolicy>;
   /** Evaluation time, ISO. Defaults to now. */
   asOf?: string;
@@ -52,6 +54,8 @@ export interface CheckClaimResult {
   usdMinor: string;
   /** Peer comparison behind the fare_peer check, when it ran. */
   fare?: FareEvidence;
+  /** Market comparison behind the fare_market check, when it ran. */
+  fareMarket?: MarketEvidence;
 }
 
 const DAY = 86_400_000;
@@ -188,6 +192,7 @@ export function checkClaim(input: CheckClaimInput): CheckClaimResult {
   const add = (code: string, label: string, passed: boolean, detail: string) =>
     checks.push({ code, label, passed, detail });
   let fareEvidence: FareEvidence | undefined;
+  let marketEvidence: MarketEvidence | undefined;
 
   // Amount and FX. Malformed money fails the check rather than throwing, so a
   // bad extraction lands in front of a person instead of crashing the run.
@@ -315,6 +320,11 @@ export function checkClaim(input: CheckClaimInput): CheckClaimResult {
       if (fare.check) checks.push(fare.check);
       fareEvidence = fare.evidence;
     }
+    if (usd !== undefined && input.fareSnapshots?.length && claim.cabin && isEconomyCabin(claim.cabin)) {
+      const market = checkFareMarket({ usdMinor: usd, purchasedAt: claim.purchasedAt, snapshots: input.fareSnapshots, policy: input.farePolicy });
+      if (market.check) checks.push(market.check);
+      marketEvidence = market.evidence;
+    }
   }
 
   if (usd !== undefined) {
@@ -337,5 +347,5 @@ export function checkClaim(input: CheckClaimInput): CheckClaimResult {
     ? "Every policy check passed and the amount is within the agent's limit."
     : failed.map((c) => `${c.label}: ${c.detail}`).join(" ");
 
-  return { checks, status, reason, usdMinor: usd === undefined ? "0" : usd.toString(), ...(fareEvidence ? { fare: fareEvidence } : {}) };
+  return { checks, status, reason, usdMinor: usd === undefined ? "0" : usd.toString(), ...(fareEvidence ? { fare: fareEvidence } : {}), ...(marketEvidence ? { fareMarket: marketEvidence } : {}) };
 }

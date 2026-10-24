@@ -138,6 +138,7 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
       { name: "Receipt reading", mode: process.env.ANTHROPIC_API_KEY ? "Live" : "Off", detail: process.env.ANTHROPIC_API_KEY ? "Claude vision extracts facts; checks stay deterministic." : "Manual entry; claims go to review." },
       { name: "Notifications", mode: "Simulated", detail: "Notices are recorded in Eve; no external delivery in demo." },
       { name: "Flights", mode: "Fixture", detail: "Fixture offers; no booking." },
+      { name: "Fare insights", mode: process.env.SERPAPI_API_KEY ? "Live" : "Fixture", detail: process.env.SERPAPI_API_KEY ? "Google Flights price insights via SerpApi, captured when attendees search flights; flags only." : "Simulated typical fares; flags only." },
       { name: "Filings", mode: "Draft", detail: "Draft PDFs only. A controller signs; nothing is e-filed." },
     ],
   };

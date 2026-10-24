@@ -17,7 +17,7 @@ import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
 
 import { agentActor, convertMinor, decisionRow, isAdultAt, type ClaimRow, type PersonRow } from "./core";
-import { evaluate } from "./claims";
+import { evaluate, toMarketSnapshots } from "./claims";
 import { changeBankDetails, buildPayout, proposePayout, releasePayout, sourceFromClaim } from "./payouts";
 import { DEMO_ORG_ID } from "./http";
 import { recommendFulfillment, startingRules, w8ExpiresAt } from "./engines";
@@ -306,6 +306,17 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   // Every seeded travel claim is on file when the seed checks them, like a live check sees the claims already submitted.
   const travelByOrigin = new Map<string, ClaimRow[]>();
   for (const c of claims) if (c.type === "travel" && c.origin) travelByOrigin.set(c.origin, [...(travelByOrigin.get(c.origin) ?? []), c]);
+  // Simulated market snapshots, as if each route had been searched on Sep 1, before the booking window.
+  const fareRows = [...travelByOrigin.keys()].sort().map((origin) => {
+    const base = routeFareCents(origin);
+    const history = Array.from({ length: 60 }, (_, i) => ({ date: new Date(D("2026-07-04T00:00:00Z").getTime() + i * 86_400_000).toISOString().slice(0, 10), minor: String(Math.round(base * (0.88 + 0.04 * Math.sin(i / 5)))) }));
+    return {
+      id: `fare_demo_${origin}`, orgId: ORG, eventId: DEMO_EVENT_ID, origin, destination: "SFO", kind: "insights" as const, capturedOn: "2026-09-01", source: "fixture", truth: "Simulated",
+      typicalLowMinor: BigInt(Math.round(base * 0.85)), typicalHighMinor: BigInt(Math.round(base * 1.2)), lowestMinor: BigInt(Math.round(base * 0.85)), priceLevel: "typical", history,
+    };
+  });
+  await tx.insert(s.fareSnapshot).values(fareRows);
+  const snapshotsByOrigin = new Map(fareRows.map((r) => [r.origin, toMarketSnapshots([{ ...r, createdAt: new Date() }])]));
   const decisions: (typeof s.decisionLog.$inferInsert)[] = [];
   const approvals: (typeof s.approval.$inferInsert)[] = [];
   const fareNotices: (typeof s.notice.$inferInsert)[] = [];
@@ -314,7 +325,8 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   for (const c of ordered) {
     if (liveIds.has(c.id)) { c.status = "submitted"; continue; }
     const farePeers = c.type === "travel" ? travelByOrigin.get(c.origin ?? "") : undefined;
-    const r = evaluate({ claim: c, person: personById.get(c.personId)!, org, event, existing: processed, personNames: names, farePeers });
+    const fareSnapshots = c.type === "travel" ? snapshotsByOrigin.get(c.origin ?? "") : undefined;
+    const r = evaluate({ claim: c, person: personById.get(c.personId)!, org, event, existing: processed, personNames: names, farePeers, fareSnapshots });
     c.status = r.status; c.checks = r.checks; c.reason = r.reason; c.reviewedBy = r.status === "approved" ? "agent" : null;
     if (r.fareReview) {
       c.extracted = { ...(c.extracted ?? {}), fareReview: r.fareReview };
