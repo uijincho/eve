@@ -3,7 +3,7 @@ import type { AgentTarget, OperationResult } from "@/lib/agent/operations";
 
 export async function agentRunWorkflow(target: AgentTarget) {
   "use workflow";
-  using hook = createHook({ token: `agent-run:${target.orgId}:${target.generation}:${target.kind}:${target.evaluateDemo}:${target.filingYear ?? "current"}` });
+  using hook = createHook({ token: `agent-run:${target.orgId}:${target.generation}:${target.kind}:${target.evaluateDemo}:${target.filingYear ?? "current"}:${target.triggerId ?? "sweep"}` });
   const conflict = await hook.getConflict();
   if (conflict) return { duplicateOf: conflict.runId };
   const { workflowRunId } = getWorkflowMetadata();

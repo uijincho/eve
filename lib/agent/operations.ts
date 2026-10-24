@@ -14,9 +14,11 @@ export interface AgentTarget {
   orgId: string;
   generation: string;
   memberId: string | null;
-  kind: "claims" | "chase" | "all";
+  kind: "claims" | "chase" | "all" | "awards";
   evaluateDemo: boolean;
   filingYear?: number;
+  awardIds?: string[];
+  triggerId?: string;
 }
 export interface OperationResult { processed: number; proposed: number; blocked: number }
 
@@ -43,10 +45,10 @@ export async function beginAgentRun(target: AgentTarget, runId: string) {
   const [org] = await db.select().from(s.organization).where(eq(s.organization.id, target.orgId));
   if (target.evaluateDemo && (!org?.isDemo || !demoModeEnabled() || !actor.demo)) return null;
   await db.insert(s.agentRun).values({ id: runId, orgId: target.orgId, kind: target.kind, triggeredBy: actor.name, status: "running" }).onConflictDoNothing();
-  const claims = target.kind === "chase" ? [] : await db.select({ id: s.claim.id }).from(s.claim)
+  const claims = target.kind === "chase" || target.kind === "awards" ? [] : await db.select({ id: s.claim.id }).from(s.claim)
     .where(and(eq(s.claim.orgId, target.orgId), inArray(s.claim.status, ["submitted", "processing"])));
   const awards = target.kind === "chase" ? [] : await db.select({ id: s.award.id }).from(s.award)
-    .where(and(eq(s.award.orgId, target.orgId), inArray(s.award.status, ["ready", "needs_form"]), sql`(${s.award.kind} = 'cash' OR ${s.award.fulfillment} = 'cash')`));
+    .where(and(eq(s.award.orgId, target.orgId), target.awardIds ? inArray(s.award.id, target.awardIds) : undefined, inArray(s.award.status, ["ready", "needs_form"]), sql`(${s.award.kind} = 'cash' OR ${s.award.fulfillment} = 'cash')`));
   return { claimIds: claims.map((c) => c.id), awardIds: awards.map((a) => a.id) };
 }
 

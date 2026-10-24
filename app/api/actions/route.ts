@@ -5,7 +5,7 @@ import { runAuthorizedAction } from "@/lib/server/services";
 import { buildSnapshot } from "@/lib/server/snapshot";
 import { actionSchemas } from "@/lib/server/action-schemas";
 import { queueControllerRelease } from "@/lib/agent/release";
-import { queueAgentRun, startPendingApprovals, startTaxChases } from "@/lib/agent/triggers";
+import { queueAgentRun, queueChangedAwards, startPendingApprovals, startTaxChases } from "@/lib/agent/triggers";
 
 export const maxDuration = 120;
 
@@ -36,10 +36,22 @@ export async function POST(request: Request) {
     response = await runAuthorizedAction(actor, action, payload ?? {});
   }
   const { status, ...result } = response;
-  if (result.ok && ["award.create", "award.choose", "award.confirm", "tax.submit", "claim.submit", "claim.review", "payout.propose", "payout.verify", "payout.retry"].includes(action)) {
+  if (result.ok && ["award.create", "award.choose", "award.confirm", "award.split", "tax.submit", "claim.submit", "claim.review", "payout.propose", "payout.verify", "payout.retry"].includes(action)) {
     // The business transaction already committed. Cron retries missed starts; hooks deduplicate active runs.
     after(async () => {
-      const launched = await Promise.allSettled([startPendingApprovals(actor.orgId), startTaxChases(actor.orgId)]);
+      // These fields have already passed the action's strict schema and authorization checks.
+      const p = payload as { id?: string; personId?: string; teamId?: string };
+      const ids = result.data?.ids;
+      const changed = action === "award.create" && Array.isArray(ids) ? { ids: ids as string[] }
+        : action === "award.choose" ? { ids: [p.id!] }
+          : action === "tax.submit" ? { personId: p.personId }
+            // Confirming the last member can unblock every award in the team.
+            : action === "award.confirm" ? { confirmedAwardId: p.id }
+              : action === "award.split" ? { teamId: p.teamId } : null;
+      const launched = await Promise.allSettled([
+        startPendingApprovals(actor.orgId), startTaxChases(actor.orgId),
+        ...(changed ? [queueChangedAwards(actor.orgId, changed)] : []),
+      ]);
       if (launched.some((r) => r.status === "rejected")) console.warn("[workflow] A follow-up start will be retried by the scheduled sweep.");
     });
   }

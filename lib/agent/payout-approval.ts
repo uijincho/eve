@@ -89,15 +89,22 @@ export async function executeControllerApproval(target: ApprovalTarget, approval
       personId: member.personId, userId: member.userId, demo: member.demoPersona && org.isDemo,
     };
     assertControllerApproval(actor, payout);
-    const paid = await releasePayout(tx, actor, payout.id);
+    const released = await releasePayout(tx, actor, payout.id);
+    const settled = released.status === "paid";
+    const processing = released.status === "processing";
     const id = createHash("sha256").update(`${runId}:released`).digest("hex").slice(0, 32);
     await tx.insert(s.decisionLog).values({
-      id: `dec_${id}`, orgId: target.orgId, runId, objectType: "payout", objectId: paid.id, personId: paid.personId,
-      action: "Controller hook resumed", summary: "The authenticated controller approved these exact terms. Release, bank-version checks, approval evidence and journal posting completed in one transaction.",
-      actor: actor.name, actorRole: actor.role, status: "done", tool: "executePayout",
-      facts: { approverId: member.id, quoteFingerprint: target.quoteFingerprint, providerRef: paid.providerRef, truth: paid.truth },
+      id: `dec_${id}`, orgId: target.orgId, runId, objectType: "payout", objectId: released.id, personId: released.personId,
+      action: settled ? "Controller hook resumed" : processing ? "Payment submitted; settlement pending" : "Payout re-quoted; fresh approval needed",
+      summary: settled
+        ? "The authenticated controller approved these exact terms. Release, bank-version checks, approval evidence and journal posting completed in one transaction."
+        : processing
+          ? "The controller authorized this payment. The provider has not confirmed bank settlement, so it is still processing."
+          : "Tax, year-to-date income or eligibility changed during the final checks. The updated proposal is saved and no money was released. A controller must review it again.",
+      actor: actor.name, actorRole: actor.role, status: settled ? "done" : processing ? "waiting" : "escalated", tool: "executePayout",
+      facts: { approverId: member.id, quoteFingerprint: target.quoteFingerprint, currentFingerprint: payoutQuoteFingerprint(released), providerRef: released.providerRef, truth: released.truth },
     }).onConflictDoNothing();
-    return { payoutId: paid.id, status: paid.status, replayed: false };
+    return { payoutId: released.id, status: released.status, replayed: false };
   });
 }
 

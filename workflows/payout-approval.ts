@@ -33,7 +33,14 @@ async function completeApproval(target: ApprovalTarget, approval: ControllerAppr
   "use step";
   const { executeControllerApproval, recordApprovalFailure, ApprovalConflictError } = await import("@/lib/agent/payout-approval");
   try {
-    return await executeControllerApproval(target, approval, runId);
+    const result = await executeControllerApproval(target, approval, runId);
+    // Release can change sibling tax quotes. Each new quote needs its own fresh approval hook.
+    // The financial transaction already committed; a failed follow-up start must not replay it.
+    try {
+      const { startPendingApprovals } = await import("@/lib/agent/triggers");
+      await startPendingApprovals(target.orgId);
+    } catch { console.warn("[workflow] Updated approval waits will be retried by the scheduled sweep."); }
+    return result;
   } catch (error) {
     // Only known business errors may enter the visible log; database/provider errors may contain private values.
     const { ActionError } = await import("@/lib/server/core");

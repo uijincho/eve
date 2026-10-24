@@ -73,6 +73,20 @@ async function main() {
     assert.equal(approvals.length, 2);
     assert.equal(journals.length, 4);
     console.log("Controller hooks paid the two-payout batch once; retry produced no extra approvals or journals. All money simulated.");
+    const entered = await action(organizerId, "award.create", { personId, track: "Automatic event", title: "Winner-entry trigger", kind: "cash", amountMinor: "25000" });
+    assert.equal(entered.status, 200, entered.body.message);
+    const automaticAwardId = entered.body.data.ids[0] as string;
+    const automatic = await until(async () => {
+      const [row] = await db.select().from(s.payout).where(and(eq(s.payout.orgId, orgId), eq(s.payout.awardId, automaticAwardId)));
+      return row ?? null;
+    }, "automatic winner-entry review");
+    assert.equal(automatic.status, "proposed");
+    assert.equal(automatic.releasedBy, null);
+    await until(async () => {
+      const runs = await db.select().from(s.agentRun).where(and(eq(s.agentRun.orgId, orgId), eq(s.agentRun.kind, "awards")));
+      return runs.some((row) => row.status === "done") ? true : null;
+    }, "automatic review completion");
+    console.log("Entering a winner triggered a durable payout proposal without pressing Run Eve; money stayed behind controller approval.");
   } finally {
     await db.transaction((tx) => purgeOrg(tx, orgId, { deleteOrg: true }));
     await db.$pool.end();

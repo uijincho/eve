@@ -4,6 +4,7 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { getChaseCandidates } from "@/lib/agent/automation";
 import { getDb } from "@/lib/db";
+import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
 import { demoModeEnabled, type ActorContext } from "@/lib/auth/session";
 import type { ActionResult } from "@/lib/contracts";
@@ -53,5 +54,32 @@ export async function queueScheduledRun(orgId: string, filingYear?: number): Pro
   const [org] = await getDb().select().from(s.organization).where(eq(s.organization.id, orgId));
   if (!org) return null;
   const target: AgentTarget = { orgId, generation: org.createdAt.toISOString(), memberId: null, kind: "all", evaluateDemo: false, filingYear };
+  return (await start(agentRunWorkflow, [target])).runId;
+}
+
+/** Internal event handler, called only after an authorized source mutation commits. */
+export async function queueChangedAwards(orgId: string, selection: { ids?: string[]; personId?: string; teamId?: string; confirmedAwardId?: string }): Promise<string | null> {
+  if (selection.confirmedAwardId) {
+    const [award] = await getDb().select({ id: s.award.id, teamId: s.award.teamId }).from(s.award).where(and(eq(s.award.orgId, orgId), eq(s.award.id, selection.confirmedAwardId)));
+    if (!award) return null;
+    selection = award.teamId ? { teamId: award.teamId } : { ids: [award.id] };
+  }
+  if (!selection.ids?.length && !selection.personId && !selection.teamId) return null;
+  const [org] = await getDb().select({ id: s.organization.id, createdAt: s.organization.createdAt }).from(s.organization).where(eq(s.organization.id, orgId));
+  if (!org) return null;
+  const awards = await getDb().select({ id: s.award.id }).from(s.award).where(and(
+    eq(s.award.orgId, orgId),
+    selection.ids?.length ? inArray(s.award.id, selection.ids) : undefined,
+    selection.personId ? eq(s.award.personId, selection.personId) : undefined,
+    selection.teamId ? eq(s.award.teamId, selection.teamId) : undefined,
+    inArray(s.award.status, ["ready", "needs_form"]),
+  ));
+  if (!awards.length) return null;
+  const target: AgentTarget = {
+    orgId, generation: org.createdAt.toISOString(), memberId: null, kind: "awards", evaluateDemo: false,
+    awardIds: awards.map((award) => award.id), triggerId: newId("event"),
+  };
+  // Each committed change gets a run, even when an older run already captured a plan.
+  // Per-source uniqueness and the org/person locks make overlapping runs safe.
   return (await start(agentRunWorkflow, [target])).runId;
 }
