@@ -44,6 +44,8 @@ Database tests use disposable organizations in the configured Postgres database 
 
 With the local server running, `pnpm verify:workflow` exercises the real HTTP route, durable background proposals, controller hooks and duplicate-release behavior against an isolated synthetic organization. `pnpm verify:ocr` makes a paid Anthropic API request using a synthetic receipt; it is separate from the ordinary test suite.
 
+`pnpm verify:demo --reset` rebuilds the shared fictional event, runs its durable review, explicitly releases the two threshold-crossing payments as the sample controller, generates drafts, and saves the measured scoreboard to `docs/demo-benchmark.json`. It takes several minutes. Coordinate before using `--reset`: it replaces the shared demo's interactions, while leaving real organizations alone. Without `--reset`, it measures the current demo state.
+
 ## External services and outputs
 
 | Area | Current path |
