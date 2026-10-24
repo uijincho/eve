@@ -368,16 +368,36 @@ export function suggestedForm(input: { country: string; citizenship: string; ent
 // ── Prizes ────────────────────────────────────────────────────────────────
 
 /** Finds the prize rule Eve would cite for this winner, if one is loaded. */
-export function prizeRule(s: Pick<AppSnapshot, "rules" | "org">, person?: Person) {
+/**
+ * The withholding rule the server will most likely apply to a prize, for an
+ * estimate only (a proposed payout carries the real figures). Rules key the
+ * payee as a country, "NON<payer>" or "*", and the payment type as
+ * cash_prize / item_prize with a ":treaty" variant that needs a signed form.
+ */
+export function prizeRule(
+  s: Pick<AppSnapshot, "rules" | "org"> & { now?: string },
+  person?: Person,
+  kind: Award["kind"] = "cash",
+) {
+  const payer = s.org.country;
   const payee = person?.country ?? "";
-  const candidates = s.rules.filter(
-    (r) => r.paymentType.includes("prize") && r.payerCountry === s.org.country,
+  const now = s.now ?? new Date().toISOString();
+  const live = s.rules.filter(
+    (r) =>
+      r.payerCountry === payer &&
+      r.effectiveFrom <= now &&
+      (!r.effectiveTo || r.effectiveTo >= now),
   );
-  return (
-    candidates.find((r) => r.payeeCountry === payee) ??
-    candidates.find((r) => r.payeeCountry === "*" && payee !== s.org.country) ??
-    candidates.find((r) => r.payeeCountry === s.org.country && payee === s.org.country)
-  );
+  const latest = (rs: typeof live) => rs.sort((a, b) => b.version - a.version)[0];
+  const typed = (type: string) => live.filter((r) => r.paymentType === type);
+  const forPayee = (rs: typeof live) =>
+    payee === payer
+      ? rs.filter((r) => r.payeeCountry === payer)
+      : rs.filter((r) => r.payeeCountry === payee).concat(rs.filter((r) => r.payeeCountry === `NON${payer}` || r.payeeCountry === "*"));
+  const base = kind === "item" ? "item_prize" : "cash_prize";
+  // A treaty rate only applies once the recipient has a valid form on file.
+  const treaty = person?.taxStatus === "valid" && payee !== payer ? latest(forPayee(typed(`${base}:treaty`)).filter((r) => r.payeeCountry === payee)) : undefined;
+  return treaty ?? latest(forPayee(typed(base))) ?? latest(forPayee(typed("cash_prize"))) ?? latest(forPayee(live.filter((r) => r.paymentType.includes("prize"))));
 }
 
 export type PrizeOptions = {
@@ -392,8 +412,8 @@ export type PrizeOptions = {
   fromPayout: boolean;
 };
 
-export function prizeOptions(s: Pick<AppSnapshot, "rules" | "org">, award: Award, person?: Person, payout?: Payout): PrizeOptions {
-  const rule = prizeRule(s, person);
+export function prizeOptions(s: Pick<AppSnapshot, "rules" | "org"> & { now?: string }, award: Award, person?: Person, payout?: Payout): PrizeOptions {
+  const rule = prizeRule(s, person, award.kind);
   const gross = big(award.amountMinor);
   const withholding = payout ? big(payout.withholdingMinor) : rule ? (gross * BigInt(rule.rateBps)) / 10000n : 0n;
   // The engine leads with its choice ("Buy it locally. …", "Cash equivalent: …");

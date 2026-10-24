@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { AppSnapshot } from "@/lib/contracts";
 import { fixtureSnapshot } from "@/lib/client/fixture";
 import {
   buildInbox,
@@ -8,6 +9,7 @@ import {
   groupRuns,
   isAdultOn,
   prizeOptions,
+  prizeRule,
   runCounters,
   suggestedForm,
 } from "@/lib/client/derive";
@@ -88,6 +90,32 @@ describe("prizeOptions", () => {
     expect(prizeOptions(s, award).recommended).toBe("local");
     expect(prizeOptions(s, { ...award, recommendation: "Offer the cash equivalent. Not sold locally in BR." }).recommended).toBe("cash");
     expect(prizeOptions(s, { ...award, recommendation: "Ship the item. Domestic winner." }).recommended).toBe("ship");
+  });
+});
+
+describe("prizeRule with seeded rule shapes", () => {
+  const rule = (id: string, payeeCountry: string, paymentType: string, rateBps: number, extra: Partial<AppSnapshot["rules"][number]> = {}) => ({
+    id, version: 1, payerCountry: "US", payeeCountry, paymentType, rateBps, thresholdMinor: "0", form: "W-8BEN",
+    reportingForm: "1042-S", verified: true, sourceUrl: "", explanation: "", effectiveFrom: "2025-01-01", ...extra,
+  });
+  const rules = [
+    rule("us-us-prize-2025", "US", "cash_prize", 0, { effectiveTo: "2025-12-31" }),
+    rule("us-us-prize", "US", "cash_prize", 0, { version: 2 }),
+    rule("us-nonus-prize", "NONUS", "cash_prize", 3000),
+    rule("us-nonus-item-prize", "NONUS", "item_prize", 3000),
+    rule("us-ca-item-prize-treaty", "CA", "item_prize:treaty", 0, { verified: false }),
+  ];
+  const snap = { rules, org: { ...s.org, country: "US" }, now: "2026-10-24T00:00:00Z" };
+  const priya = { ...s.people[0], country: "CA", taxStatus: "missing" as const };
+
+  it("uses the 30% default until a valid form is on file", () => {
+    expect(prizeRule(snap, priya, "item")?.id).toBe("us-nonus-item-prize");
+  });
+  it("uses the treaty rule once the form is valid", () => {
+    expect(prizeRule(snap, { ...priya, taxStatus: "valid" }, "item")?.id).toBe("us-ca-item-prize-treaty");
+  });
+  it("skips expired versions for domestic winners", () => {
+    expect(prizeRule(snap, { ...priya, country: "US" }, "cash")?.id).toBe("us-us-prize");
   });
 });
 
