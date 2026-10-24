@@ -46,7 +46,8 @@ describe("CRA slip worksheets", () => {
     expect(text).toContain("DRAFT, UNVERIFIED RULE, NOT FOR FILING");
     expect(text).toContain("T4A slip worksheet, tax year 2026");
     expect(text).toMatch(/has not confirmed that this T4A slip is required/);
-    expect(text).toContain("Code 028 Other income (code to verify)");
+    // The long box label wraps inside its column; preserve every word across line breaks.
+    expect(text.replace(/\s+/g, " ")).toContain("Code 028 Other income (code to verify)");
     expect(text).toContain("1500.00 CAD");
     expect(text).toContain("Recipient SIN");
     expect(text).not.toMatch(/ready to file|filing-ready/i);
