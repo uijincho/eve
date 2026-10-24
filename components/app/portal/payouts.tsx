@@ -44,8 +44,8 @@ export function PortalPayouts() {
               {frozen ? (
                 <Section title="Confirm your new account">
                   <p className="text-small text-muted-foreground">
-                    We sent a 6-digit code to {me.email}, the address you registered with.
-                    {s.demo ? " In this sample event it is also in your portal messages." : " Eve never shows it on screen, so a changed account cannot confirm itself."}
+                    Confirm this change with the 6-digit code for {me.email}, the address you registered with.
+                    {s.demo ? " In this sample event it is in your portal messages." : " Check Messages for email delivery status. Eve never shows the code on screen."}
                   </p>
                   <VerifyCode personId={me.id} personName={me.name} self primary />
                 </Section>

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useState } from "react";
 
 import { AuthForm } from "@/components/app/auth-form";
+import { LinkButton } from "@/components/app/link-button";
 import { ResultText } from "@/components/app/result-text";
 import { ListSkeleton } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -75,6 +76,7 @@ export function InviteView({ token }: { token: string }) {
         <div className="flex flex-col gap-2">
           <h1 className="text-title">Invitation not found</h1>
           <p className="text-small text-muted-foreground">{lookupError}</p>
+          <LinkButton href="/login" variant="secondary" className="self-start">Go to sign in</LinkButton>
         </div>
       ) : !invite || me === undefined ? (
         <ListSkeleton rows={2} label="Checking the invitation" />

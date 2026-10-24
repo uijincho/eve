@@ -59,7 +59,7 @@ export function DataTable<T>({
   const ends = columns.filter((c) => c.stack === "end");
 
   return (
-    <div className="overflow-hidden rounded-xl border">
+    <div className="overflow-x-auto rounded-xl border" role="region" aria-label={`${label} table`} tabIndex={0}>
       <table aria-label={label} className="w-full border-collapse max-md:hidden">
         <thead>
           <tr className="border-b">

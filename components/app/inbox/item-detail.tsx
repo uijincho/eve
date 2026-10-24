@@ -12,7 +12,7 @@ import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { Badge } from "@/components/ui/badge";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
-import { actorName, big, type InboxItem, payoutFees, payoutSource, providerLabel, isInKind, payoutValue, claimStatusLabel } from "@/lib/client/derive";
+import { big, type InboxItem, payoutFees, payoutSource, providerLabel, isInKind, payoutValue, claimStatusLabel } from "@/lib/client/derive";
 import { useEve } from "@/lib/client/use-eve";
 import { documentUrl } from "@/lib/client/api";
 import { fmtDateTime } from "@/lib/client/format";
@@ -196,7 +196,7 @@ export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payo
         {p.releasedBy ? (
           <>
             <dt className="text-muted-foreground">Released by</dt>
-            <dd className="text-right">{snapshot ? actorName(snapshot, p.releasedBy) : p.releasedBy}</dd>
+            <dd className="text-right">{snapshot?.personas.find((member) => member.id === p.releasedBy)?.name ?? "Controller"}</dd>
           </>
         ) : null}
       </dl>

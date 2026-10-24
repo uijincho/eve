@@ -38,7 +38,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={() => setPersonaOpen(true)}
-            aria-label={snapshot ? `${snapshot.actor.name}, ${snapshot.demo ? "switch demo persona" : "account"}` : "Account"}
+            aria-label={snapshot ? `${initials(snapshot.actor.name)} — ${snapshot.actor.name}, ${snapshot.demo ? "switch demo persona" : "account"}` : "Account"}
             className="ml-auto flex items-center gap-2 rounded-md px-1.5 py-1 text-small hover:bg-surface"
           >
             <span aria-hidden className="grid size-7 place-items-center rounded-full bg-border text-caption font-semibold">

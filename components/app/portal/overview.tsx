@@ -20,7 +20,7 @@ function todos(s: AppSnapshot, me: Person): Todo[] {
   if (me.taxStatus !== "valid")
     list.push({ id: "tax", title: `Sign your ${me.taxForm}`, detail: me.taxStatus === "expired" ? "Your form has lapsed. Payments wait until you sign a new one." : me.taxStatus === "review" ? "Your form needs review. An organizer may contact you." : "Payments wait until your tax form is signed.", href: "/portal/profile" });
   const frozen = s.payouts.find((p) => p.personId === me.id && p.status === "frozen");
-  if (frozen) list.push({ id: "frozen", title: "Confirm your new bank details", detail: "Enter the code we sent to your original email. Your payout is frozen until then.", href: "/portal/payouts", dueAt: frozen.dueAt, critical: "Frozen" });
+  if (frozen) list.push({ id: "frozen", title: "Confirm your new bank details", detail: "Use the code for your original email. Check Messages for delivery status; your payout stays frozen until confirmed.", href: "/portal/payouts", dueAt: frozen.dueAt, critical: "Frozen" });
   if (!me.payoutLast4) list.push({ id: "bank", title: "Add a payout account", detail: `Choose where to receive money, in ${me.payoutCurrency || "your currency"}.`, href: "/portal/payouts" });
   for (const a of s.awards.filter((x) => x.personId === me.id)) {
     if (a.kind === "item" && a.fulfillment === "undecided") list.push({ id: `a-${a.id}`, title: `Choose how to receive your ${a.title}`, detail: prizeTaskLine(s, a, me), href: "/portal/prizes", dueAt: a.dueAt });

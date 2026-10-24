@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { formatMoney, minorToDecimalString } from "@/lib/design/money";
 import { DUSK, GROUND, RAISED, STATE, STRUCTURE, TEXT, contrastRatio } from "@/lib/design/tokens";
-import { duskBand, formatDue, horizonX } from "@/lib/design/urgency";
+import { describeDue, duskBand, formatDue, horizonX } from "@/lib/design/urgency";
 
 const NOW = new Date("2026-10-25T13:42:00-07:00");
 const later = (minutes: number) => new Date(NOW.getTime() + minutes * 60_000);
@@ -34,6 +34,9 @@ describe("formatDue", () => {
     expect(formatDue(later(120), NOW)).toBe("2 h");
     expect(formatDue(new Date("2026-10-27T09:00:00-07:00"), NOW)).toBe("Oct 27");
     expect(formatDue(later(-5), NOW)).toBe("Overdue 5 min");
+    expect(formatDue(later(-7164 * 60 - 11), NOW)).toBe("Overdue 298 d");
+    expect(describeDue(later(-24 * 60), NOW)).toBe("Overdue by 1 day");
+    expect(describeDue(later(-48 * 60), NOW)).toBe("Overdue by 2 days");
   });
 });
 

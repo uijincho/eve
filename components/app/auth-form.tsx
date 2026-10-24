@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircleIcon } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Field } from "@/components/app/field";
 import { ResultText } from "@/components/app/result-text";
@@ -33,6 +33,9 @@ export function AuthForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const signUp = mode === "sign-up";
 
   const submit = async (e: React.FormEvent) => {
@@ -44,7 +47,10 @@ export function AuthForm({
     if (password.length < MIN_PASSWORD) next.password = `Use at least ${MIN_PASSWORD} characters.`;
     setErrors(next);
     setFailure(null);
-    if (Object.keys(next).length) return;
+    if (Object.keys(next).length) {
+      (next.name ? nameRef : next.email ? emailRef : passwordRef).current?.focus();
+      return;
+    }
     setPending(true);
     try {
       if (signUp) await auth.signUp(name.trim(), email.trim(), password);
@@ -68,16 +74,17 @@ export function AuthForm({
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
       {signUp ? (
         <Field label="Full name" error={errors.name}>
-          {(p) => <Input {...p} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />}
+          {(p) => <Input {...p} ref={nameRef} autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />}
         </Field>
       ) : null}
       <Field label="Email" error={errors.email} help={emailHint}>
-        {(p) => <Input {...p} type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />}
+        {(p) => <Input {...p} ref={emailRef} type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />}
       </Field>
       <Field label="Password" error={errors.password} help={signUp ? `At least ${MIN_PASSWORD} characters.` : undefined}>
         {(p) => (
           <Input
             {...p}
+            ref={passwordRef}
             type="password"
             autoComplete={signUp ? "new-password" : "current-password"}
             value={password}

@@ -73,6 +73,8 @@ function formatSpan(ms: number, long = false): string {
   const totalMinutes = Math.max(1, Math.round(ms / MINUTE));
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
+  const days = Math.floor(h / 24);
+  if (days) return long ? `${days} ${days === 1 ? "day" : "days"}` : `${days} d`;
   if (long) {
     const parts = [];
     if (h) parts.push(`${h} ${h === 1 ? "hour" : "hours"}`);

@@ -23,7 +23,7 @@ export function ListSkeleton({ rows = 5, label = "Loading" }: { rows?: number; l
   );
 }
 
-export function ErrorState({ error, onRetry }: { error: ApiError; onRetry?: () => void }) {
+export function ErrorState({ error, onRetry }: { error: ApiError; onRetry?: () => void | Promise<void> }) {
   const signedOut = error.status === 401;
   return (
     <div role="alert" className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-input px-5 py-6">
@@ -42,7 +42,18 @@ export function ErrorState({ error, onRetry }: { error: ApiError; onRetry?: () =
           </LinkButton>
         ) : null}
         {onRetry ? (
-          <Button size="sm" variant="ghost" onClick={onRetry}>
+          <Button size="sm" variant="ghost" onClick={async (event) => {
+            const button = event.currentTarget;
+            const main = button.closest("main");
+            await onRetry();
+            requestAnimationFrame(() => {
+              // A successful reload removes this button. Keep keyboard users
+              // at the recovered page instead of leaving focus on the body.
+              if (button.isConnected) return;
+              const heading = main?.querySelector("h1");
+              if (heading) { heading.tabIndex = -1; heading.focus(); }
+            });
+          }}>
             <RotateCwIcon aria-hidden />
             Try again
           </Button>
