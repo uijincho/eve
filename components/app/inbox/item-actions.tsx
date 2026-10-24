@@ -6,6 +6,7 @@ import { ActionButton } from "@/components/app/action-button";
 import { FulfillAction } from "@/components/app/fulfill-action";
 import { LinkButton } from "@/components/app/link-button";
 import { ReasonAction } from "@/components/app/reason-action";
+import { heldOnUnverifiedRule, ResolvePayoutRule } from "@/components/app/resolve-rule";
 import { VerifyCode } from "@/components/app/verify-code";
 import { Button } from "@/components/ui/button";
 import type { AppSnapshot } from "@/lib/contracts";
@@ -91,6 +92,21 @@ export function ItemActions({
         return (
           <div className={wrap}>
             <ActionButton variant={first} size={pane ? "default" : "sm"} wide={pane} label="Retry payout" pendingLabel="Retrying" permission={canControl(actor, snapshot)} call={payloads.payoutRetry(p.id)} />
+            {evidence}
+          </div>
+        );
+      }
+      if (heldOnUnverifiedRule(snapshot, p)) {
+        return pane ? (
+          <div className={wrap}>
+            <ResolvePayoutRule payout={p} snapshot={snapshot} />
+            {evidence}
+          </div>
+        ) : (
+          <div className={wrap}>
+            <LinkButton href={`/payouts?payout=${encodeURIComponent(p.id)}`} size="sm" variant="secondary">
+              Review tax rule
+            </LinkButton>
             {evidence}
           </div>
         );

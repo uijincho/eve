@@ -7,6 +7,7 @@ import { ActionButton } from "@/components/app/action-button";
 import { DataTable, FilterChips, type Column } from "@/components/app/data-table";
 import { EvidenceSheet } from "@/components/app/evidence-sheet";
 import { PayoutBreakdown } from "@/components/app/inbox/item-detail";
+import { heldOnUnverifiedRule, ResolvePayoutRule } from "@/components/app/resolve-rule";
 import { LinkButton } from "@/components/app/link-button";
 import { PageFrame } from "@/components/app/page-frame";
 import { VerifyCode } from "@/components/app/verify-code";
@@ -210,6 +211,8 @@ function PayoutDetail({ payout: p, snapshot: s, onEvidence }: { payout: Payout; 
           <VerifyCode personId={p.personId} personName={p.personName} permission={manage} primary />
         ) : p.status === "failed" || p.status === "returned" ? (
           <ActionButton wide size="default" variant="default" label="Retry payout" pendingLabel="Retrying" permission={canControl(s.actor, s)} call={payloads.payoutRetry(p.id)} />
+        ) : heldOnUnverifiedRule(s, p) ? (
+          <ResolvePayoutRule payout={p} snapshot={s} />
         ) : p.status === "proposed" || p.status === "approved" || p.status === "held" ? (
           <ActionButton wide size="default" variant="default" label="Release payout" pendingLabel="Releasing" permission={release} call={payloads.payoutRelease([p.id])} />
         ) : null}

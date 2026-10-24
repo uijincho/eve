@@ -13,6 +13,7 @@ const calls: ActionCall[] = [
   payloads.awardSplit("team-1", [{ personId: "p1", bps: 6000 }, { personId: "p2", bps: 4000 }]),
   payloads.awardConfirm("A-1"),
   payloads.payoutPropose("A-1", "award"),
+  payloads.payoutResolveRule("award", "A-1", "default", "Treaty article not yet checked"),
   payloads.payoutRelease(["PO-1"]),
   payloads.payoutRelease(["PO-1", "PO-2"]),
   payloads.payoutVerify("p1", "123456", "confirm"),

@@ -60,6 +60,9 @@ export const payloads = {
   /** Controller confirms an item prize was shipped or bought locally (simulated delivery). */
   awardFulfill: (id: string) => call("award.fulfill", { id }),
 
+  /** Controller resolves an unverified-rule hold for one payment (reason at least 10 characters). */
+  payoutResolveRule: (sourceType: "claim" | "award", sourceId: string, use: "default" | "rule", reason: string) =>
+    call("payout.resolveRule", { sourceType, sourceId, use, reason }),
   payoutPropose: (sourceId: string, sourceType: "claim" | "award") =>
     call("payout.propose", { sourceId, sourceType }),
   payoutRelease: (ids: string[]) =>
