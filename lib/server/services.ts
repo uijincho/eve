@@ -692,6 +692,7 @@ const handlers: Record<AppAction, Handler> = {
   "payout.bankChange": (async (tx, actor, p) => {
     assertSelfOrStaff(actor, p.personId);
     const r = await changeBankDetails(tx, actor, p);
+    if (r.enrolled) return ok(`Payout account ••${p.last4} added (simulated provider). ${r.requoted} unpaid payout(s) re-quoted; each still needs a controller release.`, r);
     return ok(`Bank change recorded. ${r.frozen.length} payout(s) frozen; verification requested through ${r.sentTo} (delivery pending).`, r);
   }) as Handler,
   "payout.verify": (async (tx, actor, p) => {
