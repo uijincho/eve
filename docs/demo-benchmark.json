@@ -1,0 +1,304 @@
+{
+  "measuredAt": "2026-10-24T12:00:48.968Z",
+  "commit": "680aeca415c3fd997d5a53678404f0c90867ff44",
+  "elapsedSeconds": 404,
+  "reset": true,
+  "truth": "Simulated money; real HTTP, Postgres, policy engine and Workflow execution",
+  "counts": {
+    "people": 300,
+    "claims": 160,
+    "awards": 25
+  },
+  "controllerThresholdPaymentsReleased": 2,
+  "scoreboard": {
+    "total": 40,
+    "evaluated": 40,
+    "caught": 40,
+    "missed": 0,
+    "falsePositives": 0,
+    "wrongfulPayouts": 0,
+    "results": [
+      {
+        "id": "key_demo_01",
+        "actual": "claims escalated",
+        "passed": true,
+        "expected": "hold",
+        "scenario": "Attendee under 18"
+      },
+      {
+        "id": "key_demo_02",
+        "actual": "claims escalated",
+        "passed": true,
+        "expected": "hold",
+        "scenario": "Attendee under 18"
+      },
+      {
+        "id": "key_demo_03",
+        "actual": "held",
+        "passed": true,
+        "expected": "hold",
+        "scenario": "Expired W-8BEN"
+      },
+      {
+        "id": "key_demo_04",
+        "actual": "held",
+        "passed": true,
+        "expected": "hold",
+        "scenario": "Expired W-8BEN"
+      },
+      {
+        "id": "key_demo_05",
+        "actual": "held",
+        "passed": true,
+        "expected": "hold",
+        "scenario": "Expired W-8BEN"
+      },
+      {
+        "id": "key_demo_06",
+        "actual": "held",
+        "passed": true,
+        "expected": "hold",
+        "scenario": "W-9 from a foreign address"
+      },
+      {
+        "id": "key_demo_07",
+        "actual": "held",
+        "passed": true,
+        "expected": "hold",
+        "scenario": "W-9 from a foreign address"
+      },
+      {
+        "id": "key_demo_08",
+        "actual": "held",
+        "passed": true,
+        "expected": "hold",
+        "scenario": "Unverified treaty claim"
+      },
+      {
+        "id": "key_demo_09",
+        "actual": "paid $2,100.00 on 1099-MISC in 2026 (threshold $2,000.00); 1099-MISC drafted for $2,100.00",
+        "passed": true,
+        "expected": "reportable:1099-MISC",
+        "scenario": "Crosses $2,000 across two payments"
+      },
+      {
+        "id": "key_demo_10",
+        "actual": "paid $2,100.00 on 1099-MISC in 2026 (threshold $2,000.00); 1099-MISC drafted for $2,100.00",
+        "passed": true,
+        "expected": "reportable:1099-MISC",
+        "scenario": "Crosses $2,000 across two payments"
+      },
+      {
+        "id": "key_demo_11",
+        "actual": "frozen",
+        "passed": true,
+        "expected": "freeze",
+        "scenario": "Bank details changed before payout"
+      },
+      {
+        "id": "key_demo_12",
+        "actual": "frozen",
+        "passed": true,
+        "expected": "freeze",
+        "scenario": "Bank details changed before payout"
+      },
+      {
+        "id": "key_demo_13",
+        "actual": "escalated; failed cap_hugging",
+        "passed": true,
+        "expected": "flag:cap_hugging",
+        "scenario": "Cap-hugging fare"
+      },
+      {
+        "id": "key_demo_14",
+        "actual": "escalated; failed cap",
+        "passed": true,
+        "expected": "flag:cap",
+        "scenario": "Over cap"
+      },
+      {
+        "id": "key_demo_15",
+        "actual": "escalated; failed duplicate",
+        "passed": true,
+        "expected": "flag:duplicate",
+        "scenario": "Duplicate receipt"
+      },
+      {
+        "id": "key_demo_16",
+        "actual": "escalated; failed duplicate",
+        "passed": true,
+        "expected": "flag:duplicate",
+        "scenario": "Duplicate receipt"
+      },
+      {
+        "id": "key_demo_17",
+        "actual": "escalated; failed duplicate",
+        "passed": true,
+        "expected": "flag:duplicate",
+        "scenario": "Duplicate receipt"
+      },
+      {
+        "id": "key_demo_18",
+        "actual": "escalated; failed duplicate",
+        "passed": true,
+        "expected": "flag:duplicate",
+        "scenario": "Duplicate receipt"
+      },
+      {
+        "id": "key_demo_19",
+        "actual": "escalated; failed duplicate",
+        "passed": true,
+        "expected": "flag:duplicate",
+        "scenario": "Duplicate receipt"
+      },
+      {
+        "id": "key_demo_20",
+        "actual": "escalated; failed travel_dates",
+        "passed": true,
+        "expected": "flag:travel_dates",
+        "scenario": "Flight on the wrong dates"
+      },
+      {
+        "id": "key_demo_21",
+        "actual": "escalated; failed travel_dates",
+        "passed": true,
+        "expected": "flag:travel_dates",
+        "scenario": "Flight on the wrong dates"
+      },
+      {
+        "id": "key_demo_22",
+        "actual": "escalated; failed travel_dates",
+        "passed": true,
+        "expected": "flag:travel_dates",
+        "scenario": "Flight on the wrong dates"
+      },
+      {
+        "id": "key_demo_23",
+        "actual": "escalated; failed travel_dates",
+        "passed": true,
+        "expected": "flag:travel_dates",
+        "scenario": "Flight on the wrong dates"
+      },
+      {
+        "id": "key_demo_24",
+        "actual": "escalated; failed travel_dates",
+        "passed": true,
+        "expected": "flag:travel_dates",
+        "scenario": "Flight on the wrong dates"
+      },
+      {
+        "id": "key_demo_25",
+        "actual": "escalated; failed cabin",
+        "passed": true,
+        "expected": "flag:cabin",
+        "scenario": "Business-class ticket"
+      },
+      {
+        "id": "key_demo_26",
+        "actual": "escalated; failed cabin",
+        "passed": true,
+        "expected": "flag:cabin",
+        "scenario": "Business-class ticket"
+      },
+      {
+        "id": "key_demo_27",
+        "actual": "escalated; failed cabin",
+        "passed": true,
+        "expected": "flag:cabin",
+        "scenario": "Business-class ticket"
+      },
+      {
+        "id": "key_demo_28",
+        "actual": "escalated; failed cap",
+        "passed": true,
+        "expected": "flag:cap",
+        "scenario": "EUR receipt above the cap after conversion"
+      },
+      {
+        "id": "key_demo_29",
+        "actual": "escalated; failed cap",
+        "passed": true,
+        "expected": "flag:cap",
+        "scenario": "EUR receipt above the cap after conversion"
+      },
+      {
+        "id": "key_demo_30",
+        "actual": "escalated; failed name_match",
+        "passed": true,
+        "expected": "flag:name_match",
+        "scenario": "Name mismatch"
+      },
+      {
+        "id": "key_demo_31",
+        "actual": "escalated; failed name_match",
+        "passed": true,
+        "expected": "flag:name_match",
+        "scenario": "Name mismatch"
+      },
+      {
+        "id": "key_demo_32",
+        "actual": "escalated; failed name_match",
+        "passed": true,
+        "expected": "flag:name_match",
+        "scenario": "Name mismatch"
+      },
+      {
+        "id": "key_demo_33",
+        "actual": "escalated; failed name_match",
+        "passed": true,
+        "expected": "flag:name_match",
+        "scenario": "Name mismatch"
+      },
+      {
+        "id": "key_demo_34",
+        "actual": "escalated; failed cap_hugging",
+        "passed": true,
+        "expected": "flag:cap_hugging",
+        "scenario": "Cap-hugging fare"
+      },
+      {
+        "id": "key_demo_35",
+        "actual": "needs_info; failed receipt",
+        "passed": true,
+        "expected": "flag:receipt",
+        "scenario": "Missing receipt"
+      },
+      {
+        "id": "key_demo_36",
+        "actual": "needs_info; failed receipt",
+        "passed": true,
+        "expected": "flag:receipt",
+        "scenario": "Missing receipt"
+      },
+      {
+        "id": "key_demo_37",
+        "actual": "needs_info; failed receipt",
+        "passed": true,
+        "expected": "flag:receipt",
+        "scenario": "Missing receipt"
+      },
+      {
+        "id": "key_demo_38",
+        "actual": "escalated; failed booking_deadline",
+        "passed": true,
+        "expected": "flag:booking_deadline",
+        "scenario": "Booked after the deadline"
+      },
+      {
+        "id": "key_demo_39",
+        "actual": "escalated; failed booking_deadline",
+        "passed": true,
+        "expected": "flag:booking_deadline",
+        "scenario": "Booked after the deadline"
+      },
+      {
+        "id": "key_demo_40",
+        "actual": "exception",
+        "passed": true,
+        "expected": "exception",
+        "scenario": "Sponsor short-paid"
+      }
+    ],
+    "lastRunAt": "2026-10-24T12:00:46.636Z"
+  }
+}
