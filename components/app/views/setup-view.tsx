@@ -30,8 +30,8 @@ export function SetupView() {
   return (
     <PageFrame title="Organization setup" lede={() => "About ten minutes, once per organization. Each step saves as you go."}>
       {(s) => (
-        <div className="grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)]">
-          <nav aria-label="Setup steps">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[13rem_minmax(0,1fr)]">
+          <nav aria-label="Setup steps" className="min-w-0">
             <ol className="flex gap-1 overflow-x-auto lg:flex-col">
               {STEPS.map((x, i) => (
                 <li key={x.id} className="shrink-0">
