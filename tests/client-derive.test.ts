@@ -158,3 +158,12 @@ describe("helpers", () => {
     expect(suggestedForm({ country: "CA", citizenship: "CA", entity: true })).toBe("W-8BEN-E");
   });
 });
+
+describe("calendar dates", () => {
+  it("prints a midnight-UTC purchase date as its own day, not the day before in Pacific time", async () => {
+    const { fmtDay, humanize } = await import("@/lib/client/format");
+    expect(fmtDay("2026-10-24T00:00:00.000Z")).toBe("Oct 24");
+    expect(fmtDay("2026-10-24")).toBe("Oct 24");
+    expect(humanize("ground_transport")).toBe("Ground transport");
+  });
+});

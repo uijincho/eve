@@ -14,6 +14,29 @@ export function fmtDate(iso?: string | null, withYear = false): string {
   return valid(d) ? (withYear ? DATE_Y : DATE).format(d) : "—";
 }
 
+const DAY = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+const DAY_Y = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
+
+/**
+ * A calendar date such as a receipt's purchase date. The server stores those
+ * as midnight UTC, which would read as the day before in the event's zone, so
+ * midnight-UTC values print as their own date; real instants use the event zone.
+ */
+export function fmtDay(iso?: string | null, withYear = false): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (!valid(d)) return "—";
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso) || /T00:00:00(\.000)?Z$/.test(iso);
+  return dateOnly ? (withYear ? DAY_Y : DAY).format(d) : fmtDate(iso, withYear);
+}
+
+/** "ground_transport" -> "Ground transport". */
+export function humanize(key?: string | null): string {
+  if (!key) return "";
+  const t = key.replace(/[_-]+/g, " ").trim();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 export function fmtTime(iso?: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);

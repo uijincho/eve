@@ -8,7 +8,7 @@ import { Section } from "@/components/app/page-header";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Money } from "@/components/eve/money";
 import { big } from "@/lib/client/derive";
-import { fmtDate } from "@/lib/client/format";
+import { fmtDate, fmtDay, humanize } from "@/lib/client/format";
 
 import { PortalFrame } from "./portal-frame";
 
@@ -33,7 +33,7 @@ export function PortalClaims() {
                         <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3 hover:bg-surface">
                           <span className="flex flex-col">
                             <span className="font-medium">{c.merchant || "Receipt"} · {c.id}</span>
-                            <span className="text-small text-muted-foreground">{c.type === "travel" ? "Travel" : c.category} · {fmtDate(c.purchasedAt)}</span>
+                            <span className="text-small text-muted-foreground">{c.type === "travel" ? "Travel" : humanize(c.category)} · {fmtDay(c.purchasedAt)}</span>
                           </span>
                           <span className="flex flex-col items-end gap-1">
                             <Money amountMinor={big(c.usdMinor)} className="font-semibold" />

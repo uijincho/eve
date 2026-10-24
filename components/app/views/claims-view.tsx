@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Claim } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
 import { big, canManage, canReview } from "@/lib/client/derive";
-import { fmtDate } from "@/lib/client/format";
+import { fmtDate, fmtDay, humanize } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 
 type StatusFilter = "all" | "open" | "escalated" | "needs_info" | "approved" | "rejected" | "paid";
@@ -79,7 +79,7 @@ export function ClaimsView() {
 
         const columns: Column<Claim>[] = [
           { key: "id", header: "Claim", cell: (c) => `${c.id} · ${c.personName}`, stack: "title", sort: (c) => c.personName },
-          { key: "what", header: "Details", cell: (c) => [c.type === "travel" ? `${c.origin ?? ""} ${c.cabin ?? ""}`.trim() || "Travel" : c.category, c.merchant].filter(Boolean).join(" · "), stack: "meta" },
+          { key: "what", header: "Details", cell: (c) => [c.type === "travel" ? `${c.origin ?? ""} ${c.cabin ?? ""}`.trim() || "Travel" : humanize(c.category), c.merchant].filter(Boolean).join(" · "), stack: "meta" },
           { key: "flags", header: "Checks", cell: (c) => <ChecksSummary claim={c} />, stack: "meta" },
           { key: "status", header: "Status", cell: (c) => <StatusBadge status={c.status} />, stack: "end", sort: (c) => c.status },
           {
@@ -206,7 +206,7 @@ export function ClaimDetail({ claim: c, snapshot, onEvidence }: { claim: Claim; 
         <dt className="text-muted-foreground">Merchant</dt>
         <dd className="text-right">{c.merchant}</dd>
         <dt className="text-muted-foreground">Purchased</dt>
-        <dd className="text-right">{fmtDate(c.purchasedAt, true)}</dd>
+        <dd className="text-right">{fmtDay(c.purchasedAt, true)}</dd>
         {c.travelDate ? (
           <>
             <dt className="text-muted-foreground">Travel</dt>
@@ -214,7 +214,7 @@ export function ClaimDetail({ claim: c, snapshot, onEvidence }: { claim: Claim; 
           </>
         ) : null}
         <dt className="text-muted-foreground">Category</dt>
-        <dd className="text-right">{c.category}</dd>
+        <dd className="text-right">{humanize(c.category)}</dd>
       </dl>
       <CheckList checks={c.checks} />
       <div className="flex flex-wrap gap-2">

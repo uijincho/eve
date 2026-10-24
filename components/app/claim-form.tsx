@@ -232,7 +232,7 @@ export function ClaimForm({
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" variant={submitVariant} aria-busy={busy || undefined} disabled={busy}>
           {busy ? <LoaderCircleIcon aria-hidden className="animate-spin" /> : null}
-          {phase === "uploading" ? "Uploading receipt" : phase === "submitting" ? "Submitting" : submitLabel}
+          {phase === "uploading" ? "Uploading receipt" : phase === "submitting" ? (file ? "Eve is reading the receipt" : "Checking the claim") : submitLabel}
         </Button>
         <span role="status" aria-live="polite">
           {result ? <ResultText result={result} /> : null}
