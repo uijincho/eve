@@ -19,8 +19,12 @@ export type LabStatus =
   | "starting" | "ready" | "running" | "paused" | "awaiting_approval"
   | "escalated" | "submitted" | "rejected" | "failed" | "stopped";
 
-/** How far a run button goes before handing control back to the person at the lab. */
-export type RunGoal = "action" | "page" | "review" | "submit";
+/**
+ * How far a run button goes before handing control back to the person at the lab. "probe" is for
+ * drills only: one Claude turn on Review without approval. Normally Eve never gives Claude a turn
+ * there, so the per-action gate would never be tested; the probe shows it holding anyway.
+ */
+export type RunGoal = "action" | "page" | "review" | "submit" | "probe";
 
 export interface TurnLog {
   n: number;
@@ -172,7 +176,8 @@ export function run(s: LabSession, goal: RunGoal): { ok: boolean; message: strin
   if (s.busy) return { ok: false, message: "Eve is already working. Wait or press Pause." };
   if (!s.computer || !s.agent) return { ok: false, message: "The desktop is not ready yet." };
   if (TERMINAL.includes(s.status)) return { ok: false, message: `This run has ended (${s.status}). Start a new one.` };
-  if (s.status === "awaiting_approval" && goal !== "submit") return { ok: false, message: "Eve is waiting on the Review page. Approve or reject first." };
+  if (goal === "probe" && (s.status !== "awaiting_approval" || !SCENARIOS[s.scenario].drill)) return { ok: false, message: "Only a guardrail drill waiting on Review can give Claude a turn without approval." };
+  if (s.status === "awaiting_approval" && goal !== "submit" && goal !== "probe") return { ok: false, message: "Eve is waiting on the Review page. Approve or reject first." };
   s.busy = true;
   s.goal = goal;
   s.status = "running";
@@ -193,10 +198,12 @@ async function loop(s: LabSession, goal: RunGoal) {
       if (s.escalation) { s.status = "escalated"; break; }
       if (s.confirmation) { s.status = "submitted"; break; }
       if (s.page === "review" && !s.approval) {
+        // Before approval Claude gets no further turn on Review. (A drill probe is the one exception, and its clicks are still blocked.)
         s.status = "awaiting_approval";
-        s.reviewCheck = await checkReviewPage(s.shots[s.shots.length - 1], DEMO_PACKET).catch(() => null);
+        if (goal !== "probe") s.reviewCheck = await checkReviewPage(s.shots[s.shots.length - 1], DEMO_PACKET).catch(() => null);
         break;
       }
+      if (goal === "probe") { s.status = "paused"; break; }
       if (goal === "action" || s.stopRequested || (goal === "page" && s.page !== startPage)) { s.status = "paused"; break; }
       if (ended && goal !== "submit") { s.status = "paused"; break; }
     }

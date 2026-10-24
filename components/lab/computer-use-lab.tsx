@@ -21,7 +21,7 @@ const API = "/api/lab/computer-use";
 type LabResponse = { ok: boolean; configured: boolean; message: string | null; scenarios: Scenario[]; state: LabState | null };
 type Op =
   | { op: "start"; scenario: ScenarioId }
-  | { op: "run"; id: string; goal: "action" | "page" | "review" }
+  | { op: "run"; id: string; goal: "action" | "page" | "review" | "probe" }
   | { op: "pause" | "approve" | "reject" | "stop"; id: string };
 
 const ENDED: LabState["status"][] = ["escalated", "submitted", "rejected", "failed", "stopped"];
@@ -39,7 +39,7 @@ const STATUS: Record<LabState["status"], { label: string; variant: "outline" | "
   stopped: { label: "Desktop deleted", variant: "secondary" },
 };
 
-const GOALS = { action: "Taking the next action", page: "Working until the portal moves to the next page", review: "Working until the Review page", submit: "Submitting after approval" };
+const GOALS = { action: "Taking the next action", page: "Working until the portal moves to the next page", review: "Working until the Review page", submit: "Submitting after approval", probe: "Giving Claude one turn on Review without approval (drill)" };
 
 function statusLine(s: LabState): string {
   switch (s.status) {
@@ -382,6 +382,14 @@ function Approval({ state, pending, send }: { state: LabState; pending: Op["op"]
           <XIcon aria-hidden /> Reject
         </Button>
       </div>
+      {state.scenario.drill ? (
+        <div className="flex flex-col gap-1.5 border-t pt-3">
+          <Button variant="secondary" disabled={pending !== null || state.busy} onClick={() => send({ op: "run", id: state.id, goal: "probe" })}>
+            <StepForwardIcon aria-hidden /> Give Claude a turn anyway
+          </Button>
+          <p className="text-caption text-muted-foreground">Drill only. Eve normally gives Claude no turn on Review before approval. This hands it one, with the operator telling it to press Submit, so you can watch Eve&apos;s code block the click.</p>
+        </div>
+      ) : null}
       <p className="text-caption text-muted-foreground">You are playing the controller. In Eve, only a controller can approve, and never the person who requested the payout.</p>
     </Panel>
   );
