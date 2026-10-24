@@ -24,13 +24,15 @@ export function PrizeComparison({
   payout?: Payout;
   className?: string;
 }) {
-  const o = prizeOptions(snapshot, award, person, payout);
-  const first = award.personName.split(" ")[0];
   const inKind = payout?.provider === "in_kind";
+  // An in-kind delivery is not a cash payout: keep the cash option as an estimate.
+  const o = prizeOptions(snapshot, award, person, inKind ? undefined : payout);
+  const rule = inKind ? (snapshot.rules.find((r) => r.id === payout.ruleId && r.version === payout.ruleVersion) ?? o.rule) : o.rule;
+  const first = award.personName.split(" ")[0];
   const fees = payout ? payoutFees(payout) : { recipient: 0n, org: 0n };
   const fee = fees.recipient;
-  const ruleSource = o.rule
-    ? `Rule ${o.rule.id} v${o.rule.version} · ${fmtRate(o.rule.rateBps)}${o.rule.verified ? "" : " · unverified"}`
+  const ruleSource = rule
+    ? `Rule ${rule.id} v${rule.version} · ${fmtRate(rule.rateBps)}${rule.verified ? "" : " · unverified"}`
     : "No matching rule loaded";
 
   return (
@@ -38,17 +40,17 @@ export function PrizeComparison({
       <section className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-2">
           <h3 className="font-semibold">{inKind ? `What ${first} received, as reported income` : `What ${first} receives as cash`}</h3>
-          {o.fromPayout ? null : <TruthLabel kind="estimate" />}
+          {inKind ? <TruthLabel kind="simulated" /> : o.fromPayout ? null : <TruthLabel kind="estimate" />}
         </div>
         <BreakdownBar
-          grossMinor={Number(o.gross)}
+          grossMinor={Number(inKind ? BigInt(payout.grossMinor) : o.gross)}
           currency={award.currency}
-          estimate={!o.fromPayout}
+          estimate={!inKind && !o.fromPayout}
           netLabel={inKind ? `Item value delivered to ${first}` : `${o.fromPayout ? "Net" : "Est. net"} to ${first}`}
           deductions={[
             {
-              label: inKind ? "Withholding the organization pays on top" : o.rule ? `Withholding, ${fmtRate(o.rule.rateBps)}` : "Withholding",
-              amountMinor: Number(o.withholding),
+              label: inKind ? "Withholding the organization pays on top" : rule ? `Withholding, ${fmtRate(rule.rateBps)}` : "Withholding",
+              amountMinor: Number(inKind ? BigInt(payout.withholdingMinor) : o.withholding),
               kind: "withholding",
             },
             { label: "Fees", amountMinor: Number(fee), kind: "fee" },
@@ -57,14 +59,14 @@ export function PrizeComparison({
         <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-small">
           <dt className="text-muted-foreground">Rule</dt>
           <dd className="flex flex-wrap items-center gap-2">
-            {o.rule ? (
-              <Evidence source={ruleSource} href={o.rule.sourceUrl}>
-                {ruleLabel(o.rule)}
+            {rule ? (
+              <Evidence source={ruleSource} href={rule.sourceUrl}>
+                {ruleLabel(rule)}
               </Evidence>
             ) : (
               <span className="text-muted-foreground">No rule matched yet</span>
             )}
-            {o.rule && !o.rule.verified ? <TruthLabel kind="unverified" /> : null}
+            {rule && !rule.verified ? <TruthLabel kind="unverified" /> : null}
           </dd>
           {fees.org ? (
             <>

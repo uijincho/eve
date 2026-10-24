@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Person } from "@/lib/contracts";
 import { invitations, type CreatedInvite } from "@/lib/client/account";
 import { ApiError } from "@/lib/client/api";
-import { big, canManage, payoutSource, type Permission } from "@/lib/client/derive";
+import { big, canManage, payoutSource, type Permission, payoutValue } from "@/lib/client/derive";
 import { fmtDate, fmtDateTime } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -140,7 +140,7 @@ function PersonDetail({ person: p, snapshot: s }: { person: Person; snapshot: Ap
             {payouts.map((x) => (
               <li key={x.id} className="flex items-center justify-between gap-3 px-3 py-2 text-small">
                 <span>{payoutSource(s, x)}</span>
-                <span className="flex items-center gap-2"><Money amountMinor={big(x.netMinor)} currency={x.currency} /> <StatusBadge status={x.status} /></span>
+                <span className="flex items-center gap-2"><Money amountMinor={payoutValue(x)} currency={x.currency} /> <StatusBadge status={x.status} /></span>
               </li>
             ))}
           </ul>

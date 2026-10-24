@@ -33,6 +33,12 @@ export function controllerName(s: Pick<AppSnapshot, "personas">): string {
   return s.personas.find((p) => p.role === "controller")?.name ?? "the controller";
 }
 
+/** " Ari Novak is the controller." when known (sample personas), else nothing. */
+function controllerNote(s: Pick<AppSnapshot, "personas">): string {
+  const name = s.personas.find((p) => p.role === "controller")?.name;
+  return name ? ` ${name} is the controller.` : "";
+}
+
 /** "Best Hardware Hack: 2nd place", or just "Judge stipend" when the track and title match. */
 export function awardName(a: Pick<Award, "track" | "title">, sep = ": "): string {
   return !a.title || a.title.trim().toLowerCase() === a.track.trim().toLowerCase() ? a.track : `${a.track}${sep}${a.title}`;
@@ -126,7 +132,7 @@ export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "p
   if (!["proposed", "approved"].includes(payout.status)) return no(`This payout is ${payout.status}.`);
   if (actor.role === "auditor") return no("Auditors have read-only access.");
   if (actor.role !== "controller")
-    return no(`Only a controller releases money. ${controllerName(s)} is the controller.`);
+    return no(`Only a controller releases money.${controllerNote(s)}`);
   if (payout.requestedBy === actor.id || payout.requestedBy === actor.name)
     return no("You requested this payout. A different controller must release it.");
   return ok;
@@ -137,11 +143,11 @@ export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "p
  * locally (award.fulfill). Mirrors the server's checks so the reason shows
  * before the click; the server still decides.
  */
-export function canFulfill(actor: Actor, award: Award, s: Pick<AppSnapshot, "personas" | "people" | "payouts" | "awards" | "rules" | "org"> & { now?: string }): Permission {
+export function canFulfill(actor: Actor, award: Award, s: Pick<AppSnapshot, "personas" | "people" | "payouts" | "awards">): Permission {
   if (award.kind !== "item" || (award.fulfillment !== "ship" && award.fulfillment !== "local")) return no("Choose ship or buy locally first.");
   if (award.status === "paid") return no("Already delivered.");
   if (actor.role === "auditor") return no("Auditors have read-only access.");
-  if (actor.role !== "controller") return no(`A controller confirms delivery. ${controllerName(s)} is the controller.`);
+  if (actor.role !== "controller") return no(`A controller confirms delivery.${controllerNote(s)}`);
   if (award.requestedBy === actor.id || award.requestedBy === actor.name) return no("You entered this prize, so another controller must confirm its delivery.");
   const person = s.people.find((p) => p.id === award.personId);
   if (person && actor.personId === person.id) return no("You cannot confirm your own prize.");
@@ -149,8 +155,7 @@ export function canFulfill(actor: Actor, award: Award, s: Pick<AppSnapshot, "per
   if (person && person.taxStatus !== "valid") return no(`Held until ${person.name.split(" ")[0]} signs a valid ${person.taxForm}. The item's value is reportable income.`);
   if (s.payouts.some((p) => p.sourceType === "award" && p.sourceId === award.id && !["failed", "returned"].includes(p.status))) return no("A payout already exists for this prize, so its terms are locked.");
   if (award.teamId && s.awards.some((a) => a.teamId === award.teamId && !a.splitConfirmed)) return no("Every team member must confirm the split first.");
-  const rule = prizeRule(s, person, "item");
-  if (rule && !rule.verified) return no(`Rule ${rule.id} v${rule.version} is unverified; a person must verify it before delivery.`);
+  // Which tax rule applies (and whether it is verified) is the server's call; it answers with the reason.
   return ok;
 }
 
@@ -171,7 +176,7 @@ export function canManage(actor: Actor): Permission {
 export function canControl(actor: Actor, s: Pick<AppSnapshot, "personas">): Permission {
   if (actor.role === "controller") return ok;
   if (actor.role === "auditor") return no("Auditors have read-only access.");
-  return no(`Only a controller can do this. ${controllerName(s)} is the controller.`);
+  return no(`Only a controller can do this.${controllerNote(s)}`);
 }
 
 // ── Inbox ─────────────────────────────────────────────────────────────────
@@ -220,7 +225,7 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
       category: "approvals",
       title: ready.length === 1 ? `Payout ready for release: ${ready[0].personName}` : `Payout batch ready for release`,
       mark: "Release",
-      meta: `${ready.length} ${ready.length === 1 ? "payout" : "payouts"} · controller ${controllerName(s)}`,
+      meta: `${ready.length} ${ready.length === 1 ? "payout" : "payouts"}${s.personas.some((p) => p.role === "controller") ? ` · controller ${controllerName(s)}` : " · for a controller"}`,
       detail: `${fmtPlain(withheld, "USD")} withheld · fees ${fmtPlain(sumMinor(ready.map((p) => p.feeMinor)), "USD")} · Eve cannot release money.`,
       amountMinor: gross,
       currency: ready[0].currency,
@@ -514,6 +519,19 @@ export function ruleLabel(r: Pick<AppSnapshot["rules"][number], "payerCountry" |
   const payee = r.payeeCountry === "*" ? "anyone" : r.payeeCountry.startsWith("NON") ? `non-${r.payeeCountry.slice(3)}` : r.payeeCountry;
   const [type, variant] = r.paymentType.split(":");
   return `${r.payerCountry} → ${payee}, ${type.replace(/_/g, " ")}${variant ? ` (${variant})` : ""}, v${r.version}`;
+}
+
+/** True for a prize delivered as the item itself (award.fulfill), not as money. */
+export function isInKind(p: Pick<Payout, "provider">): boolean {
+  return p.provider === "in_kind";
+}
+
+/**
+ * What the recipient gets: the net for money, the item's value for an in-kind
+ * delivery (the server records its net as 0 and the org's tax as withholding).
+ */
+export function payoutValue(p: Pick<Payout, "provider" | "grossMinor" | "withholdingMinor" | "netMinor">): bigint {
+  return isInKind(p) ? big(p.grossMinor) - big(p.withholdingMinor) : big(p.netMinor);
 }
 
 /**

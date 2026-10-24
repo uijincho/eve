@@ -18,7 +18,7 @@ import { Money } from "@/components/eve/money";
 import { Button } from "@/components/ui/button";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
 import { exportUrl } from "@/lib/client/api";
-import { big, canControl, canManage, canRelease, payoutSource, type Permission, providerLabel, releaseInFlight, sumMinor } from "@/lib/client/derive";
+import { big, canControl, canManage, canRelease, payoutSource, type Permission, providerLabel, releaseInFlight, sumMinor, payoutValue } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -73,10 +73,10 @@ export function PayoutsView() {
             header: "Net received",
             align: "end",
             stack: "end",
-            sort: (p) => big(p.netMinor),
+            sort: (p) => payoutValue(p),
             cell: (p) => (
               <span className="flex flex-col items-end">
-                <Money amountMinor={big(p.netMinor)} currency={p.currency} className="font-semibold" />
+                <Money amountMinor={payoutValue(p)} currency={p.currency} className="font-semibold" />
                 {p.destinationCurrency !== p.currency ? (
                   <Money amountMinor={big(p.destinationNetMinor)} currency={p.destinationCurrency} estimate={p.status !== "paid"} className="text-caption text-muted-foreground" />
                 ) : null}

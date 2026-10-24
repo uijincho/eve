@@ -12,7 +12,7 @@ import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { Badge } from "@/components/ui/badge";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
-import { actorName, big, type InboxItem, payoutFees, payoutSource, providerLabel } from "@/lib/client/derive";
+import { actorName, big, type InboxItem, payoutFees, payoutSource, providerLabel, isInKind, payoutValue } from "@/lib/client/derive";
 import { useEve } from "@/lib/client/use-eve";
 import { documentUrl } from "@/lib/client/api";
 import { fmtDateTime } from "@/lib/client/format";
@@ -74,7 +74,7 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
                 </span>
               </span>
               <span className="flex flex-col items-end">
-                <Money amountMinor={big(p.netMinor)} currency={p.currency} className="font-semibold" />
+                <Money amountMinor={payoutValue(p)} currency={p.currency} className="font-semibold" />
                 <span className="text-caption text-muted-foreground">
                   net of <Money amountMinor={big(p.grossMinor)} currency={p.currency} />
                 </span>
@@ -164,9 +164,9 @@ export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payo
         grossMinor={Number(big(p.grossMinor))}
         currency={p.currency}
         estimate={estimate}
-        netLabel={`Net to ${p.personName.split(" ")[0]}`}
+        netLabel={isInKind(p) ? `Item value delivered to ${p.personName.split(" ")[0]}` : `Net to ${p.personName.split(" ")[0]}`}
         deductions={[
-          { label: "Withholding", amountMinor: Number(big(p.withholdingMinor)), kind: "withholding" },
+          { label: isInKind(p) ? "Withholding the organization pays on top" : "Withholding", amountMinor: Number(big(p.withholdingMinor)), kind: "withholding" },
           { label: "Fees", amountMinor: Number(fees.recipient), kind: "fee" },
         ]}
       />
