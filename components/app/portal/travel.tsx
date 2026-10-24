@@ -13,7 +13,7 @@ import { TruthLabel } from "@/components/eve/truth-label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResult, AppSnapshot, Person } from "@/lib/contracts";
-import { big } from "@/lib/client/derive";
+import { big, claimStatusLabel } from "@/lib/client/derive";
 import { fmtDate, fmtDateTime, humanize } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 import { useEve } from "@/lib/client/use-eve";
@@ -105,7 +105,12 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
     const notes = [
       why,
       r.ok && !found.length && !left.length ? r.message : null,
-      r.ok && r.data?.destinationRecognized === false ? `Eve could not tell the venue's city, so fares fly to ${String(r.data.destination ?? "SFO")}. Check the destination before requesting.` : null,
+      // The server already explains the venue fallback in its message when it applies.
+      r.ok && r.data?.destinationRecognized === false && found.length
+        ? /venue|city/i.test(r.message)
+          ? r.message.replace(/^\d+ option\(s\) under policy\.\s*/, "")
+          : `Eve could not tell the venue's city, so fares fly to ${String(r.data.destination ?? "SFO")}. Check the destination before requesting.`
+        : null,
     ].filter(Boolean);
     setNote(notes.length ? notes.join(" ") : null);
   };
@@ -199,7 +204,7 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
                 </span>
                 <span className="flex flex-col items-end gap-1">
                   <Money amountMinor={big(c.usdMinor)} className="font-semibold" />
-                  <StatusBadge status={c.status} />
+                  <StatusBadge status={c.status} label={claimStatusLabel(c)} />
                 </span>
               </li>
             ))}

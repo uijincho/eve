@@ -12,7 +12,7 @@ import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { Badge } from "@/components/ui/badge";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
-import { actorName, big, type InboxItem, payoutFees, payoutSource, providerLabel, isInKind, payoutValue } from "@/lib/client/derive";
+import { actorName, big, type InboxItem, payoutFees, payoutSource, providerLabel, isInKind, payoutValue, claimStatusLabel } from "@/lib/client/derive";
 import { useEve } from "@/lib/client/use-eve";
 import { documentUrl } from "@/lib/client/api";
 import { fmtDateTime } from "@/lib/client/format";
@@ -106,7 +106,7 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
             <dd className="text-right">{c.merchant}</dd>
             <dt className="text-muted-foreground">Status</dt>
             <dd className="text-right">
-              <StatusBadge status={c.status} />
+              <StatusBadge status={c.status} label={claimStatusLabel(c)} />
             </dd>
           </dl>
           <CheckList checks={c.checks} />

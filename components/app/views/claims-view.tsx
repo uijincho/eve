@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Claim } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
-import { big, canManage, canReview, isOrgBookedFlight } from "@/lib/client/derive";
+import { big, canManage, canReview, isOrgBookedFlight, claimStatusLabel } from "@/lib/client/derive";
 import { fmtDate, fmtDay, humanize } from "@/lib/client/format";
 import { initialParam } from "@/lib/client/url-param";
 import { payloads } from "@/lib/client/payloads";
@@ -83,7 +83,7 @@ export function ClaimsView() {
           { key: "id", header: "Claim", cell: (c) => `${c.id} · ${c.personName}`, stack: "title", sort: (c) => c.personName },
           { key: "what", header: "Details", cell: (c) => [c.type === "travel" ? `${c.origin ?? ""} ${c.cabin ?? ""}`.trim() || "Travel" : humanize(c.category), c.merchant].filter(Boolean).join(" · "), stack: "meta" },
           { key: "flags", header: "Checks", cell: (c) => <ChecksSummary claim={c} />, stack: "meta" },
-          { key: "status", header: "Status", cell: (c) => <StatusBadge status={c.status} />, stack: "end", sort: (c) => c.status },
+          { key: "status", header: "Status", cell: (c) => <StatusBadge status={c.status} label={claimStatusLabel(c)} />, stack: "end", sort: (c) => c.status },
           {
             key: "amount",
             header: "Amount",
@@ -188,7 +188,7 @@ export function ClaimDetail({ claim: c, snapshot, onEvidence }: { claim: Claim; 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge status={c.status} />
+        <StatusBadge status={c.status} label={claimStatusLabel(c)} />
         <DueChip due={c.dueAt} now={snapshot.now} context="review" />
       </div>
       {c.reason ? <p className="text-small">{c.reason}</p> : null}

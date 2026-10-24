@@ -7,7 +7,7 @@ import { CheckList } from "@/components/app/evidence-sheet";
 import { Section } from "@/components/app/page-header";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Money } from "@/components/eve/money";
-import { big } from "@/lib/client/derive";
+import { big, claimStatusLabel } from "@/lib/client/derive";
 import { fmtDay, humanize } from "@/lib/client/format";
 
 import { PortalFrame } from "./portal-frame";
@@ -37,7 +37,7 @@ export function PortalClaims() {
                           </span>
                           <span className="flex flex-col items-end gap-1">
                             <Money amountMinor={big(c.usdMinor)} className="font-semibold" />
-                            <StatusBadge status={c.status} />
+                            <StatusBadge status={c.status} label={claimStatusLabel(c)} />
                           </span>
                         </summary>
                         <div className="flex flex-col gap-3 px-4 pb-4">

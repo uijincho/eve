@@ -82,6 +82,11 @@ export function isOrgBookedFlight(c: Pick<Claim, "category">): boolean {
   return c.category === "org_booked_flight";
 }
 
+/** Status wording for a claim: an org-booked flight that settled reads "Booked", not "Paid". */
+export function claimStatusLabel(c: Pick<Claim, "category" | "status">): string | undefined {
+  return isOrgBookedFlight(c) && c.status === "paid" ? "Booked" : undefined;
+}
+
 /** A persona's name for an actor id ("mem_demo_ari" -> "Ari Novak"); the id itself if unknown. */
 export function actorName(s: Pick<AppSnapshot, "personas">, id?: string): string {
   if (!id) return "";
