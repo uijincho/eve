@@ -13,6 +13,8 @@ import {
   useState,
 } from "react";
 
+import { useRouter } from "next/navigation";
+
 import type { ActionResult, AppSnapshot } from "@/lib/contracts";
 
 import { ResultText } from "@/components/app/result-text";
@@ -39,7 +41,15 @@ type EveContext = {
 
 const Ctx = createContext<EveContext | null>(null);
 
-export function EveProvider({ children }: { children: React.ReactNode }) {
+export function EveProvider({
+  children,
+  guard = true,
+}: {
+  children: React.ReactNode;
+  /** Send signed-out visitors to /login and accounts without an organization to /onboarding. */
+  guard?: boolean;
+}) {
+  const router = useRouter();
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState(true);
@@ -68,6 +78,14 @@ export function EveProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!guard || !error) return;
+    if (error.code === "setup_required") router.replace("/onboarding");
+    else if (error.code === "unauthenticated" || error.status === 401) {
+      router.replace(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+    }
+  }, [guard, error, router]);
 
   const fast = watchers > 0 || hasLiveWork(snapshot);
   useEffect(() => {

@@ -1,21 +1,26 @@
 "use client";
 
-import { SearchIcon, UploadIcon } from "lucide-react";
+import { LoaderCircleIcon, SearchIcon, UploadIcon } from "lucide-react";
 import { useState } from "react";
 
 import { ActionButton } from "@/components/app/action-button";
+import { CopyLink } from "@/components/app/copy-link";
 import { DataTable, FilterChips, type Column } from "@/components/app/data-table";
 import { Field, NativeSelect } from "@/components/app/field";
 import { LinkButton } from "@/components/app/link-button";
 import { PageFrame } from "@/components/app/page-frame";
+import { ResultText } from "@/components/app/result-text";
 import { Sheet } from "@/components/app/sheet";
 import { EmptyState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Person } from "@/lib/contracts";
-import { big, canManage } from "@/lib/client/derive";
+import { invitations, type CreatedInvite } from "@/lib/client/account";
+import { ApiError } from "@/lib/client/api";
+import { big, canManage, payoutSource, type Permission } from "@/lib/client/derive";
 import { fmtDate, fmtDateTime } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -126,13 +131,15 @@ function PersonDetail({ person: p, snapshot: s }: { person: Person; snapshot: Ap
         <dd className="tabular-nums">{p.chaseCount}</dd>
       </dl>
 
+      <PortalInvite person={p} snapshot={s} />
+
       {payouts.length ? (
         <section className="flex flex-col gap-2">
           <h3 className="font-semibold">Payouts</h3>
           <ul className="flex flex-col divide-y rounded-xl border">
             {payouts.map((x) => (
               <li key={x.id} className="flex items-center justify-between gap-3 px-3 py-2 text-small">
-                <span>{x.id} · {x.sourceType === "award" ? "prize" : "claim"}</span>
+                <span>{payoutSource(s, x)}</span>
                 <span className="flex items-center gap-2"><Money amountMinor={big(x.netMinor)} currency={x.currency} /> <StatusBadge status={x.status} /></span>
               </li>
             ))}
@@ -185,5 +192,55 @@ function PersonDetail({ person: p, snapshot: s }: { person: Person; snapshot: Ap
         />
       </section>
     </div>
+  );
+}
+
+/** Organizers send an imported adult their own portal link. Eve does not email it. */
+function PortalInvite({ person: p, snapshot: s }: { person: Person; snapshot: AppSnapshot }) {
+  const [created, setCreated] = useState<CreatedInvite | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const linked = s.personas.some((a) => a.personId === p.id);
+  const permission: Permission = s.actor.role !== "organizer"
+    ? { allowed: false, reason: "Only organizers invite attendees." }
+    : !p.adult
+      ? { allowed: false, reason: "Eve only pays adults; this person is under 18 at the event start." }
+      : linked
+        ? { allowed: false, reason: `${p.name.split(" ")[0]} already has portal access.` }
+        : { allowed: true };
+  return (
+    <section className="flex flex-col gap-3">
+      <h3 className="font-semibold">Portal access</h3>
+      {created ? (
+        <CopyLink url={created.acceptUrl} label={`Portal link for ${p.name}`} />
+      ) : permission.allowed ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            size="sm"
+            variant="secondary"
+            aria-busy={pending || undefined}
+            onClick={async () => {
+              if (pending) return;
+              setPending(true);
+              setFailure(null);
+              try {
+                setCreated(await invitations.inviteAttendee(p.id));
+              } catch (e) {
+                setFailure(e instanceof ApiError ? e.message : "Eve could not be reached. No invitation was created.");
+              } finally {
+                setPending(false);
+              }
+            }}
+          >
+            {pending ? <LoaderCircleIcon aria-hidden className="animate-spin" /> : null}
+            {pending ? "Creating link" : "Invite to portal"}
+          </Button>
+          <span className="text-small text-muted-foreground">Sent to {p.email} only when you share the link.</span>
+          <span role="status" aria-live="polite">{failure ? <ResultText result={{ ok: false, message: failure }} /> : null}</span>
+        </div>
+      ) : (
+        <p className="text-small text-muted-foreground">{permission.reason}</p>
+      )}
+    </section>
   );
 }

@@ -25,6 +25,10 @@ export function FilingsView() {
             <DownloadIcon aria-hidden />
             Packet CSV
           </LinkButton>
+          <LinkButton href={exportUrl("1042-summary", undefined, { year: new Date(s.now).getFullYear() })} external target="_blank" variant="outline">
+            <DownloadIcon aria-hidden />
+            {new Date(s.now).getFullYear()} 1042 summary
+          </LinkButton>
           <ActionButton
             size="default"
             variant="default"

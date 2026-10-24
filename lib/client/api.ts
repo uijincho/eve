@@ -12,19 +12,31 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** Server error code, e.g. "setup_required" or "unauthenticated". */
+    readonly code?: string,
   ) {
     super(message);
     this.name = "ApiError";
   }
 }
 
-async function readError(res: Response): Promise<string> {
+async function readBody(res: Response): Promise<{ message: string; code?: string }> {
   try {
-    const body = (await res.json()) as { message?: string; error?: string };
-    return body.message ?? body.error ?? res.statusText;
+    const body = (await res.json()) as { message?: string; error?: string; code?: string };
+    return { message: body.message ?? body.error ?? res.statusText, code: body.code };
   } catch {
-    return res.statusText || `Request failed (${res.status})`;
+    return { message: res.statusText || `Request failed (${res.status})` };
   }
+}
+
+async function readError(res: Response): Promise<string> {
+  return (await readBody(res)).message;
+}
+
+/** Throws the server's message and code for a non-2xx response. */
+export async function errorFrom(res: Response): Promise<ApiError> {
+  const { message, code } = await readBody(res);
+  return new ApiError(message, res.status, code);
 }
 
 export async function getSnapshot(signal?: AbortSignal): Promise<AppSnapshot> {
@@ -34,7 +46,7 @@ export async function getSnapshot(signal?: AbortSignal): Promise<AppSnapshot> {
     credentials: "same-origin",
     signal,
   });
-  if (!res.ok) throw new ApiError(await readError(res), res.status);
+  if (!res.ok) throw await errorFrom(res);
   return (await res.json()) as AppSnapshot;
 }
 
@@ -97,6 +109,7 @@ export function documentUrl(id: string): string {
 }
 
 export type ExportType =
+  | "1042-summary"
   | "ledger"
   | "claims"
   | "payouts"
@@ -110,9 +123,10 @@ export type ExportType =
 
 export type QboOptions = { dateFormat?: "MDY" | "DMY" | "ISO"; multicurrency?: boolean };
 
-export function exportUrl(type: ExportType, id?: string, qbo?: QboOptions): string {
+export function exportUrl(type: ExportType, id?: string, qbo?: QboOptions & { year?: number }): string {
   const q = new URLSearchParams({ type });
   if (id) q.set("id", id);
+  if (qbo?.year) q.set("year", String(qbo.year));
   if (qbo?.dateFormat) q.set("dateFormat", qbo.dateFormat);
   if (qbo?.multicurrency !== undefined) q.set("multicurrency", String(qbo.multicurrency));
   return `/api/export?${q.toString()}`;

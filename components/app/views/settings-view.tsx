@@ -14,6 +14,7 @@ import {
   PeriodLockForm,
   TravelPolicyForm,
 } from "@/components/app/settings-forms";
+import { TeamSection } from "@/components/app/team-section";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { canControl, canManage, type Permission } from "@/lib/client/derive";
 import { payloads } from "@/lib/client/payloads";
@@ -36,6 +37,11 @@ export function SettingsView() {
           <Section title="Period lock" aside={s.event.locked ? "This event is locked" : undefined}>
             <PeriodLockForm snapshot={s} permission={canControl(s.actor, s)} />
           </Section>
+          {s.actor.role !== "attendee" ? (
+            <Section title="Team">
+              <TeamSection snapshot={s} />
+            </Section>
+          ) : null}
           {s.actor.role !== "attendee" ? (
             <Section title="Accounting exports">
               <AccountingExports />

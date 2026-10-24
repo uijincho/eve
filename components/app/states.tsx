@@ -24,19 +24,21 @@ export function ListSkeleton({ rows = 5, label = "Loading" }: { rows?: number; l
 }
 
 export function ErrorState({ error, onRetry }: { error: ApiError; onRetry?: () => void }) {
-  const signedOut = error.status === 401 || error.status === 403;
+  const signedOut = error.status === 401;
   return (
     <div role="alert" className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-input px-5 py-6">
-      <p className="font-semibold">{signedOut ? "Choose a sample persona to continue" : "Eve could not load this page"}</p>
+      <p className="font-semibold">{signedOut ? "Sign in to continue" : error.status === 403 ? "You do not have access to this page" : "Eve could not load this page"}</p>
       <p className="max-w-[56ch] text-small text-muted-foreground">
         {signedOut
-          ? "This demo needs a sample session. Pick an organizer, controller, attendee, or auditor persona."
-          : `${error.message}. Your data is unchanged; try again in a moment.`}
+          ? "Your session ended. Sign in again, or pick a sample persona in the demo."
+          : error.status === 403
+            ? `${error.message.replace(/\.$/, "")}. Ask an organizer for an invitation if you need access.`
+            : `${error.message.replace(/\.$/, "")}. Your data is unchanged; try again in a moment.`}
       </p>
       <div className="flex gap-2">
         {signedOut ? (
           <LinkButton size="sm" variant="secondary" href="/login">
-            Choose a persona
+            Sign in
           </LinkButton>
         ) : null}
         {onRetry ? (
