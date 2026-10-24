@@ -12,7 +12,8 @@ import { Money } from "@/components/eve/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, BudgetLine } from "@/lib/contracts";
-import { big, budgetTotals, canManage } from "@/lib/client/derive";
+import { big, booksCurrency, budgetTotals, canManage } from "@/lib/client/derive";
+import { minorToInput } from "@/lib/client/format";
 import { payloads, toMinor } from "@/lib/client/payloads";
 
 export function BudgetView() {
@@ -23,7 +24,7 @@ export function BudgetView() {
         const t = budgetTotals(s);
         return (
           <>
-            <Money amountMinor={t.spent + t.committed} className="font-semibold text-foreground" /> spent and committed of <Money amountMinor={t.cap} /> across {s.budgets.length} lines. Committed spend is approved but not yet paid.
+            <Money amountMinor={t.spent + t.committed} currency={booksCurrency(s)} className="font-semibold text-foreground" /> spent and committed of <Money amountMinor={t.cap} currency={booksCurrency(s)} /> across {s.budgets.length} lines. Committed spend is approved but not yet paid.
           </>
         );
       }}
@@ -32,7 +33,7 @@ export function BudgetView() {
         const t = budgetTotals(s);
         return s.budgets.length ? (
           <>
-            <CapacityBar label="Whole event" capMinor={Number(t.cap)} spentMinor={Number(t.spent)} committedMinor={Number(t.committed)} className="max-w-3xl" />
+            <CapacityBar label="Whole event" capMinor={Number(t.cap)} spentMinor={Number(t.spent)} committedMinor={Number(t.committed)} currency={booksCurrency(s)} className="max-w-3xl" />
             <BooksCurrencyNote snapshot={s} />
             <Section title="Lines" aside="Spent, committed, and remaining against each cap">
               <ul className="grid max-w-3xl gap-6">
@@ -50,16 +51,29 @@ export function BudgetView() {
   );
 }
 
-function BudgetRow({ line: b, snapshot }: { line: BudgetLine; snapshot: AppSnapshot }) {
+/** A budget line as the server sends it: amounts in the USD books, plus the cap as the organizer entered it. */
+type BudgetDTO = BudgetLine & { currency?: string; enteredCapMinor?: string; enteredCurrency?: string; fxSource?: string };
+
+function BudgetRow({ line: b, snapshot }: { line: BudgetDTO; snapshot: AppSnapshot }) {
+  const books = b.currency ?? booksCurrency(snapshot);
+  const entered = b.enteredCurrency ?? snapshot.org.currency;
   const [editing, setEditing] = useState(false);
-  const [cap, setCap] = useState((Number(big(b.capMinor)) / 100).toFixed(2));
+  // Edit the cap the organizer typed, in their currency; never the converted books amount.
+  const [cap, setCap] = useState(minorToInput(b.enteredCapMinor ?? b.capMinor));
   const [error, setError] = useState<string | null>(null);
   const manage = canManage(snapshot.actor);
   return (
     <li className="flex flex-col gap-2 border-b pb-6 last:border-b-0">
-      <CapacityBar label={b.name} capMinor={Number(big(b.capMinor))} spentMinor={Number(big(b.spentMinor))} committedMinor={Number(big(b.committedMinor))} />
+      <CapacityBar label={b.name} capMinor={Number(big(b.capMinor))} spentMinor={Number(big(b.spentMinor))} committedMinor={Number(big(b.committedMinor))} currency={books} />
       <div className="flex flex-wrap items-center justify-between gap-2 text-caption text-muted-foreground">
-        <span>Funded by {b.fundingSource}</span>
+        <span>
+          Funded by {b.fundingSource}
+          {entered !== books && b.enteredCapMinor ? (
+            <>
+              {" · "}cap set as <Money amountMinor={big(b.enteredCapMinor)} currency={entered} />{b.fxSource ? `, converted at ${b.fxSource}` : ""}
+            </>
+          ) : null}
+        </span>
         {manage.allowed && !editing ? (
           <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
             Change cap
@@ -68,7 +82,7 @@ function BudgetRow({ line: b, snapshot }: { line: BudgetLine; snapshot: AppSnaps
       </div>
       {editing ? (
         <div className="flex flex-wrap items-start gap-2">
-          <label className="sr-only" htmlFor={`cap-${b.id}`}>New cap for {b.name}, USD</label>
+          <label className="sr-only" htmlFor={`cap-${b.id}`}>New cap for {b.name}, {entered}</label>
           <Input
             id={`cap-${b.id}`}
             inputMode="decimal"
@@ -77,6 +91,7 @@ function BudgetRow({ line: b, snapshot }: { line: BudgetLine; snapshot: AppSnaps
             className="w-36"
             aria-invalid={error ? true : undefined}
           />
+          <span className="self-center text-small text-muted-foreground">{entered}</span>
           <ActionButton
             label="Save cap"
             pendingLabel="Saving"
