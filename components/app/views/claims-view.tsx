@@ -22,6 +22,7 @@ import type { AppSnapshot, Claim } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
 import { big, canManage, canReview } from "@/lib/client/derive";
 import { fmtDate, fmtDay, humanize } from "@/lib/client/format";
+import { initialParam } from "@/lib/client/url-param";
 import { payloads } from "@/lib/client/payloads";
 
 type StatusFilter = "all" | "open" | "escalated" | "needs_info" | "approved" | "rejected" | "paid";
@@ -31,7 +32,7 @@ export function ClaimsView() {
   const [type, setType] = useState<"all" | "travel" | "expense">("all");
   const [flagged, setFlagged] = useState(false);
   const [query, setQuery] = useState("");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(() => initialParam("claim"));
   const [submitOpen, setSubmitOpen] = useState(false);
   const [submittedId, setSubmittedId] = useState<string | null>(null);
   const [evidence, setEvidence] = useState<Claim | null>(null);

@@ -49,7 +49,7 @@ export function FilingsView() {
             align: "end",
             stack: "meta",
             cell: (f) => (
-              <a href={f.documentId ? documentUrl(f.documentId) : exportUrl("filings", f.id)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-small underline decoration-faint decoration-dotted underline-offset-4 hover:decoration-foreground">
+              <a href={f.documentId ? documentUrl(f.documentId) : exportUrl("filing", f.id)} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-small underline decoration-faint decoration-dotted underline-offset-4 hover:decoration-foreground">
                 {f.form} draft
               </a>
             ),

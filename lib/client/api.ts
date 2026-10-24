@@ -96,10 +96,59 @@ export function documentUrl(id: string): string {
   return `/api/documents/${encodeURIComponent(id)}`;
 }
 
-export type ExportType = "ledger" | "claims" | "payouts" | "filings" | "packet" | "filing";
+export type ExportType =
+  | "ledger"
+  | "claims"
+  | "payouts"
+  | "filings"
+  | "packet"
+  | "packet-csv"
+  | "filing"
+  | "qbo"
+  | "qbo-accounts"
+  | "qbo-manifest";
 
-export function exportUrl(type: ExportType, id?: string): string {
+export type QboOptions = { dateFormat?: "MDY" | "DMY" | "ISO"; multicurrency?: boolean };
+
+export function exportUrl(type: ExportType, id?: string, qbo?: QboOptions): string {
   const q = new URLSearchParams({ type });
   if (id) q.set("id", id);
+  if (qbo?.dateFormat) q.set("dateFormat", qbo.dateFormat);
+  if (qbo?.multicurrency !== undefined) q.set("multicurrency", String(qbo.multicurrency));
   return `/api/export?${q.toString()}`;
+}
+
+/** What the QuickBooks journal export will contain, before downloading it. */
+export type QboManifest = {
+  rowCount: number;
+  journalNumbers: Record<string, string[]>;
+  excluded: { entryId: string; currency: string; reason: string }[];
+  accountsUsed: unknown[];
+  warnings: string[];
+  instructions: string;
+};
+
+export async function getQboManifest(opts: QboOptions, signal?: AbortSignal): Promise<QboManifest> {
+  const res = await fetch(exportUrl("qbo-manifest", undefined, opts), { credentials: "same-origin", cache: "no-store", signal });
+  if (!res.ok) throw new ApiError(await readError(res), res.status);
+  return (await res.json()) as QboManifest;
+}
+
+/**
+ * Downloads an export through fetch so a refusal (409 when foreign-currency
+ * lines would be silently dropped) reaches the page as a message instead of
+ * a raw JSON tab.
+ */
+export async function downloadExport(url: string): Promise<void> {
+  const res = await fetch(url, { credentials: "same-origin", cache: "no-store" });
+  if (!res.ok) throw new ApiError(await readError(res), res.status);
+  const name = /filename="?([^";]+)"?/.exec(res.headers.get("content-disposition") ?? "")?.[1] ?? "eve-export.csv";
+  const href = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(href), 10_000);
 }

@@ -17,7 +17,7 @@ import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
 import type { AppSnapshot, SponsorPacket } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
-import { big, canManage } from "@/lib/client/derive";
+import { big, canManage, payoutSource } from "@/lib/client/derive";
 import { fmtDate } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 
@@ -35,7 +35,10 @@ export function SponsorView() {
         const candidates = s.payouts.filter((p) => (p.status === "approved" || p.status === "proposed") && !packeted.has(p.id));
         const selected = s.packets.find((k) => k.id === openId);
         const columns: Column<SponsorPacket>[] = [
-          { key: "id", header: "Packet", stack: "title", sort: (k) => k.id, cell: (k) => `${k.id} · ${k.personName}` },
+          { key: "id", header: "Packet", stack: "title", sort: (k) => k.id, cell: (k) => {
+            const payout = s.payouts.find((p) => p.id === k.payoutId);
+            return payout ? `${k.personName} · ${payoutSource(s, payout)}` : k.personName;
+          } },
           { key: "sub", header: "Submitted", stack: "meta", sort: (k) => k.submittedAt ?? "", cell: (k) => (k.submittedAt ? `Submitted ${fmtDate(k.submittedAt)}` : "Not submitted") },
           { key: "status", header: "Status", stack: "end", sort: (k) => k.status, cell: (k) => <StatusBadge status={k.status} /> },
           { key: "req", header: "Requested", align: "end", stack: "hide", sort: (k) => big(k.requestedMinor), cell: (k) => <Money amountMinor={big(k.requestedMinor)} /> },
@@ -50,13 +53,13 @@ export function SponsorView() {
             </div>
             <DataTable label="Sponsor packets" rows={s.packets} columns={columns} rowKey={(k) => k.id} onRowClick={(k) => setOpenId(k.id)} selectedKey={openId} initialSort={{ key: "due", dir: "asc" }} empty={<EmptyState title="No packets yet">Approved payouts in sponsor mode become packets with the request and its supporting documents.</EmptyState>} />
             {candidates.length ? (
-              <Section title="Ready for a packet" aside={`${candidates.length} approved payouts`}>
+              <Section title="Ready for a packet" aside={`${candidates.length} ${candidates.length === 1 ? "payout" : "payouts"} awaiting release`}>
                 <ul className="flex flex-col divide-y rounded-xl border">
                   {candidates.map((p) => (
                     <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                       <span className="flex flex-col">
                         <span className="font-medium">{p.personName}</span>
-                        <span className="text-small text-muted-foreground">{p.id} · {p.sourceType === "award" ? "prize" : "claim"} {p.sourceId}</span>
+                        <span className="text-small text-muted-foreground">{payoutSource(s, p)}</span>
                       </span>
                       <span className="flex items-center gap-3">
                         <Money amountMinor={big(p.grossMinor)} currency={p.currency} className="font-semibold" />
@@ -67,7 +70,7 @@ export function SponsorView() {
                 </ul>
               </Section>
             ) : null}
-            <Sheet open={selected !== undefined} onOpenChange={(o) => !o && setOpenId(null)} title={selected ? `Packet ${selected.id}` : "Packet"} description={selected?.personName}>
+            <Sheet open={selected !== undefined} onOpenChange={(o) => !o && setOpenId(null)} title={selected ? `Packet for ${selected.personName}` : "Packet"} description={selected ? (() => { const payout = s.payouts.find((p) => p.id === selected.payoutId); return payout ? payoutSource(s, payout) : undefined; })() : undefined}>
               {selected ? <PacketDetail packet={selected} snapshot={s} /> : null}
             </Sheet>
           </>
@@ -99,12 +102,16 @@ function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snaps
           </>
         ) : null}
         <dt className="text-muted-foreground">Payout</dt>
-        <dd className="text-right">{k.payoutId}</dd>
+        <dd className="text-right">{(() => { const p = s.payouts.find((x) => x.id === k.payoutId); return p ? payoutSource(s, p) : k.payoutId; })()}</dd>
       </dl>
       <div className="flex flex-wrap gap-2">
         <LinkButton href={k.documentId ? documentUrl(k.documentId) : exportUrl("packet", k.id)} external target="_blank" size="sm" variant="outline">
           <DownloadIcon aria-hidden />
-          Download packet
+          Packet PDF
+        </LinkButton>
+        <LinkButton href={exportUrl("packet-csv", k.id)} external size="sm" variant="outline">
+          <DownloadIcon aria-hidden />
+          Request CSV
         </LinkButton>
       </div>
       <div className="flex flex-col gap-2 border-t pt-4">

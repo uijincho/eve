@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { AccountingExports } from "@/components/app/accounting-exports";
 import { ActionButton } from "@/components/app/action-button";
 import { PageFrame } from "@/components/app/page-frame";
 import { Section } from "@/components/app/page-header";
@@ -35,6 +36,11 @@ export function SettingsView() {
           <Section title="Period lock" aside={s.event.locked ? "This event is locked" : undefined}>
             <PeriodLockForm snapshot={s} permission={canControl(s.actor, s)} />
           </Section>
+          {s.actor.role !== "attendee" ? (
+            <Section title="Accounting exports">
+              <AccountingExports />
+            </Section>
+          ) : null}
           <Section title="Integrations">
             {s.integrationStatus.length ? (
               <ul className="flex flex-col divide-y rounded-xl border">

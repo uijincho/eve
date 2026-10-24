@@ -135,7 +135,7 @@ export function EveProvider({ children }: { children: React.ReactNode }) {
 
 function Announcer({ notice, onDismiss }: { notice: ActionResult | null; onDismiss: () => void }) {
   return (
-    <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
+    <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex justify-center px-4">
       {notice ? (
         <div className="pointer-events-auto flex max-w-md items-start gap-3 rounded-lg bg-surface-hover px-3 py-2 text-small shadow-[0_10px_15px_-3px_rgb(0_0_0/0.3),0_4px_6px_-4px_rgb(0_0_0/0.3)] ring-1 ring-border">
           <ResultText result={notice} />
@@ -169,23 +169,29 @@ export type ActionState =
 export function useAction() {
   const { act, announce } = useEve();
   const [state, setState] = useState<ActionState>({ status: "idle" });
+  // The fresh snapshot often removes the control that asked (a released
+  // payout has no Release button). If that happens right after the answer
+  // arrives, hand it to the page-level announcer so it is not lost.
+  const fresh = useRef<{ result: ActionResult; at: number } | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      const f = fresh.current;
+      if (f && Date.now() - f.at < 3_000) announce(f.result);
     };
-  }, []);
+  }, [announce]);
   const run = useCallback(
     async (call: ActionCall) => {
       setState({ status: "pending" });
       const result = await act(call);
-      // The fresh snapshot often removes the control that asked (a released
-      // payout has no Release button). Let that render, then hand the answer
-      // to the page-level announcer so it is not lost.
-      await new Promise((r) => window.setTimeout(r, 0));
-      if (mounted.current) setState({ status: "done", result });
-      else announce(result);
+      if (!mounted.current) {
+        announce(result);
+        return result;
+      }
+      fresh.current = { result, at: Date.now() };
+      setState({ status: "done", result });
       return result;
     },
     [act, announce],
