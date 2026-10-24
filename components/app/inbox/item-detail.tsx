@@ -12,7 +12,7 @@ import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { Badge } from "@/components/ui/badge";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
-import { actorName, big, payoutFees, type InboxItem } from "@/lib/client/derive";
+import { actorName, big, type InboxItem, payoutFees, payoutSource, providerLabel } from "@/lib/client/derive";
 import { useEve } from "@/lib/client/use-eve";
 import { documentUrl } from "@/lib/client/api";
 import { fmtDateTime } from "@/lib/client/format";
@@ -70,7 +70,7 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
               <span className="flex min-w-0 flex-col">
                 <span className="truncate font-medium">{p.personName}</span>
                 <span className="truncate text-caption text-muted-foreground">
-                  {p.sourceType === "award" ? "Prize" : "Claim"} {p.sourceId} · {p.provider}
+                  {snapshot ? payoutSource(snapshot, p) : p.sourceType === "award" ? "Prize" : "Claim"} · {providerLabel(p.provider)}
                 </span>
               </span>
               <span className="flex flex-col items-end">
@@ -192,7 +192,7 @@ export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payo
         <dt className="text-muted-foreground">Rule</dt>
         <dd className="text-right font-mono text-caption">{p.ruleId} v{p.ruleVersion}</dd>
         <dt className="text-muted-foreground">Provider</dt>
-        <dd className="text-right">{p.provider}{p.providerRef ? ` · ${p.providerRef}` : ""}</dd>
+        <dd className="text-right">{providerLabel(p.provider)}{p.providerRef ? ` · ${p.providerRef}` : ""}</dd>
         {p.releasedBy ? (
           <>
             <dt className="text-muted-foreground">Released by</dt>

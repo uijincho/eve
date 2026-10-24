@@ -167,3 +167,13 @@ describe("calendar dates", () => {
     expect(humanize("ground_transport")).toBe("Ground transport");
   });
 });
+
+describe("readable names", () => {
+  it("does not repeat a track that is also the title, and names providers", async () => {
+    const { awardName, providerLabel, objectLabel } = await import("@/lib/client/derive");
+    expect(awardName({ track: "Judge stipend", title: "Judge stipend" })).toBe("Judge stipend");
+    expect(awardName({ track: "First Overall", title: "MacBook Air" })).toBe("First Overall: MacBook Air");
+    expect(providerLabel("mock_wire")).toBe("Simulated wire");
+    expect(objectLabel({ objectType: "payout", personName: "Priya Raman", objectId: "pay_x" })).toBe("Priya Raman · Payout");
+  });
+});

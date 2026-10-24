@@ -8,7 +8,7 @@ import { EvidenceSheet } from "@/components/app/evidence-sheet";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import type { Decision } from "@/lib/contracts";
-import { groupRuns, runCounters, type Run } from "@/lib/client/derive";
+import { groupRuns, objectLabel, runCounters, type Run } from "@/lib/client/derive";
 import { fmtTime } from "@/lib/client/format";
 import { useEve, useLivePolling } from "@/lib/client/use-eve";
 
@@ -93,7 +93,7 @@ export function AgentFeed({ variant = "rail", limit }: { variant?: "rail" | "pag
       <EvidenceSheet
         open={evidence !== null}
         onOpenChange={(o) => !o && setEvidence(null)}
-        title={evidence ? `${evidence.objectId} · ${evidence.personName}` : "Evidence"}
+        title={evidence ? objectLabel(evidence) : "Evidence"}
         objectIds={evidence ? [evidence.objectId] : []}
         decisionId={evidence?.id}
       />
@@ -129,7 +129,7 @@ function RunEntry({ run, onStep }: { run: Run; onStep: (d: Decision) => void }) 
         />
         <span className="flex min-w-0 flex-col">
           <span className="truncate text-small font-medium">
-            {run.objectId} · {run.personName}
+            {objectLabel(run)}
           </span>
           {!expanded ? <span className="truncate text-caption text-muted-foreground">{last.summary}</span> : null}
         </span>

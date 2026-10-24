@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { DueChip } from "@/components/eve/due-chip";
 import { Money } from "@/components/eve/money";
 import type { AppSnapshot, Person } from "@/lib/contracts";
-import { big, prizeOptions } from "@/lib/client/derive";
+import { awardName, big, prizeOptions } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 
 import { PortalFrame } from "./portal-frame";
@@ -84,7 +84,7 @@ export function PortalOverview() {
                       return (
                         <li key={a.id} className="flex items-center justify-between gap-3 px-4 py-3">
                           <span className="flex flex-col">
-                            <span className="font-medium">{a.track} · {a.title}</span>
+                            <span className="font-medium">{awardName(a, " · ")}</span>
                             <span className="text-small text-muted-foreground">Not proposed yet</span>
                           </span>
                           <Money amountMinor={o.cashNet} currency={a.currency} estimate className="font-semibold" />

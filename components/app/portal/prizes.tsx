@@ -6,7 +6,7 @@ import { PrizeComparison } from "@/components/app/prize-comparison";
 import { StatusBadge } from "@/components/app/status-badge";
 import { DueChip } from "@/components/eve/due-chip";
 import { LinkButton } from "@/components/app/link-button";
-import { FULFILLMENT_LABEL, prizeOptions } from "@/lib/client/derive";
+import { awardName, FULFILLMENT_LABEL, prizeOptions } from "@/lib/client/derive";
 import { payloads } from "@/lib/client/payloads";
 
 import { PortalFrame } from "./portal-frame";
@@ -24,7 +24,7 @@ export function PortalPrizes() {
               const o = prizeOptions(s, a, me, payout);
               const team = a.teamId ? s.awards.filter((x) => x.teamId === a.teamId) : [];
               return (
-                <Section key={a.id} title={`${a.track}: ${a.title}`} aside={<span className="inline-flex items-center gap-2"><StatusBadge status={a.status} /><DueChip due={a.dueAt} now={s.now} align="end" /></span>}>
+                <Section key={a.id} title={awardName(a)} aside={<span className="inline-flex items-center gap-2"><StatusBadge status={a.status} /><DueChip due={a.dueAt} now={s.now} align="end" /></span>}>
                   <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_16rem]">
                     <PrizeComparison snapshot={s} award={a} person={me} payout={payout} />
                     <div className="flex flex-col gap-4">
@@ -60,7 +60,7 @@ export function PortalPrizes() {
                           {!a.splitConfirmed ? <ActionButton wide size="default" variant="secondary" label="Confirm my share" pendingLabel="Confirming" call={payloads.awardConfirm(a.id)} /> : null}
                         </div>
                       ) : null}
-                      {payout ? <p className="text-small text-muted-foreground">Payout {payout.id} is {payout.status}. Track it on Payouts.</p> : null}
+                      {payout ? <p className="text-small text-muted-foreground">Your payout is {payout.status}. Track it on Payouts.</p> : null}
                     </div>
                   </div>
                 </Section>

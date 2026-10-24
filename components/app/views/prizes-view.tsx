@@ -17,7 +17,7 @@ import { Money } from "@/components/eve/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResult, AppSnapshot, Award } from "@/lib/contracts";
-import { big, canManage, FULFILLMENT_LABEL, prizeOptions } from "@/lib/client/derive";
+import { awardName, big, canManage, FULFILLMENT_LABEL, prizeOptions } from "@/lib/client/derive";
 import { payloads, toMinor } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
 import { useEve } from "@/lib/client/use-eve";
@@ -55,7 +55,7 @@ export function PrizesView() {
         const people = new Map(s.people.map((p) => [p.id, p]));
         const columns: Column<Award>[] = [
           { key: "winner", header: "Winner", stack: "title", sort: (a) => a.personName, cell: (a) => a.personName },
-          { key: "prize", header: "Prize", stack: "meta", sort: (a) => a.track, cell: (a) => `${a.track} · ${a.title}${a.teamId ? " · team" : ""}` },
+          { key: "prize", header: "Prize", stack: "meta", sort: (a) => a.track, cell: (a) => `${awardName(a, " · ")}${a.teamId ? " · team" : ""}` },
           {
             key: "form",
             header: "Tax form",
@@ -111,7 +111,7 @@ export function PrizesView() {
               initialSort={{ key: "due", dir: "asc" }}
               empty={<EmptyState title="No winners here yet">Enter a winner and Eve links them to their tax profile, checks the form, and prepares the payout.</EmptyState>}
             />
-            <Sheet open={selected !== undefined} onOpenChange={(o) => !o && setOpenId(null)} title={selected ? `${selected.track}: ${selected.title}` : "Prize"} description={selected?.personName}>
+            <Sheet open={selected !== undefined} onOpenChange={(o) => !o && setOpenId(null)} title={selected ? awardName(selected) : "Prize"} description={selected?.personName}>
               {selected ? <AwardDetail award={selected} snapshot={s} onEvidence={() => setEvidence(selected)} /> : null}
             </Sheet>
             <Sheet open={entryOpen} onOpenChange={setEntryOpen} title="Enter a winner" description="Eve flags tax, shipping, and withholding before anyone is promised money">
@@ -166,7 +166,7 @@ export function AwardDetail({ award: a, snapshot: s, onEvidence }: { award: Awar
       <div className="flex flex-col gap-2 border-t pt-4">
         {payout ? (
           <p className="text-small text-muted-foreground">
-            Payout {payout.id} is {payout.status}. {payout.status === "proposed" ? "A controller releases it from Payouts." : payout.reason}
+            The payout is {payout.status}. {payout.status === "proposed" ? "A controller releases it from Payouts." : payout.reason}
           </p>
         ) : a.status === "needs_form" ? (
           <ActionButton wide size="default" label="Propose payout" permission={{ allowed: false, reason: `Held until ${a.personName.split(" ")[0]} signs the ${person?.taxForm ?? "tax form"}. Eve is chasing on schedule.` }} call={() => null} />

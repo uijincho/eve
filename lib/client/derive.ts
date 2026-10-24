@@ -33,14 +33,41 @@ export function controllerName(s: Pick<AppSnapshot, "personas">): string {
   return s.personas.find((p) => p.role === "controller")?.name ?? "the controller";
 }
 
+/** "Best Hardware Hack: 2nd place", or just "Judge stipend" when the track and title match. */
+export function awardName(a: Pick<Award, "track" | "title">, sep = ": "): string {
+  return !a.title || a.title.trim().toLowerCase() === a.track.trim().toLowerCase() ? a.track : `${a.track}${sep}${a.title}`;
+}
+
+const PROVIDER_LABEL: Record<string, string> = {
+  mock_wire: "Simulated wire", mock: "Simulated", simulated: "Simulated", stripe_test: "Stripe test mode", stripe: "Stripe test mode",
+};
+
+/** "mock_wire" -> "Simulated wire". */
+export function providerLabel(provider: string): string {
+  return PROVIDER_LABEL[provider] ?? provider.replace(/[_-]+/g, " ").replace(/^./, (c) => c.toUpperCase());
+}
+
 /** What a payout pays for, in words: "Best Hardware Hack: 2nd place" or "Air Canada claim". */
 export function payoutSource(s: Pick<AppSnapshot, "awards" | "claims">, p: Pick<Payout, "sourceId" | "sourceType">): string {
   if (p.sourceType === "award") {
     const a = s.awards.find((x) => x.id === p.sourceId);
-    return a ? `${a.track}: ${a.title}` : "Prize";
+    return a ? awardName(a) : "Prize";
   }
   const c = s.claims.find((x) => x.id === p.sourceId);
   return c ? `${c.merchant || (c.type === "travel" ? "Travel" : "Expense")} claim` : "Claim";
+}
+
+const OBJECT_LABEL: Record<string, string> = {
+  payout: "Payout", claim: "Claim", award: "Prize", packet: "Sponsor packet", sponsor_packet: "Sponsor packet",
+  person: "Person", period: "Period", filing: "Filing", org: "Settings", event: "Event", budget: "Budget",
+};
+
+/** "Priya Raman · Payout" for an agent run or decision, instead of its database id. */
+export function objectLabel(d: { objectType: string; personName?: string; objectId: string }): string {
+  const type = OBJECT_LABEL[d.objectType] ?? d.objectType.replace(/[_-]+/g, " ");
+  if (d.objectType === "person") return d.personName || type;
+  if (d.objectType === "period") return `Period ${d.objectId}`;
+  return d.personName ? `${d.personName} · ${type}` : type;
 }
 
 /** A persona's name for an actor id ("mem_demo_ari" -> "Ari Novak"); the id itself if unknown. */
@@ -160,7 +187,7 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
         category: "exceptions",
         title: p.status === "frozen" ? "Payout frozen: bank details changed" : `Payout ${p.status}`,
         mark: p.personName.split(" ")[0],
-        meta: `${p.personName} · ${p.sourceType === "award" ? "prize" : "claim"} payout · ${p.provider}`,
+        meta: `${p.personName} · ${p.sourceType === "award" ? "prize" : "claim"} payout · ${providerLabel(p.provider)}`,
         detail: p.reason,
         amountMinor: big(p.grossMinor),
         currency: p.currency,
@@ -200,7 +227,7 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
           ? `${c.type === "travel" ? "Travel claim" : "Expense"} needs a decision`
           : `Waiting on ${c.personName.split(" ")[0]} for more information`,
       mark: c.personName.split(" ")[0],
-      meta: [c.personName, c.origin ? `${c.origin} → SFO` : c.merchant, c.cabin].filter(Boolean).join(" · "),
+      meta: [c.personName, c.origin ? `Flight from ${c.origin}` : c.merchant, c.cabin].filter(Boolean).join(" · "),
       detail: c.reason || (failed.length ? `Flag: ${failed.join(", ")}` : "Escalated for review"),
       amountMinor: big(c.usdMinor),
       currency: "USD",
