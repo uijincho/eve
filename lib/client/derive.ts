@@ -84,16 +84,39 @@ export function actorName(s: Pick<AppSnapshot, "personas">, id?: string): string
 }
 
 /**
- * True while the server has accepted a release that has not finished: a
- * running or waiting release decision for this payout. The payout itself can
- * still read "proposed" until the queued run updates it.
+ * True only while a controller's release has been accepted and queued but has
+ * not settled. The durable approval wait also writes a waiting decision
+ * before anyone approves; that means "awaiting approval", not in flight, so it
+ * must never lock the Release button.
+ *
+ * Pending = a queueControllerRelease record for this payout whose run has no
+ * terminal step yet (executePayout done/escalated/waiting, or waitForController
+ * done/escalated), with no later re-quote of the payout, while the payout is
+ * still proposed or approved. A processing payout is always in flight.
  */
 export function releaseInFlight(s: Pick<AppSnapshot, "decisions">, payout: Pick<Payout, "id" | "status">): boolean {
   if (payout.status === "processing") return true;
   if (payout.status !== "proposed" && payout.status !== "approved") return false;
-  return s.decisions.some(
-    (d) => d.objectId === payout.id && /release/i.test(d.action) && (d.status === "running" || d.status === "waiting"),
-  );
+  const mine = s.decisions.filter((d) => d.objectId === payout.id);
+  return mine.some((q) => {
+    if (q.tool !== "queueControllerRelease") return false;
+    const settled = mine.some(
+      (d) =>
+        d.runId === q.runId &&
+        ((d.tool === "executePayout" && (d.status === "done" || d.status === "escalated" || d.status === "waiting")) ||
+          (d.tool === "waitForController" && (d.status === "done" || d.status === "escalated"))),
+    );
+    if (settled) return false;
+    const fingerprint = q.facts?.quoteFingerprint;
+    const requoted = mine.some(
+      (d) =>
+        d.runId !== q.runId &&
+        d.createdAt > q.createdAt &&
+        (/propose|quote|verify|bankchange|freeze/i.test(`${d.action} ${d.tool}`) ||
+          (fingerprint !== undefined && d.facts?.quoteFingerprint !== undefined && d.facts.quoteFingerprint !== fingerprint)),
+    );
+    return !requoted;
+  });
 }
 
 export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "personas"> & Partial<Pick<AppSnapshot, "decisions">>): Permission {

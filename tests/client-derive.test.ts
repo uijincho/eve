@@ -177,3 +177,33 @@ describe("readable names", () => {
     expect(objectLabel({ objectType: "payout", personName: "Priya Raman", objectId: "pay_x" })).toBe("Priya Raman · Payout");
   });
 });
+
+describe("releaseInFlight", () => {
+  const base = { id: "", runId: "", objectId: "pay_1", objectType: "payout", personName: "Priya Raman", summary: "", actor: "system", facts: {} };
+  let n = 0;
+  const d = (over: Partial<AppSnapshot["decisions"][number]>): AppSnapshot["decisions"][number] =>
+    ({ ...base, id: `d${n++}`, action: "", tool: "", status: "done", createdAt: `2026-10-24T10:0${n}:00Z`, ...over }) as AppSnapshot["decisions"][number];
+  const payout = { id: "pay_1", status: "proposed" as const };
+  const wait = d({ runId: "wf_1", action: "Controller release requested", tool: "waitForController", status: "waiting" });
+  const queue = d({ runId: "wf_1", action: "Controller approval submitted", tool: "queueControllerRelease", status: "running", facts: { quoteFingerprint: "q1" } });
+
+  it("keeps a payout releasable while it only awaits approval", async () => {
+    const { releaseInFlight } = await import("@/lib/client/derive");
+    expect(releaseInFlight({ decisions: [wait] }, payout)).toBe(false);
+  });
+  it("is pending once a release is queued and unsettled", async () => {
+    const { releaseInFlight } = await import("@/lib/client/derive");
+    expect(releaseInFlight({ decisions: [wait, queue] }, payout)).toBe(true);
+  });
+  it("unblocks when the run settles or the payout is re-quoted", async () => {
+    const { releaseInFlight } = await import("@/lib/client/derive");
+    const done = d({ runId: "wf_1", action: "Released", tool: "executePayout", status: "done" });
+    const escalated = d({ runId: "wf_1", action: "Controller approval rejected", tool: "waitForController", status: "escalated" });
+    const requote = d({ runId: "run_9", action: "payout.verify", tool: "verifyBankChange", status: "done", facts: { quoteFingerprint: "q2" } });
+    expect(releaseInFlight({ decisions: [wait, queue, done] }, payout)).toBe(false);
+    expect(releaseInFlight({ decisions: [wait, queue, escalated] }, payout)).toBe(false);
+    expect(releaseInFlight({ decisions: [wait, queue, requote] }, payout)).toBe(false);
+    expect(releaseInFlight({ decisions: [queue] }, { id: "pay_1", status: "paid" })).toBe(false);
+    expect(releaseInFlight({ decisions: [] }, { id: "pay_1", status: "processing" })).toBe(true);
+  });
+});
