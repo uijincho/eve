@@ -7,7 +7,7 @@ import { CheckList } from "@/components/app/evidence-sheet";
 import { Section } from "@/components/app/page-header";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Money } from "@/components/eve/money";
-import { big, claimStatusLabel } from "@/lib/client/derive";
+import { big, claimStatusLabel, claimReasonText } from "@/lib/client/derive";
 import { fmtDay, humanize } from "@/lib/client/format";
 
 import { PortalFrame } from "./portal-frame";
@@ -41,7 +41,7 @@ export function PortalClaims() {
                           </span>
                         </summary>
                         <div className="flex flex-col gap-3 px-4 pb-4">
-                          {c.reason ? <p className="text-small">{c.reason}</p> : null}
+                          {c.reason ? <p className="text-small">{claimReasonText(c)}</p> : null}
                           <CheckList checks={c.checks} />
                           {c.status === "needs_info" ? (
                             <p className="text-small text-muted-foreground">Reply to the email Eve sent, or upload a corrected receipt as a new claim.</p>

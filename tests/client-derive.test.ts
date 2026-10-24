@@ -239,3 +239,24 @@ describe("self-beneficiary", () => {
     expect(canRelease(ctrl, { ...payout, personId: s.people[1].id }, snap).allowed).toBe(true);
   });
 });
+
+describe("failed checks", () => {
+  it("states each failure as a failure, never the passing label", async () => {
+    const { failedCheckText } = await import("@/lib/client/derive");
+    expect(failedCheckText({ code: "agent_limit", label: "Within the agent's auto-approve limit", detail: "$423.81 against a $300.00 limit." })).toBe("Over the $300.00 auto-approve limit: $423.81");
+    expect(failedCheckText({ code: "adult", label: "18 or older at event start", detail: "Age 17 on 2026-10-24." })).toBe("Under 18 at event start: age 17");
+    expect(failedCheckText({ code: "cabin", label: "Economy cabin", detail: "Cabin: business." })).toBe("Business cabin, economy only");
+    expect(failedCheckText({ code: "cap", label: "Under the travel cap", detail: "$565.25 against a $500.00 cap after conversion to USD." })).toBe("Over the $500.00 travel cap: $565.25 after conversion");
+    expect(failedCheckText({ code: "booking_deadline", label: "Booked before the deadline", detail: "Booked 2026-10-14 after the 2026-10-10 deadline." })).toBe("Booked 2026-10-14 after the 2026-10-10 deadline");
+  });
+  it("titles inbox claims by their decisive failure", async () => {
+    const { buildInbox } = await import("@/lib/client/derive");
+    const claim = { ...s.claims[0], status: "escalated" as const, checks: [
+      { code: "agent_limit", label: "Within the agent's auto-approve limit", passed: false, detail: "$423.81 against a $300.00 limit." },
+      { code: "adult", label: "18 or older at event start", passed: false, detail: "Age 17 on 2026-10-24." },
+    ] };
+    const item = buildInbox({ ...s, claims: [claim] }).find((i) => i.id === `claim:${claim.id}`)!;
+    expect(item.title).toBe("Under 18 at event start: age 17");
+    expect(item.detail).toBe("Also: Over the $300.00 auto-approve limit: $423.81.");
+  });
+});

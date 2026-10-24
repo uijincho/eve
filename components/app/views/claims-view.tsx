@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Claim } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
-import { big, canManage, canReview, isOrgBookedFlight, claimStatusLabel } from "@/lib/client/derive";
+import { big, canManage, canReview, isOrgBookedFlight, claimStatusLabel, claimReasonText } from "@/lib/client/derive";
 import { fmtDate, fmtDay, humanize } from "@/lib/client/format";
 import { initialParam } from "@/lib/client/url-param";
 import { payloads } from "@/lib/client/payloads";
@@ -191,7 +191,7 @@ export function ClaimDetail({ claim: c, snapshot, onEvidence }: { claim: Claim; 
         <StatusBadge status={c.status} label={claimStatusLabel(c)} />
         <DueChip due={c.dueAt} now={snapshot.now} context="review" />
       </div>
-      {c.reason ? <p className="text-small">{c.reason}</p> : null}
+      {c.reason ? <p className="text-small">{claimReasonText(c)}</p> : null}
       <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-small">
         <dt className="text-muted-foreground">Receipt amount</dt>
         <dd className="text-right"><Money amountMinor={big(c.amountMinor)} currency={c.currency} /></dd>

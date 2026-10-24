@@ -33,6 +33,18 @@ async function fetchTeam(): Promise<{ members: Member[]; invites: Invitation[] }
 
 /** Who can sign in to this organization, and invitations for new staff. */
 export function TeamSection({ snapshot: s }: { snapshot: AppSnapshot }) {
+  // Sample personas are not accounts, so the sample org has no member list to show or invite into.
+  if (s.demo) {
+    return (
+      <p className="max-w-[64ch] text-small text-muted-foreground">
+        The sample organization has no member list, and invitations are off. Create your own organization to see and invite staff.
+      </p>
+    );
+  }
+  return <RealTeam snapshot={s} />;
+}
+
+function RealTeam({ snapshot: s }: { snapshot: AppSnapshot }) {
   const [list, setList] = useState<Member[] | null>(null);
   const [invites, setInvites] = useState<Invitation[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -87,9 +99,7 @@ export function TeamSection({ snapshot: s }: { snapshot: AppSnapshot }) {
           </ul>
         </div>
       ) : null}
-      {s.demo ? (
-        <p className="text-small text-muted-foreground">Invitations are off in the sample organization. Create your own organization to invite real staff.</p>
-      ) : manage ? <InviteStaffForm onCreated={load} /> : (
+      {manage ? <InviteStaffForm onCreated={load} /> : (
         <p className="text-small text-muted-foreground">Only organizers invite staff. Attendees join from People with a portal invite.</p>
       )}
     </div>

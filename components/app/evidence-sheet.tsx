@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { TruthLabel } from "@/components/eve/truth-label";
 import type { Check, Decision } from "@/lib/contracts";
 import { documentUrl } from "@/lib/client/api";
+import { failedCheckText } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 import { useEve } from "@/lib/client/use-eve";
 
@@ -126,8 +127,8 @@ export function CheckList({ checks }: { checks: Check[] }) {
             <CircleXIcon aria-label="Flagged" className="mt-px size-4 shrink-0 text-critical" />
           )}
           <span className="flex flex-col">
-            <span className="font-medium">{c.label}</span>
-            <span className="text-muted-foreground">{c.detail}</span>
+            <span className="font-medium">{c.passed ? c.label : failedCheckText(c)}</span>
+            {c.passed ? <span className="text-muted-foreground">{c.detail}</span> : null}
           </span>
         </li>
       ))}

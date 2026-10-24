@@ -4,6 +4,7 @@ import type {
   Actor,
   AppSnapshot,
   Award,
+  Check,
   Claim,
   Decision,
   Payout,
@@ -246,6 +247,64 @@ export type InboxItem = {
 
 const CATEGORY_RANK: Record<InboxCategory, number> = { exceptions: 0, approvals: 1, holds: 2 };
 
+const stripDot = (t: string) => t.trim().replace(/\.$/, "");
+
+/**
+ * A failed check said as a failure. Check labels are written for the passing
+ * case ("Within the agent's auto-approve limit"); printing one beside a failing
+ * detail states the opposite of the truth, so every failure is rephrased here.
+ */
+export function failedCheckText(c: Pick<Check, "code" | "label" | "detail">): string {
+  const d = stripDot(c.detail);
+  const against = /^(.+?) against a (.+?) (limit|cap)/.exec(d);
+  switch (c.code) {
+    case "agent_limit":
+      return against ? `Over the ${against[2]} auto-approve limit: ${against[1]}` : d;
+    case "cap":
+      return against ? `Over the ${against[2]} travel cap: ${against[1]}${/after conversion/.test(d) ? " after conversion" : ""}` : d;
+    case "cap_hugging":
+      return `Close to the travel cap: ${d.replace(/^Within/, "within")}`;
+    case "adult": {
+      const age = /^Age (\d+)/.exec(d);
+      return age ? `Under 18 at event start: age ${age[1]}` : d;
+    }
+    case "cabin": {
+      const cabin = /^Cabin: (.+)$/.exec(d);
+      return cabin ? `${cabin[1].charAt(0).toUpperCase()}${cabin[1].slice(1)} cabin, economy only` : d;
+    }
+    case "travel_dates":
+      return `Travel outside the event dates: ${d}`;
+    case "name_match":
+      return `Name mismatch: ${d}`;
+    case "evidence":
+      return `Receipt facts not verified: ${d}`;
+    case "budget":
+    case "booking_deadline":
+    case "duplicate":
+    case "receipt":
+    case "purchase_date":
+    case "amount_valid":
+    case "fx_converted":
+      return d;
+    default:
+      return `${c.label} failed: ${d}`;
+  }
+}
+
+/** Most decisive failures first, so a row title leads with what matters most. */
+const CHECK_PRIORITY = ["adult", "duplicate", "name_match", "evidence", "cap", "cabin", "booking_deadline", "travel_dates", "budget", "agent_limit", "cap_hugging", "receipt"];
+
+export function failedChecks(c: Pick<Claim, "checks">): Check[] {
+  const rank = (k: Check) => { const i = CHECK_PRIORITY.indexOf(k.code); return i === -1 ? CHECK_PRIORITY.length : i; };
+  return c.checks.filter((k) => !k.passed).sort((a, b) => rank(a) - rank(b));
+}
+
+/** Why a claim is waiting, in failed form; once decided, the reviewer's or server's reason. */
+export function claimReasonText(c: Pick<Claim, "checks" | "status" | "reason">): string {
+  const failed = failedChecks(c).map(failedCheckText);
+  return (c.status === "escalated" || c.status === "needs_info") && failed.length ? `${failed.join("; ")}.` : c.reason;
+}
+
 export function buildInbox(s: AppSnapshot): InboxItem[] {
   const items: InboxItem[] = [];
   const people = new Map(s.people.map((p) => [p.id, p]));
@@ -313,17 +372,25 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
 
   for (const c of s.claims) {
     if (c.status !== "escalated" && c.status !== "needs_info") continue;
-    const failed = c.checks.filter((k) => !k.passed).map((k) => k.label);
+    const failed = failedChecks(c).map(failedCheckText);
     items.push({
       id: `claim:${c.id}`,
       category: c.status === "escalated" ? "approvals" : "holds",
       title:
         c.status === "escalated"
-          ? `${c.type === "travel" ? "Travel claim" : "Expense"} needs a decision`
+          ? failed[0] ?? `${c.type === "travel" ? "Travel claim" : "Expense"} needs a decision`
           : `Waiting on ${c.personName.split(" ")[0]} for more information`,
       mark: c.personName.split(" ")[0],
       meta: [c.personName, c.origin ? `Flight from ${c.origin}` : c.merchant, c.cabin].filter(Boolean).join(" · "),
-      detail: c.reason || (failed.length ? `Flag: ${failed.join(", ")}` : "Escalated for review"),
+      // Failures in failed form; the server's reason pairs pass-phrased labels with failing facts.
+      detail:
+        c.status === "escalated"
+          ? failed.length > 1
+            ? `Also: ${failed.slice(1).join("; ")}.`
+            : `${c.type === "travel" ? "Travel claim" : "Expense"} awaiting a decision.`
+          : failed.length
+            ? `${failed.join("; ")}.`
+            : c.reason || "Waiting for more information.",
       amountMinor: big(c.usdMinor),
       currency: "USD",
       amountNote: c.currency !== "USD" ? `${fmtPlain(big(c.amountMinor), c.currency)}` : c.type,

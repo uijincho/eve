@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResult, Person } from "@/lib/contracts";
 import { ApiError, uploadDocument } from "@/lib/client/api";
-import { big } from "@/lib/client/derive";
+import { big, claimReasonText } from "@/lib/client/derive";
 import { payloads, toMinor } from "@/lib/client/payloads";
 import { rovingKeyDown } from "@/lib/client/roving";
 import { useEve, useLivePolling } from "@/lib/client/use-eve";
@@ -267,7 +267,7 @@ export function ClaimOutcome({ claimId }: { claimId: string }) {
           <StatusBadge status={claim.status} />
         </span>
       </div>
-      {claim.reason ? <p className="text-small text-muted-foreground">{claim.reason}</p> : null}
+      {claim.reason ? <p className="text-small text-muted-foreground">{claimReasonText(claim)}</p> : null}
       {claim.checks.length ? (
         <CheckList checks={claim.checks} />
       ) : (
