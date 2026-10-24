@@ -96,6 +96,10 @@ export async function finishAgentRun(target: AgentTarget, runId: string, totals:
     for (const packet of packets) await runAuthorizedAction(actor, "sponsor.reconcile", { id: packet.id });
   }
   if (target.evaluateDemo || target.filingYear) await db.transaction((tx) => generateFilings(tx, agentActor(target.orgId), { year: target.filingYear }));
+  if (target.memberId === null && !target.triggerId) {
+    const { deliverDailyDigest } = await import("./digest");
+    await deliverDailyDigest(target.orgId, target.generation);
+  }
   const board = await computeScoreboard(db, target.orgId);
   if (target.evaluateDemo) await saveScoreboard(db, target.orgId, board);
   const summary = `Reviewed ${totals.processed} claim(s), proposed ${totals.proposed} prize payout(s), scheduled ${totals.chased} form reminder workflow(s). ${totals.waiting} payout(s) await controller approval. ${totals.blocked} item(s) need attention.`;

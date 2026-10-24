@@ -50,9 +50,10 @@ export async function getChaseCandidates(orgId: string): Promise<ChaseTarget[]> 
 export async function advanceTaxChase(target: ChaseTarget, day: number, runId: string, fastDemo = false): Promise<ChaseAdvance> {
   if (![0, 2, 5, 10].includes(day)) throw new Error("Invalid chase stage");
   return getDb().transaction(async (tx) => {
-    const [person] = await tx.select().from(s.person).where(and(eq(s.person.id, target.personId), eq(s.person.orgId, target.orgId))).for("update");
+    const [org] = await tx.select().from(s.organization).where(eq(s.organization.id, target.orgId)).for("no key update");
+    if (!org) return { complete: true, noticeIds: [], reason: "Organization no longer exists." };
+    const [person] = await tx.select().from(s.person).where(and(eq(s.person.id, target.personId), eq(s.person.orgId, target.orgId))).for("no key update");
     if (!person) return { complete: true, noticeIds: [], reason: "Person no longer exists." };
-    const [org] = await tx.select().from(s.organization).where(eq(s.organization.id, target.orgId));
     const [profile] = await tx.select().from(s.taxProfile).where(and(eq(s.taxProfile.personId, person.id), isNull(s.taxProfile.supersededAt)));
     if (generationFor(person, profile) !== target.generation) return { complete: true, noticeIds: [], reason: "A newer profile or demo reset superseded this reminder." };
     const attention = taxNeedsAttention(profile);
