@@ -195,6 +195,25 @@ describe.skipIf(!hasDatabase)("business flows against real Postgres", { timeout:
     expect(reviewed.ok).toBe(true);
   });
 
+  it("serializes auto-approvals against the remaining budget line", async () => {
+    const { db, s, services } = m;
+    // Earlier tests may already have approved ground transport; leave exactly $50 of room.
+    const approved = await db.select().from(s.claim).where(eq(s.claim.eventId, `${orgId}_evt`));
+    const used = approved.filter((c) => c.category === "ground_transport" && ["approved", "paid"].includes(c.status)).reduce((sum, c) => sum + c.usdMinor, 0n);
+    await db.insert(s.budgetLine).values({ id: `${orgId}_bud`, orgId, eventId: `${orgId}_evt`, name: "Ground transport", category: "ground_transport", capMinor: used + 5000n, fundingSource: "General" });
+    const base = { orgId, eventId: `${orgId}_evt`, personId: ids.sam, type: "expense" as const, merchant: "BART", category: "ground_transport", amountMinor: 3000n, currency: "USD", usdMinor: 3000n, fxRate: "1.00000000", fxSource: "No conversion", purchasedAt: new Date("2026-10-20T10:00:00Z"), nameOnReceipt: "Sam Ortiz", status: "submitted" as const, dueAt: new Date("2026-10-30T00:00:00Z"), requestedBy: ids.samMember, extracted: { source: "trusted_fixture", corroborated: true, mismatches: [] } };
+    await db.insert(s.claim).values([
+      { ...base, id: `${orgId}_b1`, receiptName: "b1.pdf", receiptHash: `${orgId}-h1` },
+      { ...base, id: `${orgId}_b2`, receiptName: "b2.pdf", receiptHash: `${orgId}-h2`, purchasedAt: new Date("2026-10-21T10:00:00Z") },
+    ]);
+    const agent = services.agentActor(orgId);
+    const results = await Promise.all([services.processClaimById(agent, `${orgId}_b1`), services.processClaimById(agent, `${orgId}_b2`)]);
+    const statuses = results.map((r) => r.status).sort();
+    expect(statuses).toEqual(["approved", "escalated"]);
+    const over = results.find((r) => r.status === "escalated")!;
+    expect(over.checks.find((c) => c.code === "budget")?.passed).toBe(false);
+  });
+
   it("filters attendee snapshots to self and hides raw identifiers", async () => {
     const priya = actor(ids.priyaMember, "attendee", ids.priya);
     const snap = await m.snapshot.buildSnapshot(priya);

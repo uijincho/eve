@@ -11,7 +11,7 @@ import * as s from "@/lib/db/schema";
 
 const MOVED = new Set(["processing", "paid"]);
 /** Checks that reflect limits, not errors; failing them is not a false positive. */
-const NON_ERROR_CHECKS = new Set(["agent_limit", "evidence"]);
+const NON_ERROR_CHECKS = new Set(["agent_limit", "evidence", "budget"]);
 
 export async function computeScoreboard(db: Executor, orgId: string): Promise<Scoreboard> {
   const [keys, claims, payouts, packets, filings, awards, people] = await Promise.all([

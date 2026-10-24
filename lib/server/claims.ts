@@ -6,7 +6,7 @@
 // client-entered amount/currency. Manually entered details always go to a
 // person, except trusted seed fixtures (flag only settable in server code).
 
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 
 import type { ActorContext } from "@/lib/auth/session";
 import type { Check } from "@/lib/contracts";
@@ -78,6 +78,8 @@ function mergeDraft(draft: ClaimDraft, ev: ClaimEvidence): ClaimDraft {
 /** Engine checks plus Eve's evidence rule. Pure. */
 export function evaluate(input: {
   claim: ClaimRow; person: PersonRow; org: OrgRow; event: EventRow; existing: ClaimRow[]; personNames: Map<string, string>;
+  /** Remaining room on the claim's budget line (cap minus approved/paid), if the org has one for it. */
+  budget?: { name: string; remainingMinor: bigint };
 }): { checks: Check[]; status: ClaimRow["status"]; reason: string } {
   const { claim, person, org, event } = input;
   const ev = (claim.extracted ?? {}) as Partial<ClaimEvidence>;
@@ -101,6 +103,10 @@ export function evaluate(input: {
             : "Details were entered by hand; a person must compare them with the receipt.";
     checks.push({ code: "evidence", label: "Receipt facts verified", passed: Boolean(ev.corroborated), detail });
   }
+  if (input.budget) {
+    const fits = claim.usdMinor <= input.budget.remainingMinor;
+    checks.push({ code: "budget", label: "Within the budget line", passed: fits, detail: fits ? `${usd(claim.usdMinor)} fits the ${input.budget.name} line (${usd(input.budget.remainingMinor)} left).` : `${usd(claim.usdMinor)} exceeds what is left on the ${input.budget.name} line (${usd(input.budget.remainingMinor)}).` });
+  }
   const failed = checks.filter((c) => !c.passed);
   let status = result.status;
   let reason = result.reason;
@@ -123,11 +129,28 @@ async function claimsForChecks(db: Executor, orgId: string, claim: Pick<ClaimRow
   return { rows, names: new Map(people.map((p) => [p.id, p.name])) };
 }
 
+/**
+ * Locks the claim's budget line (FOR UPDATE) so concurrent auto-approvals
+ * serialize, and returns what is left on it after approved and paid claims.
+ */
+async function lockBudgetLine(tx: Executor, claim: ClaimRow) {
+  const category = claim.type === "travel" ? "travel" : claim.category;
+  const [line] = await tx.select().from(s.budgetLine)
+    .where(claim.budgetLineId ? eq(s.budgetLine.id, claim.budgetLineId) : and(eq(s.budgetLine.eventId, claim.eventId), eq(s.budgetLine.category, category)))
+    .for("update");
+  if (!line) return null;
+  const [{ used }] = await tx.select({ used: sql<string>`coalesce(sum(${s.claim.usdMinor}), 0)::text` }).from(s.claim)
+    .where(and(eq(s.claim.eventId, claim.eventId), inArray(s.claim.status, ["approved", "paid"]), sql`${s.claim.id} <> ${claim.id}`,
+      sql`(${s.claim.budgetLineId} = ${line.id} OR (${s.claim.budgetLineId} IS NULL AND ${category === "travel" ? sql`${s.claim.type} = 'travel'` : sql`${s.claim.category} = ${category} AND ${s.claim.type} = 'expense'`}))`));
+  return { id: line.id, name: line.name, remainingMinor: line.capMinor - BigInt(used) };
+}
+
 /** Applies an evaluation, logs it, and queues approved claims for payout (agent-requested). */
 async function applyEvaluation(tx: Executor, actor: ActorContext, claim: ClaimRow, person: PersonRow, org: OrgRow, event: EventRow, runId?: string) {
   const { rows, names } = await claimsForChecks(tx, org.id, claim);
-  const result = evaluate({ claim, person, org, event, existing: rows, personNames: names });
-  const [updated] = await tx.update(s.claim).set({ status: result.status, checks: result.checks, reason: result.reason, reviewedBy: result.status === "approved" ? "agent" : null })
+  const budget = await lockBudgetLine(tx, claim);
+  const result = evaluate({ claim, person, org, event, existing: rows, personNames: names, budget: budget ?? undefined });
+  const [updated] = await tx.update(s.claim).set({ status: result.status, checks: result.checks, reason: result.reason, reviewedBy: result.status === "approved" ? "agent" : null, budgetLineId: budget?.id ?? claim.budgetLineId })
     .where(eq(s.claim.id, claim.id)).returning();
   const agent = agentActor(org.id);
   await recordDecision(tx, {
