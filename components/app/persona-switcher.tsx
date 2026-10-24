@@ -6,9 +6,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { ResultText } from "@/components/app/action-button";
-import type { ActionResult } from "@/lib/contracts";
+import type { ActionResult, Role } from "@/lib/contracts";
 import { ROLE_LABEL, initials } from "@/lib/client/format";
 import { useEve } from "@/lib/client/use-eve";
+
+const ROLES: Role[] = ["organizer", "controller", "auditor", "attendee"];
 
 /**
  * Demo-only persona switcher. It changes which sample person the demo session
@@ -62,10 +64,15 @@ export function PersonaSwitcher({ className }: { className?: string }) {
             }}
             className="h-7 w-full rounded-md border border-border bg-rail px-1.5 text-small outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            {personas.map((p) => (
-              <option key={p.id} value={p.id}>
-                {ROLE_LABEL[p.role]} · {p.name}
-              </option>
+            {/* Grouped by role so the closed select shows only a name and fits the 176px rail. */}
+            {ROLES.filter((r) => personas.some((p) => p.role === r)).map((r) => (
+              <optgroup key={r} label={ROLE_LABEL[r]}>
+                {personas.filter((p) => p.role === r).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
           {result ? <ResultText result={result} /> : null}

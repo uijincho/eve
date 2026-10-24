@@ -58,7 +58,8 @@ export function PayoutsView() {
         const releasable = s.payouts.filter((p) => canRelease(s.actor, p, s).allowed);
         const chosen = releasable.filter((p) => picked.has(p.id));
         const selected = s.payouts.find((p) => p.id === openId);
-        const firstReady = s.payouts.find((p) => p.status === "proposed" || p.status === "approved");
+        const ready = s.payouts.filter((p) => p.status === "proposed" || p.status === "approved");
+        const firstReady = ready[0];
         const blocked: Permission | undefined = !releasable.length && firstReady ? canRelease(s.actor, firstReady, s) : undefined;
 
         const columns: Column<Payout>[] = [
@@ -107,10 +108,16 @@ export function PayoutsView() {
                 <div className="flex flex-col">
                   <span className="font-semibold">
                     {chosen.length ? `${chosen.length} selected · ` : ""}
-                    <Money amountMinor={sumMinor((chosen.length ? chosen : releasable).map((p) => p.netMinor))} /> net
+                    <Money amountMinor={sumMinor((chosen.length ? chosen : releasable.length ? releasable : ready).map((p) => p.netMinor))} /> net
                   </span>
                   <span className="text-small text-muted-foreground">
-                    {chosen.length ? "Release sends test-mode money through the provider." : releasable.length ? "Select payouts to release, or release all you may release." : "Nothing you can release right now."}
+                    {chosen.length
+                      ? "Release sends test-mode money through the provider."
+                      : releasable.length
+                        ? "Select payouts to release, or release all you may release."
+                        : ready.length
+                          ? `${ready.length} ${ready.length === 1 ? "payout is" : "payouts are"} waiting for a controller.`
+                          : "Nothing is waiting for release."}
                   </span>
                 </div>
                 <ActionButton
