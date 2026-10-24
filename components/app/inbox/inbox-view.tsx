@@ -74,7 +74,7 @@ function Inbox({ snapshot }: { snapshot: AppSnapshot }) {
   };
 
   return (
-    <div className={cn("grid min-h-full flex-1", railOpen ? "xl:grid-cols-[minmax(0,1fr)_19rem]" : "xl:grid-cols-[minmax(0,1fr)_3rem]")}>
+    <div className={cn("grid min-h-full flex-1", railOpen ? "xl:grid-cols-[minmax(0,1fr)_16rem] 2xl:grid-cols-[minmax(0,1fr)_19rem]" : "xl:grid-cols-[minmax(0,1fr)_3rem]")}>
       <main className="flex min-w-0 flex-col">
         <header className="flex flex-col gap-5 border-b px-4 pt-5 pb-4 sm:px-6">
           <div className="flex flex-wrap items-start justify-between gap-4">

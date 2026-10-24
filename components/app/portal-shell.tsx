@@ -3,7 +3,7 @@
 import { cn } from "cn";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { PersonaSwitcher } from "@/components/app/persona-switcher";
 import { Sheet } from "@/components/app/sheet";
@@ -24,6 +24,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { snapshot } = useEve();
   const [personaOpen, setPersonaOpen] = useState(false);
+  const { navRef, edges } = useOverflowEdges(pathname);
   return (
     <div className="flex min-h-dvh flex-col">
       <a href="#main" className="sr-only z-50 rounded-md bg-foreground px-3 py-2 text-background focus:not-sr-only focus:fixed focus:top-2 focus:left-2">
@@ -46,7 +47,12 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
             <span className="max-sm:hidden">{snapshot?.actor.name}</span>
           </button>
         </div>
-        <nav aria-label="Portal" className="mx-auto max-w-5xl overflow-x-auto px-2">
+        <nav
+          ref={navRef}
+          aria-label="Portal"
+          className="mx-auto max-w-5xl overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={fadeMask(edges)}
+        >
           <ul className="flex gap-1">
             {NAV.map((n) => {
               const active = n.href === "/portal" ? pathname === "/portal" : pathname.startsWith(n.href);
@@ -81,4 +87,34 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
       </Sheet>
     </div>
   );
+}
+
+/**
+ * Tracks whether the tab row has more to either side, so narrow screens fade
+ * that edge as a cue, and keeps the current tab scrolled into view.
+ */
+function useOverflowEdges(pathname: string) {
+  const navRef = useRef<HTMLElement>(null);
+  const [edges, setEdges] = useState({ before: false, after: false });
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const measure = () =>
+      setEdges({ before: el.scrollLeft > 2, after: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 });
+    el.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    el.addEventListener("scroll", measure, { passive: true });
+    return () => {
+      observer.disconnect();
+      el.removeEventListener("scroll", measure);
+    };
+  }, [pathname]);
+  return { navRef, edges };
+}
+
+function fadeMask({ before, after }: { before: boolean; after: boolean }): React.CSSProperties | undefined {
+  if (!before && !after) return undefined;
+  const mask = `linear-gradient(to right, ${before ? "transparent, black 2rem" : "black"}, ${after ? "black calc(100% - 3rem), transparent" : "black"})`;
+  return { maskImage: mask, WebkitMaskImage: mask };
 }
