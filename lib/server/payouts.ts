@@ -1,6 +1,19 @@
 // Payout lifecycle: propose (tax + quote via engines), release (controller
 // only, segregation of duties, bank-version check, simulated provider, ledger),
 // bank change freeze and original-channel verification, retry.
+//
+// Locking (every money path, same order everywhere, all re-entrant):
+//   organization (FOR NO KEY UPDATE, lockOrgFinance) -> org_member -> person
+//   (FOR UPDATE) -> payout -> award/claim -> payout_method / sponsor_packet.
+// The org lock serializes budget room and payout state per organization; the
+// person lock serializes same-form YTD totals and tax quotes per payee.
+//
+// Tax quotes and YTD: a payout's quote counts only *finalized* same-form
+// payments (processing, paid, and in-kind fulfillments). Whenever a payment
+// becomes final, every other unpaid payout for that person is re-quoted, and
+// release recomputes the quote under the person lock. A quote that changes is
+// written back as `proposed` with releasedBy cleared, which changes its
+// approval fingerprint: the controller must approve the new terms.
 
 import { createHash, randomInt } from "node:crypto";
 
@@ -13,6 +26,7 @@ import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
 import { postJournal, type JournalLineInput } from "@/lib/ledger";
 
+import { assertFits, claimBudgetRoom, ORG_BOOKED_FLIGHT, prizeBudgetRoom } from "./budget";
 import {
   ActionError, conflict, currentProfile, forbidden, hasValidForm, invalid, loadOrgEvent, loadPerson, maskEmail,
   methodsFor, notFound, recordDecision, recordNotice, usd,
@@ -21,8 +35,53 @@ import {
 import { aggregateYtdByForm, big, computeTax, formFamily, paymentTypeFor, quotePayout, selectRule } from "./engines";
 import { constantTimeEqual, openSecret, sealSecret } from "./vault";
 
-const LIVE = ["held", "proposed", "approved", "processing", "frozen"] as const;
+/** Unpaid statuses a quote can still change in. */
+export const UNPAID = ["held", "proposed", "approved", "frozen"] as const;
+const LIVE = [...UNPAID, "processing"] as const;
+/** Payments that count toward same-form YTD thresholds. */
+const FINAL = ["processing", "paid"] as const;
 const SIMULATED_PROVIDER = "simulated";
+export const SPONSOR_PROVIDER = "sponsor_packet";
+export const IN_KIND_PROVIDER = "in_kind";
+
+// ------------------------------------------------------------------ locks
+
+/** Serializes money decisions for one organization. NO KEY UPDATE does not block FK inserts. */
+export async function lockOrgFinance(tx: Executor, orgId: string): Promise<void> {
+  const [row] = await tx.select({ id: s.organization.id }).from(s.organization).where(eq(s.organization.id, orgId)).for("no key update");
+  if (!row) throw notFound("Organization not found.");
+}
+
+/** Org lock, then the payee's person row. Returns the person. */
+export async function lockPayee(tx: Executor, orgId: string, personId: string): Promise<PersonRow> {
+  await lockOrgFinance(tx, orgId);
+  return loadPerson(tx, orgId, personId, true);
+}
+
+/** Locks org -> person -> payout for a payout id. */
+async function lockPayoutChain(tx: Executor, orgId: string, payoutId: string) {
+  await lockOrgFinance(tx, orgId);
+  const [peek] = await tx.select({ personId: s.payout.personId }).from(s.payout).where(and(eq(s.payout.id, payoutId), eq(s.payout.orgId, orgId)));
+  if (!peek) throw notFound("Payout not found.");
+  const person = await loadPerson(tx, orgId, peek.personId, true);
+  const [p] = await tx.select().from(s.payout).where(and(eq(s.payout.id, payoutId), eq(s.payout.orgId, orgId))).for("update");
+  if (!p) throw notFound("Payout not found.");
+  return { person, p };
+}
+
+/**
+ * A person may never request, approve, review or release money to themselves.
+ * Matches the member's linked person and, as a backstop for unlinked staff
+ * accounts, the person's original email. Checked before any role exception.
+ */
+export function assertNotBeneficiary(actor: ActorContext, payee: string | Pick<PersonRow, "id" | "email">, verb: string): void {
+  const id = typeof payee === "string" ? payee : payee.id;
+  const email = typeof payee === "string" ? null : payee.email;
+  const same = (actor.personId && actor.personId === id) || (email && actor.email && actor.email.trim().toLowerCase() === email.trim().toLowerCase());
+  if (same) throw forbidden(`You are the recipient, so you cannot ${verb} this payment. Another ${actor.role === "controller" ? "controller" : "organizer"} must.`);
+}
+
+// ------------------------------------------------------------------ rules/YTD
 
 export async function loadRules(db: Executor): Promise<TaxRule[]> {
   const rows = await db.select().from(s.taxRule);
@@ -34,15 +93,22 @@ export async function loadRules(db: Executor): Promise<TaxRule[]> {
   }));
 }
 
-/** Prize/stipend payments already paid (or in flight) to this person, for same-form YTD thresholds. */
-export async function paymentsFor(db: Executor, personId: string): Promise<PaymentRecord[]> {
-  const rows = await db.select({ gross: s.payout.grossMinor, form: s.payout.reportingForm, ruleId: s.payout.ruleId, paidAt: s.payout.paidAt, createdAt: s.payout.createdAt })
+interface PaymentRecord { personId: string; reportingForm: string; grossMinor: string; paidAt: string }
+
+/**
+ * Finalized prize/stipend payments to this person for same-form YTD: payouts
+ * released or in flight to the sponsor, and in-kind item fulfillments (FMV).
+ * Unpaid proposals are excluded; they are re-quoted when a sibling becomes final.
+ */
+export async function paymentsFor(db: Executor, personId: string, excludePayoutId?: string): Promise<PaymentRecord[]> {
+  const rows = await db.select({ id: s.payout.id, gross: s.payout.grossMinor, form: s.payout.reportingForm, ruleId: s.payout.ruleId, paidAt: s.payout.paidAt, createdAt: s.payout.createdAt })
     .from(s.payout)
-    .where(and(eq(s.payout.personId, personId), eq(s.payout.sourceType, "award"), inArray(s.payout.status, ["processing", "paid"])));
-  return rows.map((r) => ({ personId, reportingForm: r.form ?? r.ruleId, grossMinor: r.gross.toString(), paidAt: (r.paidAt ?? r.createdAt).toISOString() }));
+    .where(and(eq(s.payout.personId, personId), eq(s.payout.sourceType, "award"), inArray(s.payout.status, [...FINAL])));
+  return rows.filter((r) => r.id !== excludePayoutId)
+    .map((r) => ({ personId, reportingForm: r.form ?? r.ruleId, grossMinor: r.gross.toString(), paidAt: (r.paidAt ?? r.createdAt).toISOString() }));
 }
 
-interface PaymentRecord { personId: string; reportingForm: string; grossMinor: string; paidAt: string }
+// ------------------------------------------------------------------ sources
 
 export interface PayoutSource {
   type: "claim" | "award";
@@ -60,30 +126,69 @@ export function sourceFromAward(a: AwardRow): PayoutSource {
   return { type: "award", id: a.id, grossMinor: a.amountMinor, paymentType: paymentTypeFor({ kind: "award", awardKind: a.kind, track: a.track, fulfillment: a.fulfillment }), dueAt: a.dueAt };
 }
 
+export interface LoadedSource { source: PayoutSource; personId: string; eventId: string; claim?: ClaimRow; award?: AwardRow; blockers: string[] }
+
+/**
+ * Loads (and locks) a payout's source and reports why it cannot be paid in
+ * cash right now. Checked at proposal, on every re-quote and at release.
+ */
+export async function loadSource(tx: Executor, orgId: string, ref: { sourceType: "claim" | "award"; sourceId: string }, ownPayoutId?: string): Promise<LoadedSource> {
+  if (ref.sourceType === "claim") {
+    const [c] = await tx.select().from(s.claim).where(and(eq(s.claim.id, ref.sourceId), eq(s.claim.orgId, orgId))).for("update");
+    if (!c) throw notFound("Claim not found.");
+    const blockers: string[] = [];
+    if (c.category === ORG_BOOKED_FLIGHT) blockers.push("Org-booked flights are bought by the organization; Eve never reimburses them to the attendee.");
+    else if (c.status !== "approved" && !(c.status === "paid" && ownPayoutId)) blockers.push(`Claim is ${c.status}; only approved claims can be paid.`);
+    return { source: sourceFromClaim(c), personId: c.personId, eventId: c.eventId, claim: c, blockers };
+  }
+  const [a] = await tx.select().from(s.award).where(and(eq(s.award.id, ref.sourceId), eq(s.award.orgId, orgId))).for("update");
+  if (!a) throw notFound("Award not found.");
+  const blockers: string[] = [];
+  if (a.kind === "item" && a.fulfillment !== "cash") {
+    blockers.push(a.fulfillment === "undecided"
+      ? "Item prize: choose ship, buy-local or the cash equivalent first."
+      : `Item prize set to ${a.fulfillment === "ship" ? "ship" : "buy locally"}; it is fulfilled in kind by a controller, not paid in cash.`);
+  }
+  if (a.teamId) {
+    const team = await tx.select({ ok: s.award.splitConfirmed }).from(s.award).where(eq(s.award.teamId, a.teamId));
+    if (team.some((t) => !t.ok)) blockers.push("Every team member must confirm the prize split first.");
+  }
+  return { source: sourceFromAward(a), personId: a.personId, eventId: a.eventId, award: a, blockers };
+}
+
+// ------------------------------------------------------------------ quote
+
 export interface PayoutContext {
   org: OrgRow; event: EventRow; person: PersonRow; profile?: ProfileRow; active?: MethodRow; pending?: MethodRow;
   payments: PaymentRecord[]; rules: TaxRule[]; now: Date;
 }
 
-/** Pure: computes the payout row for a source. Tax and quote come from the engines. */
-export function buildPayout(ctx: PayoutContext, source: PayoutSource, requestedBy: string) {
-  const { org, person, profile, active, pending, now } = ctx;
+/** Same-form YTD and the engine's tax result for one payment. Pure. */
+export function taxFor(ctx: PayoutContext, paymentType: string, grossMinor: bigint) {
+  const { org, person, profile, now } = ctx;
   const year = ctx.event.startsAt.getUTCFullYear();
   // YTD only counts payments on the same reporting form (1099-MISC and 1099-NEC thresholds are separate).
-  const rule = selectRule(ctx.rules, { payerCountry: org.country, payeeCountry: person.country, paymentType: source.paymentType, year });
+  const rule = selectRule(ctx.rules, { payerCountry: org.country, payeeCountry: person.country, paymentType, year });
   const ytdMinor = rule ? aggregateYtdByForm(ctx.payments, person.id, year)[formFamily(rule.reportingForm)] ?? "0" : "0";
   const tax = computeTax({
-    payerCountry: org.country, payeeCountry: person.country, paymentType: source.paymentType,
-    grossMinor: source.grossMinor.toString(), hasValidForm: hasValidForm(profile, now), hasTin: Boolean(profile?.tinLast4),
+    payerCountry: org.country, payeeCountry: person.country, paymentType,
+    grossMinor: grossMinor.toString(), hasValidForm: hasValidForm(profile, now), hasTin: Boolean(profile?.tinLast4),
     year, ytdMinor, rules: ctx.rules, treatyClaim: Boolean(profile?.treatyArticle),
   });
+  return { tax, ytdMinor };
+}
+
+/** Pure: computes the payout row for a source. Tax and quote come from the engines. */
+export function buildPayout(ctx: PayoutContext, source: PayoutSource, requestedBy: string, extraHolds: string[] = []) {
+  const { org, person, active, pending } = ctx;
+  const { tax, ytdMinor } = taxFor(ctx, source.paymentType, source.grossMinor);
   const destinationCurrency = (pending ?? active)?.currency ?? person.payoutCurrency;
   const net = big(tax.netMinor);
   const quote = net > 0n
     ? quotePayout({ amountMinor: tax.netMinor, currency: "USD", destinationCurrency, provider: SIMULATED_PROVIDER, feesPaidBy: org.feesPaidBy, destinationCountry: person.country, payerCountry: org.country })
     : { feeMinor: "0", netMinor: "0", destinationNetMinor: "0", fxRate: "1", provider: "mock_wire", truth: "Simulated" as const, warnings: [] as string[] };
 
-  const holds: string[] = [];
+  const holds: string[] = [...extraHolds];
   if (!person.adult) holds.push("Recipient is under 18; Eve does not pay minors.");
   if (source.type === "claim" ? tax.hold && tax.ruleId === "none" : tax.hold) holds.push(tax.reason);
   if (!active && !pending) holds.push("No verified payout method on file.");
@@ -109,74 +214,160 @@ export function buildPayout(ctx: PayoutContext, source: PayoutSource, requestedB
   return { row, tax, quote, ytdMinor };
 }
 
-export async function loadPayoutContext(db: Executor, orgId: string, personId: string): Promise<PayoutContext> {
+export async function loadPayoutContext(db: Executor, orgId: string, personId: string, excludePayoutId?: string): Promise<PayoutContext> {
   // Sequential: this often runs on a single transaction client.
   const { org, event } = await loadOrgEvent(db, orgId);
   const person = await loadPerson(db, orgId, personId);
   const profile = await currentProfile(db, personId);
   const methods = await methodsFor(db, personId);
   const rules = await loadRules(db);
-  const payments = await paymentsFor(db, personId);
+  const payments = await paymentsFor(db, personId, excludePayoutId);
   return { org, event, person, profile, active: methods.active, pending: methods.pending, payments, rules, now: new Date() };
 }
+
+/** Fields a controller approves. Any difference means the quote changed. */
+type Terms = Pick<PayoutRow, "grossMinor" | "withholdingMinor" | "feeMinor" | "netMinor" | "destinationCurrency" | "destinationNetMinor" | "fxRate" | "provider" | "ruleId" | "ruleVersion" | "ruleVerified" | "reportingForm" | "reportable" | "payoutMethodId" | "bankVersion" | "status">;
+
+export function termsKey(t: Partial<Terms>): string {
+  return JSON.stringify([t.grossMinor?.toString(), t.withholdingMinor?.toString(), t.feeMinor?.toString(), t.netMinor?.toString(), t.destinationCurrency,
+    t.destinationNetMinor?.toString(), t.fxRate == null ? null : Number(t.fxRate).toFixed(8), t.provider, t.ruleId, t.ruleVersion, t.ruleVerified,
+    t.reportingForm ?? null, t.reportable ?? false, t.payoutMethodId ?? null, t.bankVersion ?? null, t.status === "approved" ? "proposed" : t.status]);
+}
+
+function describeChange(before: PayoutRow, after: typeof s.payout.$inferInsert): string {
+  const parts: string[] = [];
+  if (before.withholdingMinor !== after.withholdingMinor) parts.push(`withholding ${usd(before.withholdingMinor)} → ${usd(after.withholdingMinor!)}`);
+  if (before.netMinor !== after.netMinor) parts.push(`net ${usd(before.netMinor)} → ${usd(after.netMinor!)}`);
+  if (before.reportable !== after.reportable) parts.push(after.reportable ? `now reportable on ${after.reportingForm}` : "no longer reportable");
+  if (before.ruleId !== after.ruleId || before.ruleVersion !== after.ruleVersion) parts.push(`rule ${before.ruleId} v${before.ruleVersion} → ${after.ruleId} v${after.ruleVersion}`);
+  if (before.status !== after.status) parts.push(`${before.status} → ${after.status}`);
+  if (before.bankVersion !== after.bankVersion) parts.push("bank details");
+  return parts.join(", ") || "quote details";
+}
+
+/**
+ * Re-quotes an unpaid payout against the person's current state. Writes only
+ * when terms changed; a written re-quote clears releasedBy, withdraws any
+ * draft sponsor packet and logs old and new terms.
+ */
+export async function requote(tx: Executor, p: PayoutRow, ctx: PayoutContext, why: string, actor?: ActorContext): Promise<PayoutRow> {
+  if (!(UNPAID as readonly string[]).includes(p.status)) return p;
+  const loaded = await loadSource(tx, p.orgId, { sourceType: p.sourceType, sourceId: (p.claimId ?? p.awardId)! }, p.id);
+  const { row } = buildPayout(ctx, loaded.source, p.requestedBy, loaded.blockers);
+  // A frozen payout stays frozen until the bank change is resolved, whatever the hold reason.
+  const changed = termsKey(row) !== termsKey(p) || (row.status === "held" && p.status === "held" && row.reason !== p.reason);
+  if (!changed) return p;
+  const [updated] = await tx.update(s.payout).set({
+    grossMinor: row.grossMinor, withholdingMinor: row.withholdingMinor, feeMinor: row.feeMinor, netMinor: row.netMinor,
+    destinationCurrency: row.destinationCurrency, destinationNetMinor: row.destinationNetMinor, fxRate: row.fxRate, provider: row.provider, truth: row.truth,
+    status: row.status, frozenFrom: row.frozenFrom, reason: `${row.reason}${row.status === "proposed" && p.status !== "held" ? " Re-quoted; needs a fresh controller release." : ""}`,
+    ruleId: row.ruleId, ruleVersion: row.ruleVersion,
+    ruleVerified: row.ruleVerified, reportingForm: row.reportingForm, reportable: row.reportable, payoutMethodId: row.payoutMethodId, bankVersion: row.bankVersion,
+    releasedBy: null,
+  }).where(eq(s.payout.id, p.id)).returning();
+  // A packet drafted against the old terms is stale.
+  await tx.delete(s.sponsorPacket).where(and(eq(s.sponsorPacket.payoutId, p.id), inArray(s.sponsorPacket.status, ["draft", "questioned"])));
+  if (p.awardId) await tx.update(s.award).set({ status: awardStatusFor(updated, ctx) }).where(eq(s.award.id, p.awardId));
+  await recordDecision(tx, {
+    orgId: p.orgId, objectType: "payout", objectId: p.id, personId: p.personId, personName: ctx.person.name, action: "payout.requote",
+    summary: `Re-quoted (${why}): ${describeChange(p, row)}. ${updated.status === "proposed" ? "The earlier approval no longer applies; a controller must release the new terms." : updated.reason}`,
+    actor: actor ?? { memberId: "agent", role: "agent", name: "Eve (agent)" }, status: updated.status === "proposed" ? "waiting" : updated.status === "frozen" ? "frozen" : "escalated",
+    tool: "computeWithholding+quotePayouts", ruleId: updated.ruleId, ruleVersion: updated.ruleVersion,
+    facts: { why, before: { grossMinor: p.grossMinor.toString(), withholdingMinor: p.withholdingMinor.toString(), netMinor: p.netMinor.toString(), reportable: p.reportable, status: p.status }, after: { grossMinor: String(row.grossMinor), withholdingMinor: String(row.withholdingMinor), netMinor: String(row.netMinor), reportable: row.reportable, status: row.status } },
+  });
+  return updated;
+}
+
+/** Award status that mirrors its payout: held for a form -> needs_form, otherwise proposed or paid. */
+export function awardStatusFor(p: Pick<PayoutRow, "status">, ctx: Pick<PayoutContext, "profile" | "now">): AwardRow["status"] {
+  if (p.status === "paid") return "paid";
+  if (p.status === "held" && !hasValidForm(ctx.profile, ctx.now)) return "needs_form";
+  return "proposed";
+}
+
+/** Re-quotes every other unpaid payout for a person (after a payment becomes final, a form change, a rule change). */
+export async function requoteSiblings(tx: Executor, orgId: string, personId: string, why: string, exceptPayoutId?: string, actor?: ActorContext) {
+  const rows = await tx.select().from(s.payout).where(and(eq(s.payout.personId, personId), eq(s.payout.orgId, orgId), inArray(s.payout.status, [...UNPAID]))).for("update");
+  const others = rows.filter((r) => r.id !== exceptPayoutId);
+  if (!others.length) return 0;
+  const ctx = await loadPayoutContext(tx, orgId, personId);
+  let changed = 0;
+  for (const p of others) {
+    const after = await requote(tx, p, ctx, why, actor);
+    if (after !== p) changed++;
+  }
+  return changed;
+}
+
+async function assertBudget(tx: Executor, loaded: LoadedSource, grossMinor: bigint, payoutId: string | null, verb: string) {
+  if (loaded.claim) assertFits(await claimBudgetRoom(tx, loaded.claim), loaded.claim.usdMinor, verb);
+  else assertFits(await prizeBudgetRoom(tx, loaded.eventId, payoutId), grossMinor, verb);
+}
+
+// ------------------------------------------------------------------ propose
 
 /** payout.propose. Requested by an organizer or the agent; one live payout per source. */
 export async function proposePayout(tx: Executor, actor: ActorContext, input: { sourceType: "claim" | "award"; sourceId: string }) {
   if (actor.role !== "organizer" && actor.role !== "agent") throw forbidden("Only organizers or the agent can request a payout.");
-  let source: PayoutSource;
-  let personId: string;
-  if (input.sourceType === "claim") {
-    const [c] = await tx.select().from(s.claim).where(and(eq(s.claim.id, input.sourceId), eq(s.claim.orgId, actor.orgId))).for("update");
-    if (!c) throw notFound("Claim not found.");
-    if (c.status !== "approved") throw conflict(`Claim is ${c.status}; only approved claims can be paid.`);
-    source = sourceFromClaim(c);
-    personId = c.personId;
-  } else {
-    const [a] = await tx.select().from(s.award).where(and(eq(s.award.id, input.sourceId), eq(s.award.orgId, actor.orgId))).for("update");
-    if (!a) throw notFound("Award not found.");
-    if (a.status === "paid" || a.status === "proposed") throw conflict(`Award is already ${a.status}.`);
-    if (a.kind === "item" && a.fulfillment !== "cash") throw conflict("Item prizes are fulfilled, not paid. Choose the cash equivalent to pay out.");
-    if (a.teamId) {
-      const team = await tx.select({ ok: s.award.splitConfirmed }).from(s.award).where(eq(s.award.teamId, a.teamId));
-      if (team.some((t) => !t.ok)) throw conflict("Every team member must confirm the split first.");
-    }
-    source = sourceFromAward(a);
-    personId = a.personId;
-  }
+  await lockOrgFinance(tx, actor.orgId);
+  // Find the payee, then lock person before the source row (lock order).
+  const table = input.sourceType === "claim" ? s.claim : s.award;
+  const [peek] = await tx.select({ personId: table.personId }).from(table).where(and(eq(table.id, input.sourceId), eq(table.orgId, actor.orgId)));
+  if (!peek) throw notFound(input.sourceType === "claim" ? "Claim not found." : "Award not found.");
+  assertNotBeneficiary(actor, await loadPerson(tx, actor.orgId, peek.personId, true), "request");
+  const loaded = await loadSource(tx, actor.orgId, input);
+  if (loaded.award && (loaded.award.status === "paid")) throw conflict("Award is already paid or fulfilled.");
+  if (loaded.blockers.length) throw conflict(loaded.blockers.join(" "));
   const existing = await tx.select({ id: s.payout.id, status: s.payout.status }).from(s.payout)
     .where(and(input.sourceType === "claim" ? eq(s.payout.claimId, input.sourceId) : eq(s.payout.awardId, input.sourceId), inArray(s.payout.status, [...LIVE, "paid"])));
   if (existing[0]) throw new ActionError(409, `A payout already exists for this ${input.sourceType} (${existing[0].status}).`, { payoutId: existing[0].id });
+  await assertBudget(tx, loaded, loaded.source.grossMinor, null, "Proposing");
 
-  const ctx = await loadPayoutContext(tx, actor.orgId, personId);
-  const { row, tax, quote, ytdMinor } = buildPayout(ctx, source, actor.memberId);
+  const ctx = await loadPayoutContext(tx, actor.orgId, loaded.personId);
+  const { row, tax, quote, ytdMinor } = buildPayout(ctx, loaded.source, actor.memberId);
+  const pending = await tx.select({ id: s.payout.id, gross: s.payout.grossMinor }).from(s.payout)
+    .where(and(eq(s.payout.personId, loaded.personId), eq(s.payout.sourceType, "award"), inArray(s.payout.status, [...UNPAID])));
+  if (input.sourceType === "award" && pending.length) {
+    row.reason = `${row.reason} ${pending.length} other unpaid prize payout(s) for this person; whichever is released first changes this quote's YTD, and Eve will re-quote it.`;
+  }
   await tx.insert(s.payout).values(row);
-  if (input.sourceType === "award" && row.status !== "held") await tx.update(s.award).set({ status: "proposed" }).where(eq(s.award.id, input.sourceId));
+  if (input.sourceType === "award") await tx.update(s.award).set({ status: awardStatusFor({ status: row.status! }, ctx) }).where(eq(s.award.id, input.sourceId));
   await recordDecision(tx, {
-    orgId: actor.orgId, objectType: "payout", objectId: row.id!, personId, personName: ctx.person.name, action: "payout.propose",
+    orgId: actor.orgId, objectType: "payout", objectId: row.id!, personId: loaded.personId, personName: ctx.person.name, action: "payout.propose",
     summary: row.status === "proposed"
       ? `Proposed ${usd(row.grossMinor)} gross, ${usd(row.withholdingMinor!)} withheld, est. ${usd(row.netMinor!)} net for controller release.`
       : `Payout ${row.status}: ${row.reason}`,
     actor, status: row.status === "proposed" ? "waiting" : row.status === "frozen" ? "frozen" : "escalated", tool: "computeWithholding+quotePayouts",
     ruleId: tax.ruleId, ruleVersion: tax.ruleVersion,
-    facts: { sourceType: input.sourceType, sourceId: input.sourceId, tax, quote: { ...quote }, ytdMinor },
+    facts: { sourceType: input.sourceType, sourceId: input.sourceId, tax, quote: { ...quote }, ytdMinor, ytdBasis: "finalized same-form payments (processing, paid, in-kind)" },
   });
   return row;
 }
+
+// ------------------------------------------------------------------ release
 
 function simulatedProviderRef(idempotencyKey: string) {
   return `sim_${createHash("sha256").update(idempotencyKey).digest("hex").slice(0, 20)}`;
 }
 
-/** Accrual (expense -> withholding + AP) and payment (AP -> cash, fee) entries, idempotent per payout. */
-export async function postPayoutJournals(tx: Executor, p: PayoutRow, createdBy: string, category: "travel" | "expense" | "prize" | "stipend") {
-  const expenseAccount = category === "travel" ? "5000" : category === "expense" ? "5010" : category === "stipend" ? "5200" : "5100";
+type Category = "travel" | "expense" | "prize" | "stipend";
+const EXPENSE_ACCOUNT = { travel: "5000", expense: "5010", stipend: "5200", prize: "5100" } as const;
+
+/** Accrual: expense -> withholding payable + AP to the recipient. Idempotent per payout. */
+export async function postAccrual(tx: Executor, p: PayoutRow, createdBy: string, category: Category) {
   const ap = p.grossMinor - p.withholdingMinor;
-  const accrual: JournalLineInput[] = [{ account: expenseAccount, debitMinor: p.grossMinor, currency: "USD", personId: p.personId, memo: "Gross" }];
+  const accrual: JournalLineInput[] = [{ account: EXPENSE_ACCOUNT[category], debitMinor: p.grossMinor, currency: "USD", personId: p.personId, memo: "Gross" }];
   if (p.withholdingMinor > 0n) accrual.push({ account: "2100", creditMinor: p.withholdingMinor, currency: "USD", personId: p.personId, memo: `Withholding (${p.ruleId} v${p.ruleVersion})` });
   if (ap > 0n) accrual.push({ account: "2000", creditMinor: ap, currency: "USD", personId: p.personId, memo: "Payable to recipient" });
   if (accrual.length >= 2) {
     await postJournal(tx, { orgId: p.orgId, memo: `Accrue ${p.sourceType} ${p.claimId ?? p.awardId}`, sourceType: "payout", sourceId: p.id, idempotencyKey: `accrual:${p.id}`, createdBy, lines: accrual });
   }
+}
+
+/** Accrual (expense -> withholding + AP) and payment (AP -> cash, fee) entries, idempotent per payout. */
+export async function postPayoutJournals(tx: Executor, p: PayoutRow, createdBy: string, category: Category) {
+  await postAccrual(tx, p, createdBy, category);
+  const ap = p.grossMinor - p.withholdingMinor;
   const cashAccount = p.truth === "Test mode" ? "1010" : "1000";
   const payment: JournalLineInput[] = [];
   if (ap > 0n) {
@@ -194,7 +385,7 @@ export async function postPayoutJournals(tx: Executor, p: PayoutRow, createdBy: 
   }
 }
 
-async function payoutCategory(tx: Executor, p: PayoutRow): Promise<"travel" | "expense" | "prize" | "stipend"> {
+export async function payoutCategory(tx: Executor, p: Pick<PayoutRow, "claimId" | "awardId">): Promise<Category> {
   if (p.claimId) {
     const [c] = await tx.select({ type: s.claim.type }).from(s.claim).where(eq(s.claim.id, p.claimId));
     return c?.type === "travel" ? "travel" : "expense";
@@ -203,15 +394,32 @@ async function payoutCategory(tx: Executor, p: PayoutRow): Promise<"travel" | "e
   return a && /stipend|judge|mentor|speaker/i.test(a.track) ? "stipend" : "prize";
 }
 
-/** payout.release for one payout. Controller only; never the requester; never the agent. */
-export async function releasePayout(tx: Executor, actor: ActorContext, payoutId: string) {
+export type ReleaseCheck =
+  | { kind: "ready"; p: PayoutRow; person: PersonRow; methods: { active?: MethodRow; pending?: MethodRow } }
+  | { kind: "requoted"; payout: PayoutRow };
+
+/**
+ * Shared release gate for direct release and sponsor submission. Takes the
+ * org -> person -> payout locks, checks authority (controller, never the
+ * requester, never the beneficiary), state, form, bank version, source
+ * eligibility and budget, then recomputes the quote. A changed quote is
+ * written back (status proposed, approval void) and returned as "requoted".
+ */
+export async function prepareRelease(tx: Executor, actor: ActorContext, payoutId: string, route: "direct" | "sponsor", opts: { expectTerms?: string } = {}): Promise<ReleaseCheck> {
   if (actor.role !== "controller") throw forbidden(actor.role === "agent" ? "The agent can never release money." : "Only a controller can release payouts.");
-  const [p] = await tx.select().from(s.payout).where(and(eq(s.payout.id, payoutId), eq(s.payout.orgId, actor.orgId))).for("update");
-  if (!p) throw notFound("Payout not found.");
+  const { person, p } = await lockPayoutChain(tx, actor.orgId, payoutId);
   if (p.requestedBy === actor.memberId) throw forbidden("You requested this payout, so another controller must release it.");
+  assertNotBeneficiary(actor, person, "release");
   if (p.status === "paid") throw conflict("Payout is already paid.");
+  if (p.status === "processing") throw conflict(p.provider === SPONSOR_PROVIDER ? "Payout was already submitted to the sponsor." : "Payout is already in flight.");
   if (p.status !== "proposed" && p.status !== "approved") throw conflict(`Payout is ${p.status}: ${p.reason}`);
-  const person = await loadPerson(tx, actor.orgId, p.personId);
+  if (opts.expectTerms && termsKey(p) !== opts.expectTerms) throw conflict("This payout was re-quoted after you reviewed it; review the new terms and release again.");
+  const { org } = await loadOrgEvent(tx, actor.orgId);
+  const [packet] = await tx.select({ id: s.sponsorPacket.id, status: s.sponsorPacket.status }).from(s.sponsorPacket).where(eq(s.sponsorPacket.payoutId, p.id)).for("update");
+  if (route === "direct") {
+    if (org.mode === "sponsor") throw conflict("This organization pays through its fiscal sponsor. Draft and submit a sponsor packet instead of a direct release.");
+    if (packet) throw conflict(`This payout belongs to sponsor packet ${packet.id} (${packet.status}); the sponsor pays it, so it cannot also be released directly.`);
+  }
   const profile = await currentProfile(tx, p.personId);
   const methods = await methodsFor(tx, p.personId);
   if (!person.adult) throw conflict("Recipient is under 18; payment blocked.");
@@ -220,6 +428,29 @@ export async function releasePayout(tx: Executor, actor: ActorContext, payoutId:
   if (!methods.active || methods.active.version !== p.bankVersion || methods.active.id !== p.payoutMethodId) {
     throw conflict("This payout was quoted against outdated bank details; it must be re-proposed and re-approved.");
   }
+  const loaded = await loadSource(tx, actor.orgId, { sourceType: p.sourceType, sourceId: (p.claimId ?? p.awardId)! }, p.id);
+  if (loaded.blockers.length) throw conflict(loaded.blockers.join(" "));
+  await assertBudget(tx, loaded, p.grossMinor, p.id, "Releasing");
+  // Recompute tax and quote under the person lock with finalized YTD.
+  const ctx = await loadPayoutContext(tx, actor.orgId, p.personId, p.id);
+  const { row } = buildPayout(ctx, loaded.source, p.requestedBy);
+  if (termsKey(row) !== termsKey(p)) {
+    const updated = await requote(tx, p, ctx, "terms changed before release", actor);
+    return { kind: "requoted", payout: updated };
+  }
+  return { kind: "ready", p, person, methods };
+}
+
+/**
+ * payout.release for one payout. Controller only; never the requester or the
+ * recipient; never the agent. Returns the paid row, or, when the quote changed
+ * under the lock, the re-quoted row (status "proposed"/"held"): the caller must
+ * commit and ask for a fresh approval rather than report a release.
+ */
+export async function releasePayout(tx: Executor, actor: ActorContext, payoutId: string, opts: { expectTerms?: string } = {}): Promise<PayoutRow> {
+  const check = await prepareRelease(tx, actor, payoutId, "direct", opts);
+  if (check.kind === "requoted") return check.payout;
+  const { p, person, methods } = check;
   await tx.insert(s.approval).values({
     id: newId("apr"), orgId: actor.orgId, objectType: "payout", objectId: p.id, requestedBy: p.requestedBy,
     approverId: actor.memberId, approverRole: actor.role, decision: "approved", reason: "Released", bankVersion: p.bankVersion,
@@ -236,19 +467,25 @@ export async function releasePayout(tx: Executor, actor: ActorContext, payoutId:
   if (p.awardId) await tx.update(s.award).set({ status: "paid" }).where(eq(s.award.id, p.awardId));
   await recordDecision(tx, {
     orgId: actor.orgId, objectType: "payout", objectId: p.id, personId: p.personId, personName: person.name, action: "payout.release",
-    summary: `Released ${usd(p.netMinor)} to ••${methods.active.last4} via simulated provider (${providerRef}).`,
+    summary: `Released ${usd(p.netMinor)} to ••${methods.active!.last4} via simulated provider (${providerRef}).`,
     actor, status: "done", tool: "executePayout", ruleId: p.ruleId, ruleVersion: p.ruleVersion,
-    facts: { providerRef, idempotencyKey: p.idempotencyKey, truth: p.truth, bankVersion: p.bankVersion, requestedBy: p.requestedBy },
+    facts: { providerRef, idempotencyKey: p.idempotencyKey, truth: p.truth, bankVersion: p.bankVersion, requestedBy: p.requestedBy, reportable: p.reportable, reportingForm: p.reportingForm },
   });
+  if (p.sourceType === "award") await requoteSiblings(tx, actor.orgId, p.personId, `${usd(p.grossMinor)} payment ${p.id} became final`, p.id, actor);
   return paid;
 }
 
 /** payout.retry: re-submit a failed payout with the same idempotency key (no double pay). */
 export async function retryPayout(tx: Executor, actor: ActorContext, payoutId: string) {
-  const [p] = await tx.select().from(s.payout).where(and(eq(s.payout.id, payoutId), eq(s.payout.orgId, actor.orgId))).for("update");
-  if (!p) throw notFound("Payout not found.");
+  if (actor.role !== "controller") throw forbidden("Only a controller can retry payouts.");
+  const { p, person } = await lockPayoutChain(tx, actor.orgId, payoutId);
   if (p.status !== "failed") throw conflict(`Only failed payouts can be retried (this one is ${p.status}).`);
   if (!p.releasedBy) throw conflict("This payout was never released.");
+  if (p.requestedBy === actor.memberId) throw forbidden("You requested this payout, so another controller must retry it.");
+  assertNotBeneficiary(actor, person, "retry");
+  const live = await tx.select({ id: s.payout.id }).from(s.payout)
+    .where(and(p.claimId ? eq(s.payout.claimId, p.claimId) : eq(s.payout.awardId, p.awardId!), sql`${s.payout.status} NOT IN ('failed', 'returned')`));
+  if (live.length) throw conflict("Another payout for this source is already live; it cannot be retried.");
   const methods = await methodsFor(tx, p.personId);
   if (methods.pending || methods.active?.version !== p.bankVersion) throw conflict("Bank details changed since release; re-propose instead.");
   const [paid] = await tx.update(s.payout).set({ status: "paid", paidAt: new Date(), attempts: p.attempts + 1, providerRef: simulatedProviderRef(p.idempotencyKey) })
@@ -257,29 +494,8 @@ export async function retryPayout(tx: Executor, actor: ActorContext, payoutId: s
   if (p.claimId) await tx.update(s.claim).set({ status: "paid" }).where(eq(s.claim.id, p.claimId));
   if (p.awardId) await tx.update(s.award).set({ status: "paid" }).where(eq(s.award.id, p.awardId));
   await recordDecision(tx, { orgId: actor.orgId, objectType: "payout", objectId: p.id, personId: p.personId, action: "payout.retry", summary: "Retried with the original idempotency key.", actor, status: "done", tool: "executePayout", facts: { idempotencyKey: p.idempotencyKey } });
+  if (p.sourceType === "award") await requoteSiblings(tx, actor.orgId, p.personId, `payment ${p.id} became final`, p.id, actor);
   return paid;
-}
-
-/** Re-quotes a payout against the person's current state (after a form or bank change). */
-export async function requote(tx: Executor, p: PayoutRow, ctx: PayoutContext): Promise<PayoutRow> {
-  let source: PayoutSource;
-  if (p.claimId) {
-    const [c] = await tx.select().from(s.claim).where(eq(s.claim.id, p.claimId));
-    source = sourceFromClaim(c);
-  } else {
-    const [a] = await tx.select().from(s.award).where(eq(s.award.id, p.awardId!));
-    source = sourceFromAward(a);
-  }
-  const { row } = buildPayout(ctx, source, p.requestedBy);
-  const [updated] = await tx.update(s.payout).set({
-    grossMinor: row.grossMinor, withholdingMinor: row.withholdingMinor, feeMinor: row.feeMinor, netMinor: row.netMinor,
-    destinationCurrency: row.destinationCurrency, destinationNetMinor: row.destinationNetMinor, fxRate: row.fxRate,
-    status: row.status, frozenFrom: row.frozenFrom, reason: row.reason, ruleId: row.ruleId, ruleVersion: row.ruleVersion,
-    ruleVerified: row.ruleVerified, reportingForm: row.reportingForm, reportable: row.reportable, payoutMethodId: row.payoutMethodId, bankVersion: row.bankVersion,
-    releasedBy: null,
-  }).where(eq(s.payout.id, p.id)).returning();
-  if (p.awardId) await tx.update(s.award).set({ status: updated.status === "held" ? "needs_form" : "proposed" }).where(eq(s.award.id, p.awardId));
-  return updated;
 }
 
 const CODE_TTL_MS = 30 * 60 * 1000;
@@ -290,7 +506,7 @@ const MAX_ATTEMPTS = 5;
  * payout for the person freezes; a code goes to the ORIGINAL email on file.
  */
 export async function changeBankDetails(tx: Executor, actor: ActorContext, input: { personId: string; last4: string; currency: string; accountNumber?: string; requestedVia?: string }) {
-  const person = await loadPerson(tx, actor.orgId, input.personId, true);
+  const person = await lockPayee(tx, actor.orgId, input.personId);
   if (input.accountNumber && !input.accountNumber.endsWith(input.last4)) throw invalid("The account number does not end in the given last 4 digits.");
   const methods = await methodsFor(tx, person.id);
   if (methods.pending) {
@@ -319,12 +535,12 @@ export async function changeBankDetails(tx: Executor, actor: ActorContext, input
     body: `We received a request via ${requestedVia} to send your payouts to an account ending ••${input.last4}. If this was you, enter the confirmation code in Eve. If not, do nothing and tell the organizers.`,
     privateVaultId: codeVault,
   });
-  await recordNotice(tx, { orgId: actor.orgId, channel: "organizers", title: `Payout frozen: ${person.name}`, body: `${toFreeze.length} payout(s) frozen after a bank detail change to ••${input.last4}. Confirmation sent to the original email.` });
+  await recordNotice(tx, { orgId: actor.orgId, channel: "organizers", title: `Payout frozen: ${person.name}`, body: `${toFreeze.length} payout(s) frozen after a bank detail change to ••${input.last4}. Verification requested through the original email on file; delivery pending.` });
   await recordDecision(tx, {
     orgId: actor.orgId, objectType: "person", objectId: person.id, personId: person.id, personName: person.name, action: "payout.bankChange",
-    summary: `Bank details changed to ••${input.last4} via ${requestedVia}. Froze ${toFreeze.length} payout(s) and asked ${maskEmail(person.email)} to confirm.`,
+    summary: `Bank details changed to ••${input.last4} via ${requestedVia}. Froze ${toFreeze.length} payout(s); verification requested through ${maskEmail(person.email)} (delivery pending).`,
     actor, status: "frozen", tool: "freezePayouts",
-    facts: { previousLast4: methods.active?.last4 ?? null, newLast4: input.last4, requestedVia, frozen: toFreeze.map((p) => p.id), sentTo: maskEmail(person.email) },
+    facts: { previousLast4: methods.active?.last4 ?? null, newLast4: input.last4, requestedVia, frozen: toFreeze.map((p) => p.id), verificationChannel: maskEmail(person.email), delivery: "pending" },
   });
   return { methodId, frozen: toFreeze.map((p) => p.id), sentTo: maskEmail(person.email) };
 }
@@ -334,9 +550,13 @@ export async function changeBankDetails(tx: Executor, actor: ActorContext, input
  * codes count toward a limit and are persisted (the caller must commit).
  */
 export async function verifyBankChange(tx: Executor, actor: ActorContext, input: { id: string; confirmation: string; decision?: "confirm" | "reject" }) {
-  const [pending] = await tx.select().from(s.payoutMethod)
-    .where(and(eq(s.payoutMethod.orgId, actor.orgId), eq(s.payoutMethod.status, "pending_verification"),
-      sql`(${s.payoutMethod.id} = ${input.id} OR ${s.payoutMethod.personId} = ${input.id})`)).for("update");
+  const pendingWhere = and(eq(s.payoutMethod.orgId, actor.orgId), eq(s.payoutMethod.status, "pending_verification"),
+    sql`(${s.payoutMethod.id} = ${input.id} OR ${s.payoutMethod.personId} = ${input.id})`);
+  const [peek] = await tx.select({ personId: s.payoutMethod.personId }).from(s.payoutMethod).where(pendingWhere);
+  if (!peek) throw notFound("No bank change is waiting for verification.");
+  // Lock order: org -> person -> payout method.
+  await lockPayee(tx, actor.orgId, peek.personId);
+  const [pending] = await tx.select().from(s.payoutMethod).where(pendingWhere).for("update");
   if (!pending) throw notFound("No bank change is waiting for verification.");
   if (actor.role === "attendee" && actor.personId !== pending.personId) throw forbidden("You can only verify your own bank change.");
   if (pending.verificationAttempts >= MAX_ATTEMPTS) throw conflict("Too many attempts. Start the bank change again.");
@@ -344,7 +564,7 @@ export async function verifyBankChange(tx: Executor, actor: ActorContext, input:
   const expected = pending.verificationVaultId ? await openSecret(tx, actor.orgId, pending.verificationVaultId) : null;
   if (!expected || !constantTimeEqual(expected, input.confirmation)) {
     await tx.update(s.payoutMethod).set({ verificationAttempts: pending.verificationAttempts + 1 }).where(eq(s.payoutMethod.id, pending.id));
-    return { ok: false as const, message: `That code does not match the one sent to ${maskEmail(pending.verificationSentTo ?? "")}. ${MAX_ATTEMPTS - pending.verificationAttempts - 1} attempts left.` };
+    return { ok: false as const, message: `That code does not match the one issued for ${maskEmail(pending.verificationSentTo ?? "")}. ${MAX_ATTEMPTS - pending.verificationAttempts - 1} attempts left.` };
   }
   const person = await loadPerson(tx, actor.orgId, pending.personId, true);
   const decision = input.decision ?? "confirm";
@@ -358,7 +578,7 @@ export async function verifyBankChange(tx: Executor, actor: ActorContext, input:
     await tx.update(s.payoutMethod).set({ status: "superseded" }).where(and(eq(s.payoutMethod.personId, person.id), eq(s.payoutMethod.status, "active")));
     await tx.update(s.payoutMethod).set({ status: "active", verifiedAt: new Date(), verifiedBy: actor.memberId }).where(eq(s.payoutMethod.id, pending.id));
     const ctx = await loadPayoutContext(tx, actor.orgId, person.id);
-    for (const p of frozen) await requote(tx, p, ctx);
+    for (const p of frozen) await requote(tx, p, ctx, `bank details confirmed as ••${pending.last4}`, actor);
   }
   await recordDecision(tx, {
     orgId: actor.orgId, objectType: "person", objectId: person.id, personId: person.id, personName: person.name, action: "payout.verify",
@@ -370,12 +590,20 @@ export async function verifyBankChange(tx: Executor, actor: ActorContext, input:
   return { ok: true as const, message: decision === "confirm" ? "Bank details confirmed. Payouts need a new release." : "Bank change rejected.", payouts: frozen.map((p) => p.id) };
 }
 
-/** After a tax form becomes valid: awards waiting on a form become ready; held payouts are re-quoted. */
-export async function reevaluatePerson(tx: Executor, orgId: string, personId: string) {
+/**
+ * After a tax form changes (valid, review, superseded): every unpaid payout is
+ * re-quoted, not only held ones, so a proposed quote never outlives the form
+ * it was computed from. Awards without a payout follow the form's validity.
+ */
+export async function reevaluatePerson(tx: Executor, orgId: string, personId: string, actor?: ActorContext) {
+  await lockPayee(tx, orgId, personId);
   const ctx = await loadPayoutContext(tx, orgId, personId);
   const valid = hasValidForm(ctx.profile, ctx.now);
-  if (valid) await tx.update(s.award).set({ status: "ready" }).where(and(eq(s.award.personId, personId), eq(s.award.status, "needs_form")));
-  const held = await tx.select().from(s.payout).where(and(eq(s.payout.personId, personId), eq(s.payout.status, "held")));
-  for (const p of held) await requote(tx, p, ctx);
-  return { valid, requoted: held.length };
+  const withPayout = sql`${s.award.id} NOT IN (SELECT ${s.payout.awardId} FROM ${s.payout} WHERE ${s.payout.awardId} IS NOT NULL AND ${s.payout.status} NOT IN ('failed', 'returned'))`;
+  if (valid) await tx.update(s.award).set({ status: "ready" }).where(and(eq(s.award.personId, personId), eq(s.award.status, "needs_form"), withPayout));
+  else await tx.update(s.award).set({ status: "needs_form" }).where(and(eq(s.award.personId, personId), eq(s.award.status, "ready"), withPayout));
+  const unpaid = await tx.select().from(s.payout).where(and(eq(s.payout.personId, personId), inArray(s.payout.status, [...UNPAID]))).for("update");
+  let requoted = 0;
+  for (const p of unpaid) if ((await requote(tx, p, ctx, "tax form changed", actor)) !== p) requoted++;
+  return { valid, requoted };
 }

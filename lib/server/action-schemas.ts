@@ -67,6 +67,8 @@ export const actionSchemas = {
     teamId: id, splits: z.array(z.strictObject({ personId: id, bps: z.number().int().min(1).max(10000) })).min(2).max(12),
   }).refine((v) => v.splits.reduce((s, x) => s + x.bps, 0) === 10000, "Splits must total 10000 bps (100%)"),
   "award.confirm": z.strictObject({ id }),
+  /** Controller confirms an item prize was shipped or bought locally (simulated); records FMV as reportable income. */
+  "award.fulfill": z.strictObject({ id }),
   "payout.propose": z.strictObject({ sourceId: id, sourceType: z.enum(["claim", "award"]) }),
   "payout.release": z.union([z.strictObject({ id }), z.strictObject({ ids: z.array(id).min(1).max(200) })]),
   "payout.bankChange": z.strictObject({
@@ -89,9 +91,10 @@ export const actionSchemas = {
   "demo.run": z.strictObject({}),
   "agent.run": z.strictObject({ kind: z.enum(["claims", "chase", "all"]).optional() }),
   "flight.search": z.strictObject({ origin: z.string().regex(/^[A-Z]{3}$/), date: isoDate.optional(), personId: id.optional() }),
+  /** Price and itinerary come from the server's offer (fixture table or signed offerToken); the optional copies are only compared. */
   "flight.request": z.strictObject({
-    personId: id.optional(), offerId: text(80).min(1), origin: z.string().regex(/^[A-Z]{3}$/), carrier: text(80).min(1),
-    departAt: isoDateTime, amountMinor: positiveMinor, currency: currency.optional(), cabin: text(40).optional(),
+    personId: id.optional(), offerId: text(80).min(1), origin: z.string().regex(/^[A-Z]{3}$/), offerToken: z.string().min(10).max(4000).optional(),
+    carrier: text(80).optional(), departAt: isoDateTime.optional(), amountMinor: positiveMinor.optional(), currency: currency.optional(), cabin: text(40).optional(),
   }),
 } satisfies Record<AppAction, z.ZodType>;
 

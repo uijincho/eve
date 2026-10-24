@@ -8,6 +8,7 @@ export {
   checkClaim,
   computeTax,
   formFamily,
+  grossUp,
   selectRule,
   formValidity,
   quotePayout,

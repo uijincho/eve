@@ -97,7 +97,7 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
     checkInAt: D("2026-10-24T20:30:00Z"), closingAt: D("2026-10-25T22:00:00Z"),
   });
   await tx.insert(s.taxRule).values(startingRules.map((r) => ({ ...r, thresholdMinor: BigInt(r.thresholdMinor), effectiveTo: r.effectiveTo ?? null }))).onConflictDoNothing();
-  await tx.insert(s.fxRate).values(Object.entries(FX).map(([base, rate]) => ({ rateDate: "2026-09-01", base, quote: "USD", rate, source: "ECB reference (seeded snapshot)" }))).onConflictDoNothing();
+  await tx.insert(s.fxRate).values(Object.entries(FX).map(([base, rate]) => ({ rateDate: "2026-09-01", base, quote: "USD", rate, source: "Simulated seeded rate (not an authoritative quote)" }))).onConflictDoNothing();
   await tx.insert(s.budgetLine).values([
     { id: "bud_demo_travel", orgId: ORG, eventId: DEMO_EVENT_ID, name: "Travel", category: "travel", capMinor: 4_500_000n, fundingSource: "Sponsor grant" },
     { id: "bud_demo_ground", orgId: ORG, eventId: DEMO_EVENT_ID, name: "Ground transport", category: "ground_transport", capMinor: 300_000n, fundingSource: "General fund" },
@@ -222,7 +222,7 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
       id, orgId: ORG, eventId: DEMO_EVENT_ID, personId: p.id, budgetLineId: null, type: c.type, merchant: c.merchant ?? (c.type === "travel" ? pick(["Air Canada", "United", "Delta", "Lufthansa", "British Airways", "LATAM", "Aeromexico", "ANA", "Qantas", "Korean Air", "Air France", "Swiss"]) : pick(["Lyft", "Uber", "BART", "Staples", "Best Buy"])),
       description: c.description ?? (c.type === "travel" ? `${p.airport} → SFO` : "Ground transport to venue"), category: c.category ?? (c.type === "travel" ? "travel" : "ground_transport"),
       amountMinor, currency, usdMinor: currency === "USD" ? amountMinor : convertMinor(amountMinor, currency, fxRate), fxRate,
-      fxSource: currency === "USD" ? "No conversion" : "ECB reference (seeded snapshot), 2026-09-01",
+      fxSource: currency === "USD" ? "No conversion" : "Simulated seeded rate (not an authoritative quote), 2026-09-01",
       purchasedAt: c.purchasedAt ?? D(`2026-09-${String(5 + Math.floor(rand() * 25)).padStart(2, "0")}T18:00:00Z`),
       travelDate: c.type === "travel" ? (c.travelDate === undefined ? D(rand() < 0.5 ? "2026-10-23T15:00:00Z" : "2026-10-24T08:00:00Z") : c.travelDate) : null,
       cabin: c.type === "travel" ? (c.cabin ?? "economy") : null, origin: c.type === "travel" ? p.airport : null,
@@ -355,7 +355,7 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   await changeBankDetails(tx, dana, { personId: bankSecond.id, last4: "5531", currency: "AUD", requestedVia: "email" });
 
   // Fiscal sponsor paid $970.00 on a $1,000.00 request.
-  const packetId = await sponsorSeed(tx, dana, sponsorAward);
+  const packetId = await sponsorSeed(tx, dana, ari, sponsorAward);
   await reconcilePacketSeed(tx, packetId, 97000n);
   planted.push({ scenario: "Sponsor short-paid", objectType: "packet", objectId: packetId, expected: "exception", description: "Remittance shows $970.00 on a $1,000.00 request (wire fee deducted)." });
 

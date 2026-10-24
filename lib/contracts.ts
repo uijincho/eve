@@ -77,7 +77,7 @@ export interface AppSnapshot {
 export type AppAction =
   | "org.update" | "event.update" | "budget.update" | "people.import" | "person.update"
   | "tax.submit" | "claim.submit" | "claim.review" | "award.create" | "award.choose"
-  | "award.split" | "award.confirm" | "payout.propose" | "payout.release"
+  | "award.split" | "award.confirm" | "award.fulfill" | "payout.propose" | "payout.release"
   | "payout.bankChange" | "payout.verify" | "payout.retry" | "sponsor.create"
   | "sponsor.submit" | "sponsor.reconcile" | "period.lock" | "filings.generate"
   | "demo.reset" | "demo.run" | "agent.run" | "flight.search" | "flight.request";

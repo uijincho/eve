@@ -4,9 +4,14 @@
 // Trust rule: a claim can only auto-approve on facts the SERVER established,
 // i.e. receipt extraction that read the document clearly and agrees with any
 // client-entered amount/currency. Manually entered details always go to a
-// person, except trusted seed fixtures (flag only settable in server code).
+// person, except trusted seed fixtures (flag only settable in server code)
+// and org booking requests whose fare comes from a server-verified offer.
+// Critical travel facts (passenger name, travel date, cabin, purchase date)
+// that the receipt does not show are never filled in as corroborated: a
+// client-entered value is kept for review but the claim goes to a person.
 
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { postJournal } from "@/lib/ledger";
+import { and, eq, inArray, or } from "drizzle-orm";
 
 import type { ActorContext } from "@/lib/auth/session";
 import type { Check } from "@/lib/contracts";
@@ -15,11 +20,12 @@ import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
 
 import {
-  agentActor, assertSelfOrStaff, conflict, forbidden, invalid, loadOrgEvent, loadPerson, notFound, recordDecision,
+  ActionError, agentActor, assertSelfOrStaff, conflict, forbidden, invalid, loadOrgEvent, loadPerson, notFound, recordDecision, recordNotice,
   toClaim, toEvent, toOrg, toPerson, toUsd, usd, type ClaimRow, type EventRow, type OrgRow, type PersonRow,
 } from "./core";
+import { claimBudgetRoom, ORG_BOOKED_FLIGHT, overBudgetMessage } from "./budget";
 import { checkClaim } from "./engines";
-import { proposePayout } from "./payouts";
+import { assertNotBeneficiary, lockOrgFinance, proposePayout } from "./payouts";
 import { extractReceiptForDocument, type ReceiptEvidence } from "./receipt";
 
 export interface ClaimDraft {
@@ -35,6 +41,12 @@ export interface ClaimEvidence {
   extractionError?: string;
   corroborated: boolean;
   mismatches: string[];
+  /** Critical facts the receipt did not show. */
+  missingFacts?: string[];
+  /** Of those, the ones the submitter typed in (kept, never treated as verified). */
+  manualFields?: string[];
+  /** Org booking requests: the server-verified offer the fare came from. */
+  offer?: { id: string; carrier: string; flightNumber: string; origin: string; destination: string; departAt: string; cabin: string; totalMinor: string; currency: string; source: string; truth: string; policyOk: boolean; policyReason: string };
 }
 
 const CATEGORY_DEFAULT = { travel: "travel", expense: "other" } as const;
@@ -53,7 +65,21 @@ export async function prepareClaim(db: Executor, actor: ActorContext, draft: Cla
   if (draft.amountMinor !== undefined && ex.amountMinor && BigInt(ex.amountMinor) !== draft.amountMinor) mismatches.push(`amount (entered ${draft.amountMinor}, receipt ${ex.amountMinor})`);
   if (draft.currency && ex.currency && draft.currency !== ex.currency) mismatches.push(`currency (entered ${draft.currency}, receipt ${ex.currency})`);
   if (draft.nameOnReceipt && ex.passengerName && draft.nameOnReceipt.toLowerCase() !== ex.passengerName.toLowerCase()) mismatches.push("name on receipt");
-  return { source: "extraction", extraction: ex, corroborated: !ex.requiresReview && mismatches.length === 0 && Boolean(ex.amountMinor && ex.currency), mismatches };
+  if (draft.cabin && ex.cabin && ex.cabin !== "unknown" && draft.cabin.toLowerCase().replace(/\s+/g, "_") !== ex.cabin) mismatches.push(`cabin (entered ${draft.cabin}, receipt ${ex.cabin})`);
+  if (draft.travelDate && ex.travelDate && draft.travelDate.slice(0, 10) !== ex.travelDate.slice(0, 10)) mismatches.push(`travel date (entered ${draft.travelDate.slice(0, 10)}, receipt ${ex.travelDate.slice(0, 10)})`);
+  // Facts a policy decision depends on must come from the document itself.
+  const critical: [string, unknown, unknown][] = [
+    ["amount", ex.amountMinor, draft.amountMinor], ["currency", ex.currency, draft.currency], ["purchase date", ex.purchasedAt, draft.purchasedAt], ["merchant", ex.merchant, draft.merchant],
+  ];
+  if (draft.type === "travel") {
+    critical.push(["passenger name", ex.passengerName, draft.nameOnReceipt], ["travel date", ex.travelDate, draft.travelDate], ["cabin", ex.cabin && ex.cabin !== "unknown" ? ex.cabin : null, draft.cabin]);
+  }
+  const missingFacts = critical.filter(([, fromReceipt]) => fromReceipt == null || fromReceipt === "").map(([name]) => name);
+  const manualFields = critical.filter(([, fromReceipt, typed]) => (fromReceipt == null || fromReceipt === "") && typed != null && typed !== "").map(([name]) => name);
+  return {
+    source: "extraction", extraction: ex, mismatches, missingFacts, manualFields,
+    corroborated: !ex.requiresReview && mismatches.length === 0 && missingFacts.length === 0,
+  };
 }
 
 function mergeDraft(draft: ClaimDraft, ev: ClaimEvidence): ClaimDraft {
@@ -99,6 +125,7 @@ export function evaluate(input: {
     const detail = ev.corroborated ? "Receipt read by extraction and matches the entered details."
       : ev.extractionError ? `Receipt could not be read automatically: ${ev.extractionError}`
         : ev.mismatches?.length ? `Entered details differ from the receipt: ${ev.mismatches.join(", ")}.`
+          : ev.missingFacts?.length ? `The receipt does not show the ${ev.missingFacts.join(", ")}${ev.manualFields?.length ? `; the ${ev.manualFields.join(", ")} entered by hand must be checked by a person` : ""}.`
           : ev.extraction?.requiresReview ? `Extraction needs review: ${(ev.extraction.warnings ?? []).join("; ") || "low confidence"}.`
             : "Details were entered by hand; a person must compare them with the receipt.";
     checks.push({ code: "evidence", label: "Receipt facts verified", passed: Boolean(ev.corroborated), detail });
@@ -129,28 +156,19 @@ async function claimsForChecks(db: Executor, orgId: string, claim: Pick<ClaimRow
   return { rows, names: new Map(people.map((p) => [p.id, p.name])) };
 }
 
-/**
- * Locks the claim's budget line (FOR UPDATE) so concurrent auto-approvals
- * serialize, and returns what is left on it after approved and paid claims.
- */
-async function lockBudgetLine(tx: Executor, claim: ClaimRow) {
-  const category = claim.type === "travel" ? "travel" : claim.category;
-  const [line] = await tx.select().from(s.budgetLine)
-    .where(claim.budgetLineId ? eq(s.budgetLine.id, claim.budgetLineId) : and(eq(s.budgetLine.eventId, claim.eventId), eq(s.budgetLine.category, category)))
-    .for("update");
-  if (!line) return null;
-  const [{ used }] = await tx.select({ used: sql<string>`coalesce(sum(${s.claim.usdMinor}), 0)::text` }).from(s.claim)
-    .where(and(eq(s.claim.eventId, claim.eventId), inArray(s.claim.status, ["approved", "paid"]), sql`${s.claim.id} <> ${claim.id}`,
-      sql`(${s.claim.budgetLineId} = ${line.id} OR (${s.claim.budgetLineId} IS NULL AND ${category === "travel" ? sql`${s.claim.type} = 'travel'` : sql`${s.claim.category} = ${category} AND ${s.claim.type} = 'expense'`}))`));
-  return { id: line.id, name: line.name, remainingMinor: line.capMinor - BigInt(used) };
-}
-
 /** Applies an evaluation, logs it, and queues approved claims for payout (agent-requested). */
 async function applyEvaluation(tx: Executor, actor: ActorContext, claim: ClaimRow, person: PersonRow, org: OrgRow, event: EventRow, runId?: string) {
   const { rows, names } = await claimsForChecks(tx, org.id, claim);
-  const budget = await lockBudgetLine(tx, claim);
-  const result = evaluate({ claim, person, org, event, existing: rows, personNames: names, budget: budget ?? undefined });
-  const [updated] = await tx.update(s.claim).set({ status: result.status, checks: result.checks, reason: result.reason, reviewedBy: result.status === "approved" ? "agent" : null, budgetLineId: budget?.id ?? claim.budgetLineId })
+  // The org finance lock serializes budget room across concurrent approvals.
+  await lockOrgFinance(tx, org.id);
+  const budget = await claimBudgetRoom(tx, claim);
+  const result = evaluate({ claim, person, org, event, existing: rows, personNames: names, budget: budget ? { name: budget.name, remainingMinor: budget.remainingMinor } : undefined });
+  if (claim.category === ORG_BOOKED_FLIGHT && result.status === "approved") {
+    // The agent never buys tickets: an organizer approves every org booking.
+    result.status = "escalated";
+    result.reason = `Within policy (fare from server-verified offer ${(claim.extracted as Partial<ClaimEvidence> | null)?.offer?.id ?? ""}). An organizer must approve the booking; it is bought by the organization, never reimbursed to the attendee.`;
+  }
+  const [updated] = await tx.update(s.claim).set({ status: result.status, checks: result.checks, reason: result.reason, reviewedBy: result.status === "approved" ? "agent" : null, budgetLineId: budget?.lineId ?? claim.budgetLineId })
     .where(eq(s.claim.id, claim.id)).returning();
   const agent = agentActor(org.id);
   await recordDecision(tx, {
@@ -175,6 +193,7 @@ export async function submitClaim(tx: Executor, actor: ActorContext, draft: Clai
     const [dup] = await tx.select().from(s.claim).where(and(eq(s.claim.orgId, actor.orgId), eq(s.claim.idempotencyKey, draft.idempotencyKey)));
     if (dup) return { claim: dup, replayed: true };
   }
+  if (draft.category === ORG_BOOKED_FLIGHT && evidence.source !== "org_booking") throw invalid("Org-booked flights are requested from flight search, not submitted as claims.");
   const merged = mergeDraft(draft, evidence);
   if (!merged.merchant || merged.amountMinor === undefined || !merged.currency || !merged.purchasedAt) {
     throw invalid("Enter the merchant, amount, currency and purchase date (the receipt could not supply them).");
@@ -205,6 +224,7 @@ export async function submitClaim(tx: Executor, actor: ActorContext, draft: Clai
 
 /** Re-runs checks for one claim (workflow entrypoint). Never re-approves a decided claim. */
 export async function processClaim(tx: Executor, actor: ActorContext, claimId: string, runId?: string) {
+  await lockOrgFinance(tx, actor.orgId);
   const [claim] = await tx.select().from(s.claim).where(and(eq(s.claim.id, claimId), eq(s.claim.orgId, actor.orgId))).for("update");
   if (!claim) throw notFound("Claim not found.");
   if (!["submitted", "processing"].includes(claim.status)) return claim;
@@ -215,9 +235,11 @@ export async function processClaim(tx: Executor, actor: ActorContext, claimId: s
 
 /** claim.review by an organizer (within their limit) or a controller. */
 export async function reviewClaim(tx: Executor, actor: ActorContext, input: { id: string; decision: "approve" | "reject" | "needs_info"; reason: string }) {
+  await lockOrgFinance(tx, actor.orgId);
   const [claim] = await tx.select().from(s.claim).where(and(eq(s.claim.id, input.id), eq(s.claim.orgId, actor.orgId))).for("update");
   if (!claim) throw notFound("Claim not found.");
-  if (claim.requestedBy === actor.memberId || (actor.personId && actor.personId === claim.personId)) throw forbidden("You cannot review your own claim.");
+  if (claim.requestedBy === actor.memberId) throw forbidden("You cannot review your own claim.");
+  assertNotBeneficiary(actor, await loadPerson(tx, actor.orgId, claim.personId), "review");
   if (!["escalated", "needs_info", "submitted", "processing"].includes(claim.status)) throw conflict(`Claim is already ${claim.status}.`);
   const { org } = await loadOrgEvent(tx, actor.orgId);
   if (input.decision === "approve" && actor.role === "organizer" && claim.usdMinor > org.organizerLimitMinor) {
@@ -225,14 +247,48 @@ export async function reviewClaim(tx: Executor, actor: ActorContext, input: { id
   }
   const person = await loadPerson(tx, actor.orgId, claim.personId);
   if (input.decision === "approve" && !person.adult) throw conflict("Recipient is under 18; claim cannot be approved.");
+  if (input.decision === "approve") {
+    const room = await claimBudgetRoom(tx, claim);
+    if (room && claim.usdMinor > room.remainingMinor) throw new ActionError(409, overBudgetMessage(room, claim.usdMinor, "Approving"), { budgetLineId: room.lineId });
+  }
+  const orgBooking = claim.category === ORG_BOOKED_FLIGHT;
   const status = input.decision === "approve" ? "approved" : input.decision === "reject" ? "rejected" : "needs_info";
-  await tx.update(s.claim).set({ status, reason: input.reason, reviewedBy: actor.memberId }).where(eq(s.claim.id, claim.id));
+  await tx.update(s.claim).set({ status, reason: input.reason, reviewedBy: actor.memberId, budgetLineId: claim.budgetLineId }).where(eq(s.claim.id, claim.id));
   await tx.insert(s.approval).values({ id: newId("apr"), orgId: actor.orgId, objectType: "claim", objectId: claim.id, requestedBy: claim.requestedBy, approverId: actor.memberId, approverRole: actor.role, decision: input.decision === "approve" ? "approved" : input.decision === "reject" ? "rejected" : "needs_info", reason: input.reason });
   await recordDecision(tx, {
     orgId: actor.orgId, objectType: "claim", objectId: claim.id, personId: person.id, personName: person.name, action: "claim.review",
-    summary: `${actor.name} ${status === "approved" ? "approved" : status === "rejected" ? "rejected" : "asked for more information on"} ${usd(claim.usdMinor)}: ${input.reason}`,
+    summary: `${actor.name} ${status === "approved" ? "approved" : status === "rejected" ? "rejected" : "asked for more information on"} ${orgBooking ? "the org booking of " : ""}${usd(claim.usdMinor)}: ${input.reason}`,
     actor, status: "done", tool: "review", checks: claim.checks, facts: { decision: input.decision },
   });
+  if (status === "approved" && orgBooking) {
+    await bookOrgFlight(tx, actor, claim, person);
+    return { status: "paid" as const, booked: true };
+  }
   if (status === "approved") await proposePayout(tx, agentActor(actor.orgId), { sourceType: "claim", sourceId: claim.id });
   return { status };
+}
+
+/**
+ * The organization buys an approved org-booked flight. Simulated: no ticket is
+ * purchased and no airline is contacted. The cost is travel expense paid from
+ * simulated cash; the attendee is never paid for it.
+ */
+async function bookOrgFlight(tx: Executor, actor: ActorContext, claim: ClaimRow, person: PersonRow) {
+  const offer = (claim.extracted as Partial<ClaimEvidence> | null)?.offer;
+  const ref = `simbook_${claim.id.slice(-12)}`;
+  await postJournal(tx, {
+    orgId: actor.orgId, memo: `Org booking ${claim.merchant} for ${person.name} (simulated; no ticket purchased)`, sourceType: "claim", sourceId: claim.id,
+    idempotencyKey: `org-booking:${claim.id}`, createdBy: actor.memberId,
+    lines: [
+      { account: "5000", debitMinor: claim.usdMinor, currency: "USD", personId: person.id, memo: `Flight ${offer?.id ?? ""}`.trim() },
+      { account: "1000", creditMinor: claim.usdMinor, currency: "USD", memo: `Simulated airline purchase ${ref}` },
+    ],
+  });
+  await tx.update(s.claim).set({ status: "paid", reason: `Booked by the organization (simulated booking ${ref}; no ticket was purchased). Nothing is reimbursed to the attendee.` }).where(eq(s.claim.id, claim.id));
+  await recordDecision(tx, {
+    orgId: actor.orgId, objectType: "claim", objectId: claim.id, personId: person.id, personName: person.name, action: "flight.book",
+    summary: `Org booking recorded for ${person.name}: ${claim.merchant}, ${usd(claim.usdMinor)} (Simulated, ${ref}). No payout to the attendee.`,
+    actor, status: "done", tool: "bookFlight", facts: { truth: "Simulated", bookingRef: ref, offer: offer ?? null, approvedBy: actor.memberId },
+  });
+  await recordNotice(tx, { orgId: actor.orgId, personId: person.id, channel: "portal", title: "Your flight request was approved", body: `The organizers approved ${claim.merchant} (${usd(claim.usdMinor)}). This demo records a simulated booking (${ref}); no real ticket was purchased.` });
 }

@@ -2,27 +2,34 @@
 // actually did: claim statuses and check results, payout states, packet
 // reconciliation and filings. Nothing here is hardcoded to pass.
 
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import type { Scoreboard } from "@/lib/contracts";
 import type { Executor } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
 
+import { usd } from "./core";
+import { formFamily } from "./engines";
+
 const MOVED = new Set(["processing", "paid"]);
 /** Checks that reflect limits, not errors; failing them is not a false positive. */
 const NON_ERROR_CHECKS = new Set(["agent_limit", "evidence", "budget"]);
 
 export async function computeScoreboard(db: Executor, orgId: string): Promise<Scoreboard> {
-  const [keys, claims, payouts, packets, filings, awards, people] = await Promise.all([
+  const [keys, claims, payouts, packets, filings, awards, people, rules, events] = await Promise.all([
     db.select().from(s.answerKey).where(eq(s.answerKey.orgId, orgId)),
     db.select({ id: s.claim.id, personId: s.claim.personId, status: s.claim.status, checks: s.claim.checks }).from(s.claim).where(eq(s.claim.orgId, orgId)),
-    db.select({ id: s.payout.id, personId: s.payout.personId, claimId: s.payout.claimId, status: s.payout.status, reportingForm: s.payout.reportingForm, reportable: s.payout.reportable }).from(s.payout).where(eq(s.payout.orgId, orgId)),
+    db.select({ id: s.payout.id, personId: s.payout.personId, claimId: s.payout.claimId, status: s.payout.status, reportingForm: s.payout.reportingForm, reportable: s.payout.reportable, sourceType: s.payout.sourceType, grossMinor: s.payout.grossMinor, paidAt: s.payout.paidAt, ruleId: s.payout.ruleId, ruleVersion: s.payout.ruleVersion }).from(s.payout).where(eq(s.payout.orgId, orgId)),
     db.select({ id: s.sponsorPacket.id, status: s.sponsorPacket.status }).from(s.sponsorPacket).where(eq(s.sponsorPacket.orgId, orgId)),
-    db.select({ personId: s.filing.personId, form: s.filing.form }).from(s.filing).where(eq(s.filing.orgId, orgId)),
+    db.select({ personId: s.filing.personId, form: s.filing.form, year: s.filing.year, grossMinor: s.filing.grossMinor }).from(s.filing).where(eq(s.filing.orgId, orgId)),
     db.select({ personId: s.award.personId, status: s.award.status }).from(s.award).where(eq(s.award.orgId, orgId)),
     db.select({ id: s.person.id, adult: s.person.adult }).from(s.person).where(eq(s.person.orgId, orgId)),
+    db.select({ id: s.taxRule.id, version: s.taxRule.version, thresholdMinor: s.taxRule.thresholdMinor }).from(s.taxRule),
+    db.select({ startsAt: s.event.startsAt }).from(s.event).where(and(eq(s.event.orgId, orgId))).orderBy(desc(s.event.startsAt)).limit(1),
   ]);
+  const year = (events[0]?.startsAt ?? new Date()).getUTCFullYear();
+  const thresholdOf = new Map(rules.map((r) => [`${r.id}:${r.version}`, r.thresholdMinor]));
   const claimById = new Map(claims.map((c) => [c.id, c]));
   const payoutsByPerson = new Map<string, typeof payouts>();
   for (const p of payouts) payoutsByPerson.set(p.personId, [...(payoutsByPerson.get(p.personId) ?? []), p]);
@@ -59,12 +66,22 @@ export async function computeScoreboard(db: Executor, orgId: string): Promise<Sc
       const pk = packets.find((p) => p.id === k.objectId);
       passed = pk?.status === "exception";
       actual = pk ? pk.status : "packet missing";
-    } else if (k.expected === "reportable") {
-      const ps = payoutsByPerson.get(k.objectId) ?? [];
-      const filed = filings.filter((f) => f.personId === k.objectId);
-      const formPrefix = k.expectedCode ?? "1099";
-      passed = filed.some((f) => f.form.startsWith(formPrefix)) || ps.some((p) => !["failed", "returned"].includes(p.status) && p.reportable && Boolean(p.reportingForm?.startsWith(formPrefix)));
-      actual = filed.length ? `filing ${filed.map((f) => f.form).join(", ")}` : ps.length ? `payouts ${ps.map((p) => `${p.status}${p.reportable ? ` (reportable ${p.reportingForm?.split(" ")[0]})` : ""}`).join(", ")}` : "no payouts";
+    } else if (k.expected === "reportable" || (k.expected === "clean" && k.objectType === "person")) {
+      // Threshold truth comes from what was actually paid and filed, never from a proposal's flag:
+      // reportable = a drafted filing for this form and year whose gross equals the paid same-form
+      // total, and that total reaches the rule threshold. clean = paid but below it, and no filing.
+      const form = formFamily(k.expectedCode ?? "1099-MISC");
+      const paid = (payoutsByPerson.get(k.objectId) ?? []).filter((p) => p.sourceType === "award" && p.status === "paid" && p.paidAt?.getUTCFullYear() === year && formFamily(p.reportingForm ?? "") === form);
+      const paidTotal = paid.reduce((sum, p) => sum + p.grossMinor, 0n);
+      const threshold = paid.reduce((max, p) => {
+        const t = thresholdOf.get(`${p.ruleId}:${p.ruleVersion}`) ?? 0n;
+        return t > max ? t : max;
+      }, 0n);
+      const filed = filings.filter((f) => f.personId === k.objectId && f.year === year && f.form === form);
+      const filedGross = filed.reduce((sum, f) => sum + f.grossMinor, 0n);
+      if (k.expected === "reportable") passed = paid.length > 0 && paidTotal >= threshold && filed.length === 1 && filedGross === paidTotal;
+      else passed = paid.length > 0 && paidTotal < threshold && filed.length === 0;
+      actual = `${paid.length ? `paid ${usd(paidTotal)} on ${form} in ${year} (threshold ${usd(threshold)})` : `nothing paid on ${form} in ${year} yet`}; ${filed.length ? `${form} drafted for ${usd(filedGross)}` : `no ${form} drafted`}`;
     }
     results.push({ id: k.id, scenario: k.scenario, expected: k.expected + (k.expectedCode ? `:${k.expectedCode}` : ""), actual, passed });
   }
