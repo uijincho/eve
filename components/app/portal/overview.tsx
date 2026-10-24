@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { DueChip } from "@/components/eve/due-chip";
 import { Money } from "@/components/eve/money";
 import type { AppSnapshot, Person } from "@/lib/contracts";
-import { awardName, big, prizeOptions, payoutSource, providerLabel } from "@/lib/client/derive";
+import { awardName, big, prizeOptions, payoutSource, providerLabel, isInKind, payoutValue } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 
 import { PortalFrame } from "./portal-frame";
@@ -74,7 +74,7 @@ export function PortalOverview() {
                           <span className="text-small text-muted-foreground">{p.status === "paid" ? `Paid ${fmtDateTime(p.paidAt)}` : p.reason || providerLabel(p.provider)}</span>
                         </span>
                         <span className="flex flex-col items-end gap-0.5">
-                          <Money amountMinor={big(p.destinationNetMinor)} currency={p.destinationCurrency} estimate={p.status !== "paid"} className="font-semibold" />
+                          <Money amountMinor={isInKind(p) ? payoutValue(p) : big(p.destinationNetMinor)} currency={isInKind(p) ? p.currency : p.destinationCurrency} estimate={!isInKind(p) && p.status !== "paid"} className="font-semibold" />
                           <StatusBadge status={p.status} />
                         </span>
                       </li>

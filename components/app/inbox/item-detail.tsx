@@ -179,7 +179,7 @@ export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payo
             </dd>
           </>
         ) : null}
-        {p.destinationCurrency !== p.currency ? (
+        {p.destinationCurrency !== p.currency && !isInKind(p) ? (
           <>
             <dt className="text-muted-foreground">Received in {p.destinationCurrency}</dt>
             <dd className="text-right">
