@@ -145,6 +145,12 @@ describe("helpers", () => {
     expect(toMinor("0.1")).toBe("10");
     expect(toMinor("12.345")).toBeNull();
     expect(toMinor("abc")).toBeNull();
+    expect(toMinor("36,44")).toBeNull();
+    expect(toMinor("1,00.00")).toBeNull();
+    expect(toMinor("1.000,00")).toBeNull();
+    expect(toMinor("1,000")).toBe("100000");
+    expect(toMinor(" $ 1,000.00 ")).toBe("100000");
+    expect(toMinor("36.44")).toBe("3644");
   });
 
   it("refuses anyone under 18 at the event start", () => {

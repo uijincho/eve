@@ -123,8 +123,10 @@ function stripEmpty<T extends Record<string, unknown>>(obj: T): Record<string, u
 
 /** Dollars typed by a person ("1,299.5") to an integer minor-unit string. */
 export function toMinor(input: string, digits = 2): string | null {
-  const clean = input.replace(/[,\s$]/g, "");
-  if (!/^\d+(\.\d+)?$/.test(clean)) return null;
+  const entered = input.trim().replace(/^\$\s*/, "");
+  // Commas group thousands; never silently read a decimal comma as 100× the amount.
+  if (!/^(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$/.test(entered)) return null;
+  const clean = entered.replace(/,/g, "");
   const [whole, frac = ""] = clean.split(".");
   if (frac.length > digits) return null;
   const minor = BigInt(whole) * 10n ** BigInt(digits) + BigInt((frac + "0".repeat(digits)).slice(0, digits) || "0");

@@ -145,12 +145,12 @@ function RecordRemittance({ packet, snapshot }: { packet: SponsorPacket; snapsho
   const [error, setError] = useState<string | null>(null);
   return (
     <div className="mb-3 flex flex-col gap-3">
-      <Field label="Amount remitted (USD)" help="Enter the total received for this packet, including any earlier partial payment. A difference stays open for review." error={error}>
+      <Field label="Amount remitted (USD)" help="Enter the total received for this packet, including any earlier partial payment. Use a period for cents (36.44). A difference stays open for review." error={error}>
         {(props) => <Input {...props} inputMode="decimal" placeholder="0.00" value={amount} onChange={(e) => { setAmount(e.target.value); setError(null); }} />}
       </Field>
       <ActionButton wide size="default" variant={packet.status === "submitted" ? "default" : "secondary"} label="Record remittance" pendingLabel="Reconciling" permission={canManage(snapshot.actor)} call={() => {
         const paidMinor = toMinor(amount);
-        if (paidMinor === null) { setError("Enter an amount of zero or more, with up to two decimal places."); return null; }
+        if (paidMinor === null) { setError("Enter zero or more with a period for cents (36.44). Commas may group thousands (1,000.00)."); return null; }
         setError(null);
         return payloads.sponsorReconcile(packet.id, { paidMinor });
       }} />
