@@ -17,7 +17,10 @@ export function VerifyCode({
   permission,
   primary,
   self,
+  trailing,
 }: {
+  /** Another control that belongs on the same line, such as a phone row's Details. */
+  trailing?: React.ReactNode;
   personId: string;
   personName: string;
   permission?: Permission;
@@ -37,7 +40,12 @@ export function VerifyCode({
     return true;
   };
   if (permission && !permission.allowed) {
-    return <ActionButton label="Confirm bank change" permission={permission} call={() => null} />;
+    return (
+      <>
+        <ActionButton label="Confirm bank change" permission={permission} call={() => null} />
+        {trailing}
+      </>
+    );
   }
   return (
     <div className="flex w-full flex-col gap-2">
@@ -67,16 +75,17 @@ export function VerifyCode({
           wide={primary}
           size={primary ? "default" : "sm"}
           variant={primary ? "default" : "secondary"}
-          label="Confirm new account"
+          label={primary ? "Confirm new account" : "Confirm account"}
           pendingLabel="Confirming"
           call={() => (check() ? payloads.payoutVerify(personId, code, "confirm") : null)}
         />
         <ActionButton
           variant="ghost"
-          label="Reject change"
+          label={primary ? "Reject change" : "Reject"}
           pendingLabel="Rejecting"
           call={() => (check() ? payloads.payoutVerify(personId, code, "reject") : null)}
         />
+        {trailing}
       </div>
     </div>
   );

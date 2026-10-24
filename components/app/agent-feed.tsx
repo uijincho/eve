@@ -8,7 +8,7 @@ import { EvidenceSheet } from "@/components/app/evidence-sheet";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Decision } from "@/lib/contracts";
-import { groupRuns, objectLabel, runCounters, runLine, runSubject, type Run } from "@/lib/client/derive";
+import { groupRuns, objectLabel, runCounters, runHeading, runLine, type Run } from "@/lib/client/derive";
 import { fmtTime } from "@/lib/client/format";
 import { useEve, useLivePolling } from "@/lib/client/use-eve";
 
@@ -115,23 +115,33 @@ function RunEntry({ run, onStep, snapshot }: { run: Run; onStep: (d: Decision) =
   const [open, setOpen] = useState(live);
   const expanded = open || live;
   const last = run.steps[run.steps.length - 1];
+  const heading = runHeading(run, snapshot);
   return (
     <li className="flex flex-col">
       <button
         type="button"
         aria-expanded={expanded}
         onClick={() => setOpen((o) => !o)}
-        className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-surface"
+        className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 px-3 py-2.5 text-left transition-colors duration-150 hover:bg-surface"
       >
         <ChevronRightIcon
           aria-hidden
           className={cn("mt-0.5 size-3.5 text-muted-foreground transition-transform duration-150", expanded && "rotate-90")}
         />
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate text-small font-medium">{runSubject(run, snapshot)}</span>
-          {!expanded ? <span className="truncate text-caption text-muted-foreground" title={last.summary}>{runLine(run, snapshot)}</span> : null}
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex min-w-0 items-baseline gap-2 text-small font-medium">
+            <span className="truncate">{heading.name}</span>
+            {heading.amount ? <span className="ml-auto shrink-0 tabular-nums">{heading.amount}</span> : null}
+          </span>
+          {!expanded ? (
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-caption text-muted-foreground" title={last.summary}>{runLine(run, snapshot)}</span>
+              <span className="ml-auto shrink-0"><RunStatus run={run} /></span>
+            </span>
+          ) : (
+            <span className="self-end"><RunStatus run={run} /></span>
+          )}
         </span>
-        <RunStatus run={run} />
       </button>
       {expanded ? (
         <ol className="flex flex-col gap-1 px-3 pb-3 pl-8">
@@ -172,7 +182,12 @@ function RunStatus({ run }: { run: Run }) {
       return <Badge variant="outline">Running · step {run.steps.length}</Badge>;
     case "waiting": {
       const next = run.steps[run.steps.length - 1].nextActionAt;
-      return <Badge variant="outline">Waiting{next ? ` · ${fmtTime(next)}` : ""}</Badge>;
+      // The time alone; the status line already says what it waits for.
+      return next ? (
+        <Badge variant="outline" aria-label={`Waiting until ${fmtTime(next)}`}>{fmtTime(next)}</Badge>
+      ) : (
+        <Badge variant="outline">Waiting</Badge>
+      );
     }
     case "escalated":
       return <Badge variant="outline">Escalated</Badge>;

@@ -517,26 +517,29 @@ export type Run = {
 const firstSentence = (t: string) => (t.match(/^.*?[.!?](\s|$)/)?.[0] ?? t).trim();
 
 /**
- * The agent rail's subject for a run: who or what it is about, plus the amount
- * or count, in sentence case ("Quinn Davis · payout $600.00", "Filing drafts 2026").
+ * The agent rail's subject for a run, split so the amount never truncates:
+ * who or what it is about, and the figure that goes with it.
  */
-export function runSubject(run: Run, s: Pick<AppSnapshot, "payouts" | "packets">): string {
-  const last = run.steps[run.steps.length - 1];
+export function runHeading(run: Run, s: Pick<AppSnapshot, "payouts" | "packets">): { name: string; amount?: string } {
   if (run.objectType === "filings") {
     const year = run.steps.map((d) => d.facts?.year).find(Boolean);
-    return `Filing drafts${year ? ` ${String(year)}` : ""}`;
+    return { name: `Filing drafts${year ? ` ${String(year)}` : ""}` };
   }
   if (run.objectType === "payout") {
     const p = s.payouts.find((x) => x.id === run.objectId);
-    const who = run.personName || p?.personName || "Payout";
-    return p ? `${who} · payout ${fmtPlain(payoutValue(p), p.currency)}` : `${who} · payout`;
+    return { name: run.personName || p?.personName || "Payout", amount: p ? fmtPlain(payoutValue(p), p.currency) : undefined };
   }
   if (run.objectType === "packet" || run.objectType === "sponsor_packet") {
     const k = s.packets.find((x) => x.id === run.objectId);
-    return k ? `Sponsor packet · ${k.personName} ${fmtPlain(big(k.requestedMinor), "USD")}` : "Sponsor packet";
+    return { name: k ? `Sponsor packet · ${k.personName}` : "Sponsor packet", amount: k ? fmtPlain(big(k.requestedMinor), "USD") : undefined };
   }
-  void last;
-  return objectLabel(run);
+  return { name: objectLabel(run) };
+}
+
+/** Heading as one string ("Quinn Davis · $600.00"), for labels and tests. */
+export function runSubject(run: Run, s: Pick<AppSnapshot, "payouts" | "packets">): string {
+  const h = runHeading(run, s);
+  return h.amount ? `${h.name} · ${h.amount}` : h.name;
 }
 
 /** A short line that survives truncation: what happened last, not the full explanation. */
@@ -550,11 +553,15 @@ export function runLine(run: Run, s: Pick<AppSnapshot, "payouts">): string {
   }
   switch (last.tool) {
     case "waitForController":
-      return last.status === "waiting" ? `Awaiting controller release${amount}` : last.status === "escalated" ? `Release stopped: ${firstSentence(last.summary)}` : "Release request closed; quote changed";
+      return last.status === "waiting" ? "Waiting for controller" : last.status === "escalated" ? `Release stopped: ${firstSentence(last.summary)}` : "Release request closed; quote changed";
     case "queueControllerRelease":
       return `Release queued${amount}`;
-    case "executePayout":
-      return last.status === "done" ? (/^Released/.test(last.summary) ? firstSentence(last.summary).replace(/ via simulated provider.*$/, "").replace(/\.$/, "") : `Release approved${amount}`) : firstSentence(last.summary);
+    case "executePayout": {
+      if (last.status !== "done") return firstSentence(last.summary);
+      // "Released $600.00 to ••9625 via simulated provider (sim_…)." -> "Paid $600.00 · ••9625"
+      const paid = /^Released (\S+) to (\S+)/.exec(last.summary);
+      return paid ? `Paid ${paid[1]} · ${paid[2]}` : `Approved${amount}`;
+    }
     default:
       return firstSentence(last.summary).replace(/(\d+) filing\(s\)/, (_, n) => `${n} ${n === "1" ? "filing" : "filings"}`);
   }

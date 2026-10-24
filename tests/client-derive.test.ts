@@ -271,8 +271,10 @@ describe("agent rail lines", () => {
       d({ personName: "Quinn Davis", tool: "waitForController", status: "waiting", summary: "This exact payout quote is waiting for a controller.", createdAt: "2026-10-24T10:00:00Z" }),
       d({ tool: "waitForController", status: "waiting", summary: "Still waiting.", createdAt: "2026-10-24T10:01:00Z" }),
     ]);
-    expect(runSubject(run, { payouts: [payout], packets: [] })).toBe("Quinn Davis · payout $600.00");
-    expect(runLine(run, { payouts: [payout] })).toBe("Awaiting controller release $600.00");
+    expect(runSubject(run, { payouts: [payout], packets: [] })).toBe("Quinn Davis · $600.00");
+    expect(runLine(run, { payouts: [payout] })).toBe("Waiting for controller");
+    const [paid] = groupRuns([d({ runId: "r2", personName: "Quinn Davis", tool: "executePayout", status: "done", summary: "Released $600.00 to ••9625 via simulated provider (sim_x)." })]);
+    expect(runLine(paid, { payouts: [payout] })).toBe("Paid $600.00 · ••9625");
     const [filings] = groupRuns([d({ runId: "f", objectType: "filings", objectId: "2026", tool: "draftFilings", summary: "Drafted 0 filing(s) for 2026.", facts: { year: 2026, count: 0 } })]);
     expect(runSubject(filings, { payouts: [], packets: [] })).toBe("Filing drafts 2026");
     expect(runLine(filings, { payouts: [] })).toBe("No new filings to draft");

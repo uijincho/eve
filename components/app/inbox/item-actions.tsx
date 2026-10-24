@@ -33,7 +33,10 @@ export function ItemActions({
   layout,
   onEvidence,
   showEvidence = true,
+  trailing,
 }: {
+  /** Extra control on the same line as the actions (the phone row's Details). */
+  trailing?: React.ReactNode;
   item: InboxItem;
   snapshot: AppSnapshot;
   layout: "row" | "pane";
@@ -77,6 +80,7 @@ export function ItemActions({
           <LinkButton href="/payouts" size="sm" variant="ghost">
             Open payouts
           </LinkButton>
+          {trailing}
         </div>
       );
     }
@@ -86,7 +90,7 @@ export function ItemActions({
       if (p.status === "frozen") {
         return (
           <div className={wrap}>
-            <VerifyCode personId={p.personId} personName={p.personName} permission={manage} primary={pane} />
+            <VerifyCode personId={p.personId} personName={p.personName} permission={manage} primary={pane} trailing={trailing} />
             {evidence}
           </div>
         );
@@ -96,6 +100,7 @@ export function ItemActions({
           <div className={wrap}>
             <ActionButton variant={first} size={pane ? "default" : "sm"} wide={pane} label="Retry payout" pendingLabel="Retrying" permission={canControl(actor, snapshot)} call={payloads.payoutRetry(p.id)} />
             {evidence}
+            {trailing}
           </div>
         );
       }
@@ -104,6 +109,7 @@ export function ItemActions({
           <div className={wrap}>
             <ResolvePayoutRule payout={p} snapshot={snapshot} />
             {evidence}
+            {trailing}
           </div>
         ) : (
           <div className={wrap}>
@@ -111,6 +117,7 @@ export function ItemActions({
               Review tax rule
             </LinkButton>
             {evidence}
+            {trailing}
           </div>
         );
       }
@@ -120,6 +127,7 @@ export function ItemActions({
             Open {p.personName.split(" ")[0]}&rsquo;s profile
           </LinkButton>
           {evidence}
+          {trailing}
         </div>
       );
     }
@@ -146,6 +154,7 @@ export function ItemActions({
             </>
           ) : null}
           {evidence}
+          {trailing}
         </div>
       );
     }
@@ -169,6 +178,7 @@ export function ItemActions({
               Compare options
             </LinkButton>
             {evidence}
+            {trailing}
           </div>
         );
       }
@@ -180,6 +190,7 @@ export function ItemActions({
               Open prize
             </LinkButton>
             {evidence}
+            {trailing}
           </div>
         );
       }
@@ -196,6 +207,7 @@ export function ItemActions({
               call={payloads.payoutPropose(a.id, "award")}
             />
             {evidence}
+            {trailing}
           </div>
         );
       }
@@ -205,6 +217,7 @@ export function ItemActions({
             Open prize{a.fulfillment !== "undecided" ? ` · ${FULFILLMENT_LABEL[a.fulfillment]}` : ""}
           </LinkButton>
           {evidence}
+          {trailing}
         </div>
       );
     }
@@ -228,6 +241,7 @@ export function ItemActions({
           <LinkButton href={`/sponsor?packet=${encodeURIComponent(k.id)}`} size="sm" variant="ghost">
             Open packet
           </LinkButton>
+          {trailing}
         </div>
       );
     }
@@ -237,6 +251,7 @@ export function ItemActions({
           <LinkButton href={`/people?person=${encodeURIComponent(ref.person.id)}`} size="sm" variant="secondary">
             View chase log
           </LinkButton>
+          {trailing}
         </div>
       );
     }

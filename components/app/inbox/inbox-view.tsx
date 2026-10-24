@@ -341,10 +341,18 @@ function FullRow({
       </div>
       {item.detail ? <p className="text-small text-muted-foreground">{item.detail}</p> : null}
       <div className="flex flex-wrap items-center gap-2 [&_[data-slot=button]]:h-9 [&>div]:contents">
-        <ItemActions item={item} snapshot={snapshot} layout="row" onEvidence={onEvidence} showEvidence={false} />
-        <Button size="sm" variant="ghost" onClick={onDetails}>
-          Details
-        </Button>
+        <ItemActions
+          item={item}
+          snapshot={snapshot}
+          layout="row"
+          onEvidence={onEvidence}
+          showEvidence={false}
+          trailing={
+            <Button size="sm" variant="ghost" onClick={onDetails}>
+              Details
+            </Button>
+          }
+        />
       </div>
     </li>
   );
