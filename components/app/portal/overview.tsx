@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { DueChip } from "@/components/eve/due-chip";
 import { Money } from "@/components/eve/money";
 import type { AppSnapshot, Person } from "@/lib/contracts";
-import { awardName, big, prizeOptions } from "@/lib/client/derive";
+import { awardName, big, prizeOptions, payoutSource, providerLabel } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 
 import { PortalFrame } from "./portal-frame";
@@ -70,8 +70,8 @@ export function PortalOverview() {
                     {mine.map((p) => (
                       <li key={p.id} className="flex items-center justify-between gap-3 px-4 py-3">
                         <span className="flex flex-col">
-                          <span className="font-medium">{p.sourceType === "award" ? "Prize" : "Reimbursement"} · {p.sourceId}</span>
-                          <span className="text-small text-muted-foreground">{p.status === "paid" ? `Paid ${fmtDateTime(p.paidAt)}` : p.reason || p.provider}</span>
+                          <span className="font-medium">{p.sourceType === "award" ? "Prize" : "Reimbursement"} · {payoutSource(s, p)}</span>
+                          <span className="text-small text-muted-foreground">{p.status === "paid" ? `Paid ${fmtDateTime(p.paidAt)}` : p.reason || providerLabel(p.provider)}</span>
                         </span>
                         <span className="flex flex-col items-end gap-0.5">
                           <Money amountMinor={big(p.destinationNetMinor)} currency={p.destinationCurrency} estimate={p.status !== "paid"} className="font-semibold" />

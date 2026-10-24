@@ -24,7 +24,7 @@ export function PortalPrizes() {
               const o = prizeOptions(s, a, me, payout);
               const team = a.teamId ? s.awards.filter((x) => x.teamId === a.teamId) : [];
               return (
-                <Section key={a.id} title={awardName(a)} aside={<span className="inline-flex items-center gap-2"><StatusBadge status={a.status} /><DueChip due={a.dueAt} now={s.now} align="end" /></span>}>
+                <Section key={a.id} title={awardName(a)} aside={<span className="inline-flex items-center gap-2"><StatusBadge status={a.status} />{a.status === "paid" ? null : <DueChip due={a.dueAt} now={s.now} align="end" />}</span>}>
                   <div className="grid gap-8 md:grid-cols-[minmax(0,1fr)_16rem]">
                     <PrizeComparison snapshot={s} award={a} person={me} payout={payout} />
                     <div className="flex flex-col gap-4">

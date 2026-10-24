@@ -84,7 +84,7 @@ export function PrizesView() {
               );
             },
           },
-          { key: "due", header: "Due", align: "end", stack: "hide", sort: (a) => a.dueAt, cell: (a) => <DueChip due={a.dueAt} now={s.now} align="end" /> },
+          { key: "due", header: "Due", align: "end", stack: "hide", sort: (a) => a.dueAt, cell: (a) => (a.status === "paid" ? <span className="text-small text-muted-foreground">Paid</span> : <DueChip due={a.dueAt} now={s.now} align="end" />) },
         ];
         return (
           <>
@@ -137,7 +137,7 @@ export function AwardDetail({ award: a, snapshot: s, onEvidence }: { award: Awar
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={a.status} />
-        <DueChip due={a.dueAt} now={s.now} context="ceremony" />
+        {a.status === "paid" ? null : <DueChip due={a.dueAt} now={s.now} context="ceremony" />}
       </div>
       {a.recommendation ? <p className="text-small">{a.recommendation}</p> : null}
       <PrizeComparison snapshot={s} award={a} person={person} payout={payout} />
