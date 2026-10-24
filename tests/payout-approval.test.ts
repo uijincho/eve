@@ -26,6 +26,7 @@ describe("controller approval scope", () => {
     expect(() => assertControllerApproval({ ...controller, orgId: "org_2" }, payout)).toThrow("not found");
     expect(() => assertControllerApproval({ ...controller, memberId: "organizer_1" }, payout)).toThrow("own payout");
     expect(() => assertControllerApproval({ ...controller, personId: "person_1" }, payout)).toThrow("recipient");
+    expect(() => assertControllerApproval({ ...controller, email: " Recipient@Example.test " }, payout, "recipient@example.test")).toThrow("recipient");
     expect(() => assertControllerApproval(controller, { ...payout, status: "frozen" })).toThrow("frozen");
   });
 });

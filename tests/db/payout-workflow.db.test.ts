@@ -62,4 +62,16 @@ describe.skipIf(!hasDatabase)("durable controller release against Postgres", { t
     const { target, approval } = await proposed(memberId);
     await expect(executeControllerApproval(target, approval, "wf-test-self")).rejects.toThrow("own payout");
   });
+  it("rejects an unlinked staff member whose email matches the recipient", async () => {
+    const { target, approval } = await proposed();
+    await db.update(s.orgMember).set({ email: "recipient@example.test", personId: null }).where(eq(s.orgMember.id, memberId));
+    try {
+      await expect(executeControllerApproval(target, approval, "wf-test-self-email")).rejects.toThrow("recipient");
+      const [unchanged] = await db.select().from(s.payout).where(eq(s.payout.id, target.payoutId));
+      expect(unchanged.status).toBe("proposed");
+      expect(unchanged.releasedBy).toBeNull();
+    } finally {
+      await db.update(s.orgMember).set({ email: "controller@example.test" }).where(eq(s.orgMember.id, memberId));
+    }
+  });
 });

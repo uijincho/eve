@@ -5,7 +5,7 @@ import { HookNotFoundError } from "workflow/errors";
 import type { ActorContext } from "@/lib/auth/session";
 import type { ActionResult } from "@/lib/contracts";
 import { getDb } from "@/lib/db";
-import { payout } from "@/lib/db/schema";
+import { payout, person } from "@/lib/db/schema";
 import { payoutApprovalWorkflow } from "@/workflows/payout-approval";
 import { approvalToken, assertControllerApproval, loadApprovalTarget, payoutQuoteFingerprint, type ApprovalTarget } from "./payout-approval";
 
@@ -43,7 +43,9 @@ export async function queueControllerRelease(actor: ActorContext, ids: string[])
     const [row] = await getDb().select().from(payout).where(and(eq(payout.id, id), eq(payout.orgId, actor.orgId)));
     if (!row) { failed.push({ payoutId: id, reason: "Payout not found." }); return; }
     if (row.status === "paid") { completed.push(row.id); return; }
-    try { assertControllerApproval(actor, row); }
+    const [recipient] = await getDb().select({ email: person.email }).from(person).where(and(eq(person.id, row.personId), eq(person.orgId, actor.orgId)));
+    if (!recipient) { failed.push({ payoutId: id, reason: "Recipient not found." }); return; }
+    try { assertControllerApproval(actor, row, recipient.email); }
     catch (error) { failed.push({ payoutId: id, reason: (error as Error).message }); return; }
     const target = { orgId: actor.orgId, payoutId: row.id, quoteFingerprint: payoutQuoteFingerprint(row) };
     try { queued.push({ payoutId: id, runId: await resumeRegistered(target, actor.memberId) }); }

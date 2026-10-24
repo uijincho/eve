@@ -25,11 +25,12 @@ export function approvalToken(target: ApprovalTarget): string {
   return `payout-release:${target.orgId}:${target.payoutId}:${target.quoteFingerprint}`;
 }
 
-export function assertControllerApproval(actor: Pick<ActorContext, "role" | "memberId" | "orgId" | "personId">, payout: Pick<PayoutRow, "orgId" | "requestedBy" | "status" | "personId">): void {
+export function assertControllerApproval(actor: Pick<ActorContext, "role" | "memberId" | "orgId" | "personId"> & { email?: string }, payout: Pick<PayoutRow, "orgId" | "requestedBy" | "status" | "personId">, recipientEmail?: string): void {
   if (actor.role !== "controller") throw new ApprovalConflictError("Only a controller can release money.");
   if (payout.orgId !== actor.orgId) throw new ApprovalConflictError("Payout not found.");
   if (payout.requestedBy === actor.memberId) throw new ApprovalConflictError("The requester cannot release their own payout.");
   if (actor.personId && actor.personId === payout.personId) throw new ApprovalConflictError("The recipient cannot release their own payout.");
+  if (actor.email?.trim() && recipientEmail?.trim() && actor.email.trim().toLowerCase() === recipientEmail.trim().toLowerCase()) throw new ApprovalConflictError("The recipient cannot release their own payout.");
   if (!["proposed", "approved"].includes(payout.status)) throw new ApprovalConflictError(`This payout is ${payout.status} and cannot be released.`);
 }
 
@@ -77,7 +78,8 @@ export async function executeControllerApproval(target: ApprovalTarget, approval
     if (!member || member.role !== "controller") throw new ApprovalConflictError("The approver no longer has controller access.");
     if (!org || (member.demoPersona && (!org.isDemo || !demoModeEnabled()))) throw new ApprovalConflictError("The demo approval is no longer valid.");
     const [recipient] = await tx.select({ personId: s.payout.personId }).from(s.payout).where(and(eq(s.payout.id, target.payoutId), eq(s.payout.orgId, target.orgId)));
-    if (recipient) await tx.select({ id: s.person.id }).from(s.person).where(and(eq(s.person.id, recipient.personId), eq(s.person.orgId, target.orgId))).for("no key update");
+    const [person] = recipient ? await tx.select({ id: s.person.id, email: s.person.email }).from(s.person).where(and(eq(s.person.id, recipient.personId), eq(s.person.orgId, target.orgId))).for("no key update") : [];
+    if (!person) throw new ApprovalConflictError("Recipient no longer exists.");
     const [payout] = await tx.select().from(s.payout).where(and(eq(s.payout.id, target.payoutId), eq(s.payout.orgId, target.orgId))).for("update");
     if (!payout) throw new ApprovalConflictError("Payout no longer exists.");
     if (approval.quoteFingerprint !== target.quoteFingerprint || payoutQuoteFingerprint(payout) !== target.quoteFingerprint) {
@@ -88,7 +90,7 @@ export async function executeControllerApproval(target: ApprovalTarget, approval
       memberId: member.id, orgId: member.orgId, role: member.role, name: member.name, email: member.email,
       personId: member.personId, userId: member.userId, demo: member.demoPersona && org.isDemo,
     };
-    assertControllerApproval(actor, payout);
+    assertControllerApproval(actor, payout, person.email);
     const released = await releasePayout(tx, actor, payout.id);
     const settled = released.status === "paid";
     const processing = released.status === "processing";
