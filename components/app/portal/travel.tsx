@@ -87,7 +87,28 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
   const [result, setResult] = useState<ActionResult | null>(null);
   const [offers, setOffers] = useState<Offer[]>([]);
   const [rejected, setRejected] = useState<{ id: string; reason: string }[]>([]);
+  const [note, setNote] = useState<string | null>(null);
+  const [searchedFrom, setSearchedFrom] = useState<string | null>(null);
   const requests = s.claims.filter((c) => c.personId === me.id && c.type === "travel");
+
+  const search = async (code: string, why?: string) => {
+    setPending(true);
+    const r = await act(payloads.flightSearch({ origin: code, date: date || undefined, personId: me.id }));
+    setPending(false);
+    setSearchedFrom(code);
+    const found = r.ok ? readOffers(r.data, code) : [];
+    const left = r.ok && Array.isArray(r.data?.rejected) ? (r.data.rejected as { id: string; reason: string }[]) : [];
+    setOffers(found);
+    setRejected(left);
+    // The server explains an empty result (own airport, unknown origin, or policy); a refusal is an error.
+    setResult(r.ok ? (!found.length && left.length ? { ok: false, message: r.message || "No fare meets the travel policy for that route." } : null) : r);
+    const notes = [
+      why,
+      r.ok && !found.length && !left.length ? r.message : null,
+      r.ok && r.data?.destinationRecognized === false ? `Eve could not tell the venue's city, so fares fly to ${String(r.data.destination ?? "SFO")}. Check the destination before requesting.` : null,
+    ].filter(Boolean);
+    setNote(notes.length ? notes.join(" ") : null);
+  };
 
   return (
     <div className="flex flex-col gap-10">
@@ -100,14 +121,7 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
             const code = origin.trim().toUpperCase();
             if (!/^[A-Z]{3}$/.test(code)) return setError("Use a three-letter airport code, like YYZ.");
             setError(null);
-            setPending(true);
-            const r = await act(payloads.flightSearch({ origin: code, date: date || undefined, personId: me.id }));
-            setPending(false);
-            const found = r.ok ? readOffers(r.data, code) : [];
-            setOffers(found);
-            setRejected(r.ok && Array.isArray(r.data?.rejected) ? (r.data.rejected as { id: string; reason: string }[]) : []);
-            // The server says why nothing qualified (cap, cabin, or timing); show that, not a guess.
-            setResult(r.ok && found.length ? null : r.ok ? { ok: false, message: r.message || "No fare meets the travel policy for that route." } : r);
+            await search(code);
           }}
         >
           <Field label="From airport" error={error} className="w-36">
@@ -122,6 +136,7 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
           </Button>
           <span role="status" aria-live="polite">{result ? <ResultText result={result} /> : null}</span>
         </form>
+        {note ? <p className="max-w-[62ch] text-small text-muted-foreground">{note}</p> : null}
         {!offers.length && rejected.length ? (
           <details className="rounded-xl border px-4 py-3 text-small">
             <summary className="cursor-pointer font-medium">Why {rejected.length} {rejected.length === 1 ? "fare was" : "fares were"} left out</summary>
@@ -158,6 +173,13 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
                     pendingLabel="Requesting"
                     variant={i === 0 ? "secondary" : "ghost"}
                     call={payloads.flightRequest({ personId: me.id, offerId: o.id, origin: o.origin, offerToken: o.offerToken })}
+                    onDone={(r) => {
+                      // A fare quoted before the event changed, or one that expired, is re-searched for the current event.
+                      const code = (r.data as { code?: string } | undefined)?.code;
+                      if (!r.ok && (code === "event_mismatch" || code === "expired" || /search again|expired/i.test(r.message)) && searchedFrom) {
+                        void search(searchedFrom, "Fares changed since your search, so Eve searched again for the current event.");
+                      }
+                    }}
                   />
                 </span>
               </li>
