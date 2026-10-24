@@ -1,4 +1,4 @@
-// Blue Hour tokens as data, for the /design reference page.
+// Daylight tokens as data, for the /design reference page.
 // The source of truth is app/globals.css; tests/design.test.ts fails if these
 // values drift from it.
 
@@ -9,35 +9,40 @@ export type ColorToken = {
 };
 
 export const STRUCTURE: ColorToken[] = [
-  { name: "--rail", value: "#191c3b", role: "Navigation rail and sunken areas" },
-  { name: "--background", value: "#1e2246", role: "Page ground" },
-  { name: "--surface", value: "#252a52", role: "Raised panels, row hover" },
-  { name: "--surface-hover", value: "#2c3260", role: "Selected rows, secondary buttons, popovers" },
-  { name: "--border", value: "#343a6b", role: "Hairlines between surfaces" },
-  { name: "--input", value: "#626aa8", role: "Field boundaries" },
+  { name: "--rail", value: "#ffffff", role: "Navigation rail and top bar" },
+  { name: "--background", value: "#f3f3ef", role: "Page ground" },
+  { name: "--surface", value: "#ffffff", role: "Cards and raised panels" },
+  { name: "--surface-hover", value: "#ebebe5", role: "Row hover, selected rows, secondary buttons" },
+  { name: "--border", value: "#e4e4de", role: "Hairlines between surfaces" },
+  { name: "--input", value: "#8e8f86", role: "Field boundaries" },
 ];
 
 export const TEXT: ColorToken[] = [
-  { name: "--foreground", value: "#eceef8", role: "Primary text, figures, primary button fill" },
-  { name: "--muted-foreground", value: "#a7acd2", role: "Secondary text, placeholders" },
-  { name: "--faint", value: "#8b91be", role: "Tertiary text on the ground or rail only" },
+  { name: "--foreground", value: "#17181a", role: "Primary text, figures, primary button fill" },
+  { name: "--muted-foreground", value: "#5d5e57", role: "Secondary text, placeholders" },
+  { name: "--faint", value: "#6b6c64", role: "Tertiary text on the ground or rail only" },
 ];
 
 export const DUSK: (ColorToken & { band: 1 | 2 | 3 | 4 | 5 })[] = [
-  { name: "--dusk-5", value: "#f5a962", band: 5, role: "Under an hour" },
-  { name: "--dusk-4", value: "#f08ba0", band: 4, role: "Under a day" },
-  { name: "--dusk-3", value: "#cf86e3", band: 3, role: "Under 2 days" },
-  { name: "--dusk-2", value: "#9d9bf6", band: 2, role: "Under a week" },
-  { name: "--dusk-1", value: "#62b6f2", band: 1, role: "A week or more" },
+  { name: "--dusk-5", value: "#a3500e", band: 5, role: "Under an hour" },
+  { name: "--dusk-4", value: "#b8365a", band: 4, role: "Under a day" },
+  { name: "--dusk-3", value: "#8e3bab", band: 3, role: "Under 2 days" },
+  { name: "--dusk-2", value: "#5450c8", band: 2, role: "Under a week" },
+  { name: "--dusk-1", value: "#1f6aa5", band: 1, role: "A week or more" },
 ];
 
 export const STATE: ColorToken[] = [
-  { name: "--critical", value: "#ff7a85", role: "Frozen, failed, over cap. Also the destructive action" },
-  { name: "--positive", value: "#6fcf9e", role: "Passed, paid, verified" },
+  { name: "--critical", value: "#b42318", role: "Frozen, failed, over cap. Also the destructive action" },
+  { name: "--positive", value: "#3d6b10", role: "Passed, paid, verified" },
 ];
 
-export const GROUND = "#1e2246";
-export const RAISED = "#252a52";
+export const FILL: ColorToken[] = [
+  { name: "--money", value: "#a3cf5b", role: "Money received or cleared. Fill only, never text" },
+  { name: "--pending", value: "#f2a65a", role: "Money pending or estimated; hatched when an estimate" },
+];
+
+export const GROUND = "#f3f3ef";
+export const RAISED = "#ffffff";
 
 export const TYPE_SCALE = [
   { token: "text-display", spec: "40 / 44 · 600 · −2.5%", sample: "Blue Hour", use: "This page only" },

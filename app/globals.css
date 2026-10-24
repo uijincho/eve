@@ -5,11 +5,12 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Blue Hour, Eve's design system. Documented at /design.
+ * Daylight, Eve's design system. Documented at /design.
  *
- * One rule carries the system: the dusk hues mean time. They appear only on
- * deadlines (due chips, the horizon). Structure is quiet indigo; state colour
- * is limited to critical (coral) and passed (mint).
+ * Warm paper ground, white cards, hairlines and no shadows. The dusk hues
+ * still mean time and appear only on deadlines. State colour is critical
+ * (brick) and passed (moss) as text; lime and apricot are fills for money in
+ * and money pending, and hatched fills mark estimates.
  *
  * Values here are mirrored in lib/design/tokens.ts for the /design page;
  * tests/design.test.ts keeps the two in sync.
@@ -28,6 +29,8 @@
   --color-surface-hover: var(--surface-hover);
   --color-faint: var(--faint);
   --color-positive: var(--positive);
+  --color-money: var(--money);
+  --color-pending: var(--pending);
   --color-critical: var(--critical);
   --color-dusk-1: var(--dusk-1);
   --color-dusk-2: var(--dusk-2);
@@ -101,57 +104,61 @@
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* Structure: quiet indigo */
-  --rail: #191c3b;
-  --background: #1e2246;
-  --surface: #252a52;
-  --surface-hover: #2c3260;
-  --border: #343a6b;
-  --input: #626aa8;
+  /* Structure: warm daylight paper, white cards, hairlines */
+  --rail: #ffffff;
+  --background: #f3f3ef;
+  --surface: #ffffff;
+  --surface-hover: #ebebe5;
+  --border: #e4e4de;
+  --input: #8e8f86;
 
   /* Text */
-  --foreground: #eceef8;
-  --muted-foreground: #a7acd2;
-  --faint: #8b91be;
+  --foreground: #17181a;
+  --muted-foreground: #5d5e57;
+  --faint: #6b6c64;
 
   /* Time: the dusk scale, cool to warm. Deadlines only. */
-  --dusk-1: #62b6f2;
-  --dusk-2: #9d9bf6;
-  --dusk-3: #cf86e3;
-  --dusk-4: #f08ba0;
-  --dusk-5: #f5a962;
+  --dusk-1: #1f6aa5;
+  --dusk-2: #5450c8;
+  --dusk-3: #8e3bab;
+  --dusk-4: #b8365a;
+  --dusk-5: #a3500e;
 
   /* State */
-  --critical: #ff7a85;
-  --positive: #6fcf9e;
+  --critical: #b42318;
+  --positive: #3d6b10;
+
+  /* Fills: money in or cleared, and pending or estimated. Never text. */
+  --money: #a3cf5b;
+  --pending: #f2a65a;
 
   /* shadcn mapping */
   --card: var(--surface);
   --card-foreground: var(--foreground);
-  --popover: var(--surface-hover);
+  --popover: var(--surface);
   --popover-foreground: var(--foreground);
   --primary: var(--foreground);
-  --primary-foreground: var(--background);
+  --primary-foreground: #ffffff;
   --secondary: var(--surface-hover);
   --secondary-foreground: var(--foreground);
-  --muted: var(--surface);
+  --muted: var(--surface-hover);
   --accent: var(--surface-hover);
   --accent-foreground: var(--foreground);
   --destructive: var(--critical);
-  --ring: #c3c7f0;
-  --chart-1: #eceef8;
-  --chart-2: #a7acd2;
-  --chart-3: #6e75a8;
-  --chart-4: #4a5185;
-  --chart-5: #343a6b;
-  --radius: 0.5rem;
+  --ring: #17181a;
+  --chart-1: #17181a;
+  --chart-2: #a3cf5b;
+  --chart-3: #f2a65a;
+  --chart-4: #b9b9b0;
+  --chart-5: #e4e4de;
+  --radius: 0.625rem;
   --sidebar: var(--rail);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--foreground);
-  --sidebar-primary-foreground: var(--background);
-  --sidebar-accent: var(--surface);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--surface-hover);
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
@@ -171,7 +178,7 @@
     caret-color: var(--foreground);
   }
   ::selection {
-    background: #4a5185;
+    background: #ddedc2;
     color: var(--foreground);
   }
   a {
@@ -187,9 +194,8 @@
   h3 {
     text-wrap: balance;
   }
-  /* Native radios and checkboxes drawn from the palette: dark-scheme defaults
-     tint the empty control olive on indigo. Field Edge when empty, Cool White
-     when checked. */
+  /* Native radios and checkboxes drawn from the palette: field edge when
+     empty, ink when checked. */
   input[type="radio"],
   input[type="checkbox"] {
     appearance: none;
@@ -218,13 +224,21 @@
     box-shadow: inset 0 0 0 3px var(--background);
   }
   input[type="checkbox"]:checked {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231e2246' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
   }
   input[type="radio"]:disabled,
   input[type="checkbox"]:disabled {
     border-color: var(--border);
     cursor: not-allowed;
   }
+}
+
+/* Estimates: projected withholding, fees, FX and pending amounts. */
+@utility hatch-pending {
+  background: repeating-linear-gradient(135deg, var(--pending) 0 3px, #fbddbe 3px 7px);
+}
+@utility hatch-money {
+  background: repeating-linear-gradient(135deg, var(--money) 0 3px, #ddedc2 3px 7px);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -79,5 +79,5 @@ export const members = {
 
 /** Where a member lands after signing in or accepting an invite. */
 export function homeFor(role?: string | null): string {
-  return role === "attendee" ? "/portal" : "/";
+  return role === "attendee" ? "/portal" : "/overview";
 }

@@ -4,7 +4,7 @@ import { InboxView } from "@/components/app/inbox/inbox-view";
 
 export const metadata: Metadata = { title: "Inbox · Eve" };
 
-// The PRD makes the inbox the organizer's home page.
+// Overview is the organizer's home; the inbox is where decisions get made.
 export default function InboxPage() {
   return <InboxView />;
 }
