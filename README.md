@@ -4,6 +4,8 @@ Event finance for travel claims, prizes, controller approvals, sponsor handoffs 
 
 The application uses real Postgres persistence, deterministic financial rules, an immutable balanced ledger, Better Auth accounts and Vercel Workflow jobs. Money movement is **simulated**. Tax documents are **drafts, not for filing**. Integration and validation details are tracked in [IMPLEMENTATION.md](IMPLEMENTATION.md).
 
+Open the [Vercel preview](https://eve-calhacks-hj2fnowlg-badbird5907s-projects.vercel.app) with your Vercel account. The [overnight handover](docs/overnight-handover.md) contains the walkthrough, validation evidence and remaining limitations.
+
 ## Run locally
 
 Use Node 24 and pnpm 11. Install with `pnpm install --frozen-lockfile`. Copy `.env.example` to `.env.local` and set the database URLs, auth secret and vault key. Receipt reading additionally needs the Anthropic key. Never commit an environment file or replace an existing vault key: saved identifiers depend on it.
@@ -69,4 +71,4 @@ The Vercel project is `eve-calhacks`. Preview deployments use the CLI; GitHub au
 
 See [workflow operations](workflows/README.md) for triggers, reminders and recovery. Vercel's configured daily cron runs on production deployments; a Preview needs a manual authenticated `/api/cron` invocation to exercise that sweep. Durable jobs started by an action run on the Preview itself.
 
-Computer use against a sponsor portal, historical fare intelligence and real tax filing are outside the shipped demo scope. The build remains in active integration; the final acceptance record will be added to [IMPLEMENTATION.md](IMPLEMENTATION.md).
+Computer use against a sponsor portal, historical fare intelligence and real tax filing are outside the shipped demo scope. See [requirement coverage](docs/requirement-coverage.md) for the completed behavior and boundaries of each workflow.
