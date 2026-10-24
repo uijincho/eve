@@ -1,9 +1,10 @@
 "use client";
 
 import { cn } from "cn";
-import { CheckIcon, LoaderCircleIcon, LockIcon, TriangleAlertIcon } from "lucide-react";
+import { LoaderCircleIcon, LockIcon } from "lucide-react";
 import { useId } from "react";
 
+import { ResultText } from "@/components/app/result-text";
 import { Button } from "@/components/ui/button";
 import type { ActionResult } from "@/lib/contracts";
 import type { Permission } from "@/lib/client/derive";
@@ -93,17 +94,4 @@ export function ActionButton({
   );
 }
 
-export function ResultText({ result, className }: { result: ActionResult; className?: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 text-small",
-        result.ok ? "text-positive" : "text-critical",
-        className,
-      )}
-    >
-      {result.ok ? <CheckIcon aria-hidden className="size-3.5" /> : <TriangleAlertIcon aria-hidden className="size-3.5" />}
-      {result.message}
-    </span>
-  );
-}
+export { ResultText };

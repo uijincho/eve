@@ -15,7 +15,7 @@ import {
 
 import type { ActionResult, AppSnapshot } from "@/lib/contracts";
 
-import { ResultText } from "@/components/app/action-button";
+import { ResultText } from "@/components/app/result-text";
 
 import { ApiError, getSnapshot, runAction, switchPersona } from "./api";
 import { hasLiveWork } from "./derive";
