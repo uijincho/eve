@@ -77,7 +77,7 @@ export async function executeControllerApproval(target: ApprovalTarget, approval
     if (!member || member.role !== "controller") throw new ApprovalConflictError("The approver no longer has controller access.");
     if (!org || (member.demoPersona && (!org.isDemo || !demoModeEnabled()))) throw new ApprovalConflictError("The demo approval is no longer valid.");
     const [recipient] = await tx.select({ personId: s.payout.personId }).from(s.payout).where(and(eq(s.payout.id, target.payoutId), eq(s.payout.orgId, target.orgId)));
-    if (recipient) await tx.select({ id: s.person.id }).from(s.person).where(and(eq(s.person.id, recipient.personId), eq(s.person.orgId, target.orgId))).for("update");
+    if (recipient) await tx.select({ id: s.person.id }).from(s.person).where(and(eq(s.person.id, recipient.personId), eq(s.person.orgId, target.orgId))).for("no key update");
     const [payout] = await tx.select().from(s.payout).where(and(eq(s.payout.id, target.payoutId), eq(s.payout.orgId, target.orgId))).for("update");
     if (!payout) throw new ApprovalConflictError("Payout no longer exists.");
     if (approval.quoteFingerprint !== target.quoteFingerprint || payoutQuoteFingerprint(payout) !== target.quoteFingerprint) {

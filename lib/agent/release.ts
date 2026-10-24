@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { resumeHook, start } from "workflow/api";
+import { getHookByToken, resumeHook, start } from "workflow/api";
 import { HookNotFoundError } from "workflow/errors";
 
 import type { ActorContext } from "@/lib/auth/session";
@@ -12,6 +12,8 @@ import { approvalToken, assertControllerApproval, loadApprovalTarget, payoutQuot
 export async function startPayoutApproval(orgId: string, payoutId: string): Promise<string | null> {
   const target = await loadApprovalTarget(orgId, payoutId);
   if (!target) return null;
+  try { return (await getHookByToken(approvalToken(target))).runId; }
+  catch (error) { if (!HookNotFoundError.is(error)) throw error; }
   return (await start(payoutApprovalWorkflow, [target])).runId;
 }
 
@@ -33,16 +35,16 @@ async function resumeRegistered(target: ApprovalTarget, memberId: string): Promi
 /** API callers provide only payout ids. Actor identity and quote terms always come from authenticated server state. */
 export async function queueControllerRelease(actor: ActorContext, ids: string[]): Promise<ActionResult & { status: number }> {
   if (actor.role !== "controller") return { ok: false, status: 403, message: "Only a controller can release money." };
-  if (!ids.length || ids.length > 100 || ids.some((id) => !id || id.length > 100)) return { ok: false, status: 400, message: "Choose between 1 and 100 payouts." };
+  if (!ids.length || ids.length > 200 || ids.some((id) => !id || id.length > 100)) return { ok: false, status: 400, message: "Choose between 1 and 200 payouts." };
   const queued: { payoutId: string; runId: string }[] = [];
   const completed: string[] = [];
   const failed: { payoutId: string; reason: string }[] = [];
-  for (const id of [...new Set(ids)]) {
+  async function queueOne(id: string) {
     const [row] = await getDb().select().from(payout).where(and(eq(payout.id, id), eq(payout.orgId, actor.orgId)));
-    if (!row) { failed.push({ payoutId: id, reason: "Payout not found." }); continue; }
-    if (row.status === "paid") { completed.push(row.id); continue; }
+    if (!row) { failed.push({ payoutId: id, reason: "Payout not found." }); return; }
+    if (row.status === "paid") { completed.push(row.id); return; }
     try { assertControllerApproval(actor, row); }
-    catch (error) { failed.push({ payoutId: id, reason: (error as Error).message }); continue; }
+    catch (error) { failed.push({ payoutId: id, reason: (error as Error).message }); return; }
     const target = { orgId: actor.orgId, payoutId: row.id, quoteFingerprint: payoutQuoteFingerprint(row) };
     try { queued.push({ payoutId: id, runId: await resumeRegistered(target, actor.memberId) }); }
     catch {
@@ -50,6 +52,14 @@ export async function queueControllerRelease(actor: ActorContext, ids: string[])
       if (latest?.status === "paid") completed.push(id);
       else failed.push({ payoutId: id, reason: "The workflow could not confirm the release request. Check the payout status before retrying." });
     }
+  }
+  const unique = [...new Set(ids)];
+  for (let offset = 0; offset < unique.length; offset += 5) {
+    const batch = unique.slice(offset, offset + 5);
+    const results = await Promise.allSettled(batch.map(queueOne));
+    results.forEach((result, index) => {
+      if (result.status === "rejected") failed.push({ payoutId: batch[index], reason: "The release service is temporarily unavailable. Check this payout before retrying." });
+    });
   }
   return {
     ok: queued.length > 0 || completed.length > 0, status: queued.length ? 202 : completed.length ? 200 : 409,

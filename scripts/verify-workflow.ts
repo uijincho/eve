@@ -41,7 +41,7 @@ async function main() {
     ]);
     await db.insert(s.taxProfile).values({ id: newId("tax"), orgId, personId, form: "W-9", status: "valid", signatureName: "Synthetic Winner", tinLast4: "1234", signedAt: new Date("2026-01-01") });
     await db.insert(s.payoutMethod).values({ id: newId("method"), orgId, personId, provider: "simulated", currency: "USD", last4: "4242", status: "active", version: 1, requestedBy: "attendee", verifiedAt: new Date() });
-    await db.insert(s.award).values({ id: awardId, orgId, eventId, personId, track: "Acceptance", title: "Synthetic prize", kind: "cash", fulfillment: "cash", amountMinor: 50000n, currency: "USD", status: "ready", dueAt: new Date("2026-11-01"), requestedBy: organizerId });
+    await db.insert(s.award).values([awardId, newId("award")].map((id) => ({ id, orgId, eventId, personId, track: "Acceptance", title: "Synthetic prize", kind: "cash" as const, fulfillment: "cash" as const, amountMinor: 50000n, currency: "USD", status: "ready" as const, dueAt: new Date("2026-11-01"), requestedBy: organizerId })));
     const started = await action(organizerId, "agent.run", { kind: "claims" });
     assert.equal(started.status, 202, started.body.message);
     const runId = started.body.data.runId as string;
@@ -51,26 +51,28 @@ async function main() {
       if (row?.status === "failed") throw new Error(row.summary);
       return row?.status === "done" ? row : null;
     }, "durable review");
-    assert.match(run.summary, /proposed 1 prize payout/);
+    assert.match(run.summary, /proposed 2 prize payout/);
+    const payouts = await db.select().from(s.payout).where(eq(s.payout.orgId, orgId));
+    assert.equal(payouts.length, 2);
     const [payout] = await db.select().from(s.payout).where(and(eq(s.payout.orgId, orgId), eq(s.payout.awardId, awardId)));
     assert.equal(payout.status, "proposed");
     assert.equal(payout.releasedBy, null);
     const denied = await action(organizerId, "payout.release", { id: payout.id });
     assert.equal(denied.status, 403);
     console.log("Durable agent proposed the prize and could not release it; organizer release denied.");
-    const accepted = await action(controllerId, "payout.release", { id: payout.id });
+    const accepted = await action(controllerId, "payout.release", { ids: payouts.map((p) => p.id) });
     assert.equal(accepted.status, 202, accepted.body.message);
     await until(async () => {
-      const [row] = await db.select().from(s.payout).where(eq(s.payout.id, payout.id));
-      return row.status === "paid" ? row : null;
+      const rows = await db.select().from(s.payout).where(eq(s.payout.orgId, orgId));
+      return rows.every((row) => row.status === "paid") ? rows : null;
     }, "controller hook release");
-    const replay = await action(controllerId, "payout.release", { id: payout.id });
+    const replay = await action(controllerId, "payout.release", { ids: payouts.map((p) => p.id) });
     assert.equal(replay.status, 200);
-    const approvals = await db.select().from(s.approval).where(eq(s.approval.objectId, payout.id));
-    const journals = await db.select().from(s.journalEntry).where(and(eq(s.journalEntry.orgId, orgId), eq(s.journalEntry.sourceId, payout.id)));
-    assert.equal(approvals.length, 1);
-    assert.equal(journals.length, 2);
-    console.log("Controller hook paid once; retry produced no extra approval or journals. All money simulated.");
+    const approvals = await db.select().from(s.approval).where(eq(s.approval.orgId, orgId));
+    const journals = await db.select().from(s.journalEntry).where(eq(s.journalEntry.orgId, orgId));
+    assert.equal(approvals.length, 2);
+    assert.equal(journals.length, 4);
+    console.log("Controller hooks paid the two-payout batch once; retry produced no extra approvals or journals. All money simulated.");
   } finally {
     await db.transaction((tx) => purgeOrg(tx, orgId, { deleteOrg: true }));
     await db.$pool.end();

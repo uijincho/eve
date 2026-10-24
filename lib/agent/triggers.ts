@@ -1,4 +1,5 @@
-import { start } from "workflow/api";
+import { getHookByToken, start } from "workflow/api";
+import { HookNotFoundError } from "workflow/errors";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { getChaseCandidates } from "@/lib/agent/automation";
@@ -17,6 +18,9 @@ export async function startTaxChases(orgId: string, options: { personId?: string
   const runIds: string[] = [];
   for (let offset = 0; offset < targets.length; offset += 5) {
     const batch = await Promise.all(targets.slice(offset, offset + 5).map(async (target) => {
+      const token = `tax-chase:${target.orgId}:${target.personId}:${target.generation}`;
+      try { return (await getHookByToken(token)).runId; }
+      catch (error) { if (!HookNotFoundError.is(error)) throw error; }
       const run = await start(taxChaseWorkflow, [target, options.acceleratedDemo === true]);
       return run.runId;
     }));
