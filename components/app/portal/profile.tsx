@@ -155,7 +155,7 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
         </div>
         <label className="flex items-start gap-2 text-small">
           <input type="checkbox" checked={certify} onChange={(e) => setCertify(e.target.checked)} className="mt-0.5 size-4 accent-foreground" aria-describedby="certify-err" />
-          <span>I certify under penalties of perjury that the information on this form is true, correct, and complete. <span className="text-muted-foreground">(Typed signatures are demo-grade.)</span></span>
+          <span>{form === "Residency declaration" ? "I confirm that my residency information is true, correct, and complete." : "I certify under penalties of perjury that the information on this form is true, correct, and complete."} <span className="text-muted-foreground">(Typed signatures are demo-grade.)</span></span>
         </label>
         {errors.certify ? <p id="certify-err" className="text-small text-critical">{errors.certify}</p> : null}
         <ActionButton

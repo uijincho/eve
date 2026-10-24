@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Claim } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
-import { big, canManage, canReview, isOrgBookedFlight, claimStatusLabel, claimReasonText } from "@/lib/client/derive";
+import { big, canOrganize, canReview, isOrgBookedFlight, claimStatusLabel, claimReasonText } from "@/lib/client/derive";
 import { fmtDate, fmtDay, humanize } from "@/lib/client/format";
 import { initialParam } from "@/lib/client/url-param";
 import { payloads } from "@/lib/client/payloads";
@@ -51,7 +51,7 @@ export function ClaimsView() {
             <DownloadIcon aria-hidden />
             Export CSV
           </LinkButton>
-          {canManage(s.actor).allowed ? (
+          {canOrganize(s.actor).allowed ? (
             <Button onClick={() => setSubmitOpen(true)}>
               <PlusIcon aria-hidden />
               Submit a claim
@@ -251,7 +251,7 @@ export function ClaimDetail({ claim: c, snapshot, onEvidence }: { claim: Claim; 
         <p className="flex flex-wrap items-center gap-2 text-small text-muted-foreground">
           <TruthLabel kind="simulated" /> Booked by the organization. {c.personName.split(" ")[0]} pays nothing, so there is no payout.
         </p>
-      ) : c.status === "approved" && canManage(snapshot.actor).allowed && !snapshot.payouts.some((p) => p.sourceId === c.id) ? (
+      ) : c.status === "approved" && canOrganize(snapshot.actor).allowed && !snapshot.payouts.some((p) => p.sourceId === c.id) ? (
         <ActionButton wide size="default" variant="default" label="Propose payout" pendingLabel="Proposing" call={payloads.payoutPropose(c.id, "claim")} />
       ) : null}
     </div>

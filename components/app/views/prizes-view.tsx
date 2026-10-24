@@ -18,7 +18,7 @@ import { Money } from "@/components/eve/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResult, AppSnapshot, Award } from "@/lib/contracts";
-import { awardName, big, canManage, FULFILLMENT_LABEL, prizeOptions } from "@/lib/client/derive";
+import { awardName, big, canOrganize, FULFILLMENT_LABEL, prizeOptions } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 import { payloads, toMinor } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -40,7 +40,7 @@ export function PrizesView() {
         return `${s.awards.length} prizes entered. ${held} held for a tax form. Item prizes compare shipping, buying locally, and cash.`;
       }}
       actions={(s) =>
-        canManage(s.actor).allowed ? (
+        canOrganize(s.actor).allowed ? (
           <Button onClick={() => setEntryOpen(true)}>
             <PlusIcon aria-hidden />
             Enter a winner
@@ -130,7 +130,7 @@ export function PrizesView() {
 export function AwardDetail({ award: a, snapshot: s, onEvidence }: { award: Award; snapshot: AppSnapshot; onEvidence: () => void }) {
   const person = s.people.find((p) => p.id === a.personId);
   const payout = s.payouts.find((p) => p.sourceType === "award" && p.sourceId === a.id);
-  const manage = canManage(s.actor);
+  const manage = canOrganize(s.actor);
   const o = prizeOptions(s, a, person, payout);
   const team = a.teamId ? s.awards.filter((x) => x.teamId === a.teamId) : [];
   // Items shipped or bought locally are delivered, not paid out; only cash goes through a payout.
@@ -197,7 +197,7 @@ function TeamSplit({ award, team, snapshot }: { award: Award; team: Award[]; sna
     Object.fromEntries(team.map((t, i) => [t.personId, ((i === 0 ? 10000 - even * (team.length - 1) : even) / 100).toString()])),
   );
   const total = Object.values(shares).reduce((sum, v) => sum + Math.round(Number(v || 0) * 100), 0);
-  const manage = canManage(snapshot.actor);
+  const manage = canOrganize(snapshot.actor);
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-baseline justify-between">

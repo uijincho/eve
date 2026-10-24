@@ -13,6 +13,7 @@ import type { AppSnapshot } from "@/lib/contracts";
 import {
   canControl,
   canManage,
+  canOrganize,
   canRelease,
   canReview,
   prizeOptions,
@@ -160,7 +161,7 @@ export function ItemActions({
     }
     case "award": {
       const a = ref.award;
-      const manage = canManage(actor);
+      const manage = canOrganize(actor);
       const opts = prizeOptions(snapshot, a, ref.person, ref.payout);
       if (a.kind === "item" && a.fulfillment === "undecided" && opts.recommended !== "undecided") {
         return (

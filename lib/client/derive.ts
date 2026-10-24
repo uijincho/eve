@@ -213,6 +213,17 @@ export function canManage(actor: Actor): Permission {
   return ok;
 }
 
+/**
+ * Organizer-only actions: org and event settings, budget, people import, award
+ * entry and choices, payout proposals. The server's role map gives controllers
+ * none of these, so the button explains that instead of failing with a 403.
+ */
+export function canOrganize(actor: Actor): Permission {
+  if (actor.role === "organizer") return ok;
+  if (actor.role === "auditor") return no("Auditors have read-only access.");
+  return no("Only an organizer can do this.");
+}
+
 export function canControl(actor: Actor, s: Pick<AppSnapshot, "personas">): Permission {
   if (actor.role === "controller") return ok;
   if (actor.role === "auditor") return no("Auditors have read-only access.");

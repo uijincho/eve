@@ -17,7 +17,7 @@ import {
 } from "@/components/app/settings-forms";
 import { TeamSection } from "@/components/app/team-section";
 import { TruthLabel } from "@/components/eve/truth-label";
-import { canControl, canManage, type Permission } from "@/lib/client/derive";
+import { canControl, canManage, canOrganize, type Permission } from "@/lib/client/derive";
 import { payloads } from "@/lib/client/payloads";
 
 export function SettingsView() {
@@ -29,7 +29,7 @@ export function SettingsView() {
     >
       {(s) => (
         <div className="flex max-w-3xl flex-col gap-12">
-          <ReadOnlyNote permission={canManage(s.actor)} />
+          <ReadOnlyNote permission={canOrganize(s.actor)} />
           <Section title="Organization"><OrgIdentityForm snapshot={s} /></Section>
           <Section title="Approval limits">
             <BooksCurrencyNote snapshot={s} />

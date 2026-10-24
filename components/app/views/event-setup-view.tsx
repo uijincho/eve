@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "cn";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { ActionButton, ResultText } from "@/components/app/action-button";
@@ -14,11 +15,10 @@ import { CapacityBar } from "@/components/eve/capacity-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResult, AppSnapshot } from "@/lib/contracts";
-import { big, canManage } from "@/lib/client/derive";
+import { big, canOrganize } from "@/lib/client/derive";
 import { parsePeopleCsv } from "@/lib/client/csv";
 import { payloads, toMinor } from "@/lib/client/payloads";
 import { rovingKeyDown } from "@/lib/client/roving";
-import { initialParam } from "@/lib/client/url-param";
 import { useEve } from "@/lib/client/use-eve";
 
 const TABS = [
@@ -31,8 +31,22 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 
+/** The open tab lives in ?tab= so deep links (People → Import) and reloads land on it. */
+function useTab(): [Tab, (t: Tab) => void] {
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const tab = TABS.find((t) => t.id === params.get("tab"))?.id ?? "basics";
+  const setTab = (t: Tab) => {
+    const next = new URLSearchParams(params.toString());
+    next.set("tab", t);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  };
+  return [tab, setTab];
+}
+
 export function EventSetupView() {
-  const [tab, setTab] = useState<Tab>(() => (TABS.find((t) => t.id === initialParam("tab"))?.id ?? "basics"));
+  const [tab, setTab] = useTab();
   return (
     <PageFrame
       title="Event setup"
@@ -105,7 +119,7 @@ function BudgetTab({ snapshot: s }: { snapshot: AppSnapshot }) {
           className="self-start"
           label="Add line"
           pendingLabel="Adding"
-          permission={canManage(s.actor)}
+          permission={canOrganize(s.actor)}
           onDone={(r) => { if (r.ok) { setName(""); setCap(""); } }}
           call={() => {
             const er: Record<string, string> = {};
@@ -223,7 +237,7 @@ function ImportTab({ snapshot: s }: { snapshot: AppSnapshot }) {
         </div>
       ) : null}
       <div className="flex flex-wrap items-center gap-3">
-        {canManage(s.actor).allowed ? (
+        {canOrganize(s.actor).allowed ? (
           <Button
             disabled={!parsed || !parsed.people.length || parsed.errors.length > 0 || pending}
             aria-busy={pending || undefined}
@@ -239,7 +253,7 @@ function ImportTab({ snapshot: s }: { snapshot: AppSnapshot }) {
             {pending ? "Importing" : `Import ${parsed?.people.length ?? 0} people`}
           </Button>
         ) : (
-          <ActionButton label="Import people" permission={canManage(s.actor)} call={() => null} />
+          <ActionButton label="Import people" permission={canOrganize(s.actor)} call={() => null} />
         )}
         <span role="status" aria-live="polite">{result ? <ResultText result={result} /> : null}</span>
       </div>

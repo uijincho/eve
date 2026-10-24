@@ -14,7 +14,7 @@ import { PrizeComparison } from "@/components/app/prize-comparison";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResult, AppSnapshot } from "@/lib/contracts";
-import { canManage } from "@/lib/client/derive";
+import { canManage, canOrganize } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 import { payloads, toMinor } from "@/lib/client/payloads";
 import { useEve } from "@/lib/client/use-eve";
@@ -118,13 +118,13 @@ function TryReceipt({ snapshot: s }: { snapshot: AppSnapshot }) {
       <p className="text-small text-muted-foreground">
         Upload a receipt photo or PDF. Eve reads it, runs the policy checks, and records the result as a claim{s.demo ? " in the sample event" : ""}.
       </p>
-      {canManage(s.actor).allowed || s.actor.role === "attendee" ? (
+      {canOrganize(s.actor).allowed || s.actor.role === "attendee" ? (
         <>
           <ClaimForm people={forOthers ? s.people : undefined} defaultType="expense" submitLabel="Run Eve on this receipt" submitVariant="secondary" onSubmitted={setClaimId} />
           {claimId ? <ClaimOutcome claimId={claimId} /> : null}
         </>
       ) : (
-        <p className="text-small text-muted-foreground">Auditors have read-only access, so this is disabled for your persona.</p>
+        <p className="text-small text-muted-foreground">{s.actor.role === "auditor" ? "Auditors have read-only access, so this is disabled for your persona." : "Organizers, or the attendee who paid, submit receipts. Controllers review them."}</p>
       )}
     </Section>
   );
@@ -145,7 +145,7 @@ function TryWinner({ snapshot: s }: { snapshot: AppSnapshot }) {
   const [pending, setPending] = useState<string | null>(null);
   const [result, setResult] = useState<ActionResult | null>(null);
   const [email, setEmail] = useState<string | null>(null);
-  const manage = canManage(s.actor);
+  const manage = canOrganize(s.actor);
   const person = email ? s.people.find((p) => p.email === email) : undefined;
   const award = person ? s.awards.find((a) => a.personId === person.id) : undefined;
 

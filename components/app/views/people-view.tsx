@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Person } from "@/lib/contracts";
 import { invitations, type CreatedInvite } from "@/lib/client/account";
 import { ApiError } from "@/lib/client/api";
-import { big, canManage, payoutSource, type Permission, payoutValue } from "@/lib/client/derive";
+import { big, canOrganize, payoutSource, type Permission, payoutValue } from "@/lib/client/derive";
 import { fmtDate, fmtDateTime } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -37,7 +37,7 @@ export function PeopleView() {
       title="People"
       lede={(s) => `${s.people.length} attendees, judges, and mentors. Tax identifiers and bank numbers stay in the vault; Eve sees only the last four digits.`}
       actions={(s) =>
-        canManage(s.actor).allowed ? (
+        canOrganize(s.actor).allowed ? (
           <LinkButton href="/events/new?tab=import" variant="outline">
             <UploadIcon aria-hidden />
             Import people
@@ -187,7 +187,7 @@ function PersonDetail({ person: p, snapshot: s }: { person: Person; snapshot: Ap
         <ActionButton
           label="Send simulated change"
           pendingLabel="Sending"
-          permission={canManage(s.actor)}
+          permission={canOrganize(s.actor)}
           call={() => (last4.length === 4 ? payloads.payoutBankChange(p.id, last4, currency) : null)}
         />
       </section>

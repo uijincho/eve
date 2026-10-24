@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { AppSnapshot } from "@/lib/contracts";
 import { fixtureSnapshot } from "@/lib/client/fixture";
 import { PortalPrizes } from "@/components/app/portal/prizes";
+import { PortalProfile } from "@/components/app/portal/profile";
 import { PortalTravel } from "@/components/app/portal/travel";
 
 const state = vi.hoisted(() => ({ snapshot: null as AppSnapshot | null }));
@@ -45,5 +46,23 @@ describe("attendee-scoped portal rendering", () => {
     const html = renderToStaticMarkup(createElement(PortalTravel));
     expect(html).toContain("CA$600.00");
     expect(html).not.toContain("US$600.00");
+  });
+
+  it("words the residency declaration as a confirmation, not a US perjury statement", () => {
+    const s = attendeeSnapshot();
+    s.people[0] = { ...s.people[0], taxForm: "Residency declaration", taxStatus: "valid" };
+    state.snapshot = s;
+    const html = renderToStaticMarkup(createElement(PortalProfile));
+    expect(html).toContain("I confirm that my residency information is true, correct, and complete.");
+    expect(html).not.toContain("penalties of perjury");
+  });
+
+  it("keeps the perjury certification on W-9 and W-8 forms", () => {
+    for (const taxForm of ["W-9", "W-8BEN"] as const) {
+      const s = attendeeSnapshot();
+      s.people[0] = { ...s.people[0], taxForm, taxStatus: "valid" };
+      state.snapshot = s;
+      expect(renderToStaticMarkup(createElement(PortalProfile))).toContain("I certify under penalties of perjury");
+    }
   });
 });

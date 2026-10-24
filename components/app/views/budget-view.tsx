@@ -12,7 +12,7 @@ import { Money } from "@/components/eve/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, BudgetLine } from "@/lib/contracts";
-import { big, booksCurrency, budgetTotals, canManage } from "@/lib/client/derive";
+import { big, booksCurrency, budgetTotals, canOrganize } from "@/lib/client/derive";
 import { minorToInput } from "@/lib/client/format";
 import { payloads, toMinor } from "@/lib/client/payloads";
 
@@ -59,7 +59,7 @@ function BudgetRow({ line: b, snapshot }: { line: BudgetLine; snapshot: AppSnaps
   // Edit the cap the organizer typed, in their currency; never the converted books amount.
   const [cap, setCap] = useState(minorToInput(b.enteredCapMinor ?? b.capMinor));
   const [error, setError] = useState<string | null>(null);
-  const manage = canManage(snapshot.actor);
+  const manage = canOrganize(snapshot.actor);
   return (
     <li className="flex flex-col gap-2 border-b pb-6 last:border-b-0">
       <CapacityBar label={b.name} capMinor={Number(big(b.capMinor))} spentMinor={Number(big(b.spentMinor))} committedMinor={Number(big(b.committedMinor))} currency={books} />

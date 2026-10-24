@@ -6,7 +6,7 @@ import { ActionButton } from "@/components/app/action-button";
 import { Field, NativeSelect, TextArea } from "@/components/app/field";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Organization } from "@/lib/contracts";
-import { canManage, type Permission } from "@/lib/client/derive";
+import { canOrganize, type Permission } from "@/lib/client/derive";
 import { fromLocalInput, minorToInput, toLocalInput } from "@/lib/client/format";
 import { payloads, toMinor } from "@/lib/client/payloads";
 
@@ -43,7 +43,7 @@ export function OrgIdentityForm({ snapshot: s, submitLabel = "Save organization"
         className="self-start"
         label={submitLabel}
         pendingLabel="Saving"
-        permission={canManage(s.actor)}
+        permission={canOrganize(s.actor)}
         onDone={(r) => r.ok && onSaved?.()}
         call={() => {
           if (!name.trim()) {
@@ -108,7 +108,7 @@ export function MoneyMovementForm({ snapshot: s, submitLabel = "Save money movem
         className="self-start"
         label={submitLabel}
         pendingLabel="Saving"
-        permission={canManage(s.actor)}
+        permission={canOrganize(s.actor)}
         onDone={(r) => r.ok && onSaved?.()}
         call={() => {
           const days = Number(turnaround);
@@ -146,7 +146,7 @@ export function LimitsForm({ snapshot: s, submitLabel = "Save limits", onSaved }
         className="self-start"
         label={submitLabel}
         pendingLabel="Saving"
-        permission={canManage(s.actor)}
+        permission={canOrganize(s.actor)}
         onDone={(r) => r.ok && onSaved?.()}
         call={() => {
           const e: Errors = {};
@@ -168,7 +168,7 @@ export function NotificationsForm({ snapshot: s, submitLabel = "Save notificatio
       <Field label="Slack or Discord channel or webhook" help="Organizers get escalations here; attendees get email and portal notices. Delivery is simulated in this demo.">
         {(p) => <Input {...p} value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="#finance" />}
       </Field>
-      <ActionButton className="self-start" label={submitLabel} pendingLabel="Saving" permission={canManage(s.actor)} onDone={(r) => r.ok && onSaved?.()} call={payloads.orgUpdate({ notificationChannel: channel.trim() })} />
+      <ActionButton className="self-start" label={submitLabel} pendingLabel="Saving" permission={canOrganize(s.actor)} onDone={(r) => r.ok && onSaved?.()} call={payloads.orgUpdate({ notificationChannel: channel.trim() })} />
     </div>
   );
 }
@@ -198,7 +198,7 @@ export function EventBasicsForm({ snapshot: s }: { snapshot: AppSnapshot }) {
         className="self-start"
         label="Save basics"
         pendingLabel="Saving"
-        permission={canManage(s.actor)}
+        permission={canOrganize(s.actor)}
         call={() => {
           const er: Errors = {};
           if (!name.trim()) er.name = "Name the event.";
@@ -236,7 +236,7 @@ export function TravelPolicyForm({ snapshot: s }: { snapshot: AppSnapshot }) {
         className="self-start"
         label="Save travel policy"
         pendingLabel="Saving"
-        permission={canManage(s.actor)}
+        permission={canOrganize(s.actor)}
         call={() => {
           const er: Errors = {};
           const m = money(cap, "cap", er, "a cap");
