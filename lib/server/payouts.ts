@@ -502,13 +502,64 @@ const CODE_TTL_MS = 30 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 
 /**
- * payout.bankChange. New details are stored pending verification; every unpaid
- * payout for the person freezes; a code goes to the ORIGINAL email on file.
+ * First-account enrollment applies only when the signed-in attendee enters an
+ * account for their own person record from the portal and that person has
+ * never had an active or confirmed method. Staff never qualify. Every later
+ * change goes through the freeze and original-email verification below.
+ */
+export function isInitialEnrollment(actor: Pick<ActorContext, "role" | "personId">, personId: string, history: readonly Pick<MethodRow, "status" | "verifiedAt">[], requestedVia?: string): boolean {
+  if (actor.role !== "attendee" || !actor.personId || actor.personId !== personId) return false;
+  if (requestedVia !== undefined && requestedVia !== "portal") return false;
+  return !history.some((m) => m.status === "active" || m.status === "superseded" || m.verifiedAt !== null);
+}
+
+/**
+ * Activates an attendee's first payout account. Called under the org -> person
+ * locks, so concurrent first setups serialize and only one can activate (the
+ * partial unique index on active methods is the backstop). No code is issued,
+ * nothing is released: unpaid payouts are re-quoted and any that become
+ * payable wait for a fresh controller release.
+ */
+async function enrollFirstMethod(tx: Executor, actor: ActorContext, person: PersonRow, input: { last4: string; currency: string; accountNumber?: string }, abandoned: MethodRow | undefined, maxVersion: number) {
+  if (abandoned) await tx.update(s.payoutMethod).set({ status: "rejected" }).where(eq(s.payoutMethod.id, abandoned.id));
+  const vaultId = input.accountNumber ? await sealSecret(tx, { orgId: actor.orgId, personId: person.id, kind: "bank_account", value: input.accountNumber }) : null;
+  const methodId = newId("pm");
+  const now = new Date();
+  await tx.insert(s.payoutMethod).values({
+    id: methodId, orgId: actor.orgId, personId: person.id, provider: SIMULATED_PROVIDER, currency: input.currency, last4: input.last4, vaultId,
+    status: "active", version: maxVersion + 1, requestedVia: "portal", requestedBy: actor.memberId, verifiedAt: now, verifiedBy: actor.memberId,
+  });
+  await recordDecision(tx, {
+    orgId: actor.orgId, objectType: "person", objectId: person.id, personId: person.id, personName: person.name, action: "payout.enroll",
+    summary: `${person.name} added a first payout account ••${input.last4} (${input.currency}) from their own signed-in portal session. No earlier account existed, so there was nothing to freeze and no code was sent. Provider is simulated; no money moved.`,
+    actor, status: "done", tool: "enrollPayoutMethod",
+    facts: {
+      methodId, last4: input.last4, currency: input.currency, version: maxVersion + 1, provider: SIMULATED_PROVIDER, truth: "Simulated",
+      basis: "initial_self_enrollment", channelVerified: false, accountNumberVaulted: Boolean(vaultId), replacedUnconfirmedMethodId: abandoned?.id ?? null,
+    },
+  });
+  // Existing unpaid quotes (held for "no payout method", or frozen by an abandoned unconfirmed request) are re-quoted; none are released.
+  const requoted = await requoteSiblings(tx, actor.orgId, person.id, `first payout account ••${input.last4} added`, undefined, actor);
+  await recordNotice(tx, { orgId: actor.orgId, channel: "organizers", title: `Payout account added: ${person.name}`, body: `${person.name} added a first payout account ••${input.last4} (${input.currency}, simulated). ${requoted} unpaid payout(s) re-quoted; each still needs a controller release.` });
+  return { enrolled: true as const, activeMethodId: methodId, frozen: [] as string[], requoted, sentTo: null };
+}
+
+/**
+ * payout.bankChange. A first account entered by the attendee themselves is
+ * enrolled directly (isInitialEnrollment). Otherwise new details are stored
+ * pending verification; every unpaid payout for the person freezes; a code
+ * goes to the ORIGINAL email on file.
  */
 export async function changeBankDetails(tx: Executor, actor: ActorContext, input: { personId: string; last4: string; currency: string; accountNumber?: string; requestedVia?: string }) {
   const person = await lockPayee(tx, actor.orgId, input.personId);
   if (input.accountNumber && !input.accountNumber.endsWith(input.last4)) throw invalid("The account number does not end in the given last 4 digits.");
+  // Read under the person lock: a concurrent first setup that committed first is visible here.
+  const history = await tx.select().from(s.payoutMethod).where(and(eq(s.payoutMethod.orgId, actor.orgId), eq(s.payoutMethod.personId, person.id))).for("update");
   const methods = await methodsFor(tx, person.id);
+  if (isInitialEnrollment(actor, person.id, history, input.requestedVia)) {
+    const maxVersion = history.reduce((m, r) => Math.max(m, r.version), 0);
+    return enrollFirstMethod(tx, actor, person, input, methods.pending, maxVersion);
+  }
   if (methods.pending) {
     await tx.update(s.payoutMethod).set({ status: "rejected" }).where(eq(s.payoutMethod.id, methods.pending.id));
   }
@@ -542,7 +593,7 @@ export async function changeBankDetails(tx: Executor, actor: ActorContext, input
     actor, status: "frozen", tool: "freezePayouts",
     facts: { previousLast4: methods.active?.last4 ?? null, newLast4: input.last4, requestedVia, frozen: toFreeze.map((p) => p.id), verificationChannel: maskEmail(person.email), delivery: "pending" },
   });
-  return { methodId, frozen: toFreeze.map((p) => p.id), sentTo: maskEmail(person.email) };
+  return { enrolled: false as const, methodId, frozen: toFreeze.map((p) => p.id), sentTo: maskEmail(person.email) };
 }
 
 /**
