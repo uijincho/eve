@@ -401,3 +401,44 @@ describe("splits and fulfillment", () => {
     expect(recommendFulfillment({ ...award, kind: "cash" }, person).choice).toBe("cash");
   });
 });
+
+describe("policy date and name validation", () => {
+  it("rejects impossible, offset-less and future dates instead of trusting Date.parse", async () => {
+    const { parseCalendarDate, parseInstant } = await import("@/lib/engines");
+    expect(parseCalendarDate("2026-02-30")).toBeUndefined();
+    expect(parseCalendarDate("2026-13-01")).toBeUndefined();
+    expect(parseCalendarDate("2028-02-29")).toEqual({ year: 2028, month: 2, day: 29 });
+    expect(parseInstant("2026-10-23T08:00:00")).toBeUndefined(); // no offset: server-zone dependent
+    expect(parseInstant("2026-10-23T25:00:00Z")).toBeUndefined();
+    expect(parseInstant("2026-10-23")).toBe(Date.UTC(2026, 9, 23));
+    expect(() => ageOn("2008-02-30", "2026-10-23")).toThrow(EngineError);
+    expect(() => ageOn("2030-01-01", "2026-10-23")).toThrow(/after the event/);
+    expect(ageOn("2008-02-29", "2026-02-28")).toBe(17);
+    expect(ageOn("2008-02-29", "2026-03-01")).toBe(18);
+  });
+
+  it("fails checks with readable details rather than throwing on bad event or claim dates", () => {
+    expect(failed(run({ travelDate: "2026-10-23T08:00:00" }))).toContain("travel_dates");
+    expect(failed(run({ purchasedAt: "yesterday" }))).toContain("purchase_date");
+    expect(failed(run({ purchasedAt: "2026-12-01T00:00:00Z" }))).toContain("purchase_date");
+    const bad = checkClaim({ claim, person, event: { ...event, startsAt: "nope", bookingDeadline: "2026-02-31" }, org: { ...org, agentLimitMinor: "x" }, existingClaims: [], asOf: "2026-10-26T00:00:00Z" });
+    expect(failed(bad)).toEqual(expect.arrayContaining(["travel_dates", "booking_deadline", "agent_limit", "adult"]));
+    expect(failed(run({}, { person: { ...person, dateOfBirth: "2004-13-01" } } as never))).toContain("adult");
+  });
+
+  it("keeps non-Latin names and refuses to call different scripts a mismatch", async () => {
+    const { compareNames, normalizeName } = await import("@/lib/engines");
+    expect(normalizeName("Мария Иванова")).toEqual(["мария", "иванова"]);
+    expect(compareNames("Мария Иванова", "Мария Иванова")).toBe("match");
+    expect(compareNames("Мария Иванова", "Ольга Петрова")).toBe("mismatch");
+    expect(compareNames("李小龙", "李小龙")).toBe("match");
+    expect(compareNames("李小龙", "LI/XIAOLONG")).toBe("uncomparable");
+    expect(compareNames("Jörg Straße", "STRASSE/JORG MR")).toBe("match");
+    expect(compareNames("Søren Kierkegaard", "KIERKEGAARD/SOREN")).toBe("match");
+    expect(compareNames("Anne-Marie Lee", "ANNEMARIE LEE")).toBe("match");
+    expect(compareNames("", "LEE/MARCUS")).toBe("uncomparable");
+    const r = checkClaim({ claim: { ...claim, personName: "LI/XIAOLONG" }, person: { ...person, name: "李小龙" }, event, org, existingClaims: [], asOf: "2026-10-26T00:00:00Z" });
+    expect(r.checks.find((c) => c.code === "name_match")?.detail).toMatch(/different scripts/);
+    expect(r.status).toBe("escalated");
+  });
+});
