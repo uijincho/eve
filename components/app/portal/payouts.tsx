@@ -59,9 +59,14 @@ export function PortalPayouts() {
   );
 }
 
+const COUNTRY_CURRENCY: Record<string, string> = {
+  US: "USD", CA: "CAD", GB: "GBP", DE: "EUR", FR: "EUR", ES: "EUR", IT: "EUR", NL: "EUR", IE: "EUR",
+  IN: "INR", MX: "MXN", JP: "JPY", BR: "BRL", AU: "AUD",
+};
+
 function PayoutMethod({ me }: { me: Person }) {
   const [last4, setLast4] = useState("");
-  const [currency, setCurrency] = useState(me.payoutCurrency || "USD");
+  const [currency, setCurrency] = useState(me.payoutCurrency || COUNTRY_CURRENCY[me.country] || "USD");
   const [error, setError] = useState<string | null>(null);
   return (
     <Section title="Payout account">
