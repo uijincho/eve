@@ -260,7 +260,7 @@ function Controls({ data, state, scenario, setScenario, pending, send, notice }:
               >
                 <input type="radio" name="scenario" value={s.id} checked={scenario === s.id} onChange={() => setScenario(s.id)} className="mt-0.5 size-4 accent-foreground" />
                 <span className="flex flex-col gap-0.5">
-                  <span className="font-medium">{s.label}</span>
+                  <span className="flex flex-wrap items-center gap-2 font-medium">{s.label}{s.drill ? <Badge variant="outline">Drill</Badge> : null}</span>
                   <span className="text-small text-muted-foreground">{s.summary}</span>
                   <span className="text-small text-muted-foreground">Expect: {s.expected}</span>
                 </span>
@@ -530,7 +530,9 @@ function Usage({ state }: { state: LabState | null }) {
   if (!state) return null;
   const cached = state.totals.inputTokens ? Math.round((state.totals.cacheReadTokens / state.totals.inputTokens) * 100) : 0;
   const rows: [string, string][] = [
-    ["Model", `${state.model}, effort ${state.effort}`],
+    ["Model requested", `${state.model}, effort ${state.effort}`],
+    ["Answered by", state.servedBy.length ? state.servedBy.join(", ") : "No turns yet"],
+    ["Refusal fallbacks", String(state.fallbacks)],
     ["Claude turns", String(state.turns.length)],
     ["Input tokens", `${state.totals.inputTokens.toLocaleString()} (${cached}% from cache)`],
     ["Output tokens", state.totals.outputTokens.toLocaleString()],
@@ -597,7 +599,9 @@ function TurnRow({ turn, sessionId }: { turn: TurnLog; sessionId: string }) {
           <span className="text-caption text-muted-foreground tabular-nums">
             {(turn.ms / 1000).toFixed(1)} s{moved ? ` · ${PAGE_LABELS[turn.pageBefore]} → ${PAGE_LABELS[turn.pageAfter]}` : ` · ${PAGE_LABELS[turn.pageAfter]}`}
           </span>
+          <span className="font-mono text-caption text-muted-foreground">{turn.model}</span>
         </div>
+        {turn.fellBackFrom ? <p className="text-small text-muted-foreground">{turn.fellBackFrom} declined this turn; {turn.model} answered instead.</p> : null}
         {turn.notes.length > 0 ? <p className="max-w-[62ch]">{turn.notes.join(" ")}</p> : null}
         {turn.actions.length > 0 ? (
           <ul className="flex flex-col gap-1 text-small">

@@ -16,7 +16,8 @@
     "verify:workflow": "tsx scripts/verify-workflow.ts",
     "verify:demo": "tsx scripts/verify-demo.ts",
     "verify:ocr": "tsx scripts/verify-ocr.ts",
-    "verify:computer-use": "tsx scripts/verify-computer-use.ts"
+    "verify:computer-use": "tsx scripts/verify-computer-use.ts",
+    "verify:portal": "tsx scripts/verify-portal.ts"
   },
   "engines": {
     "node": "24.x"

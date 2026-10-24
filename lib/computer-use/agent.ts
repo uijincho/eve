@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { BetaMessage, BetaMessageParam, BetaToolUnion } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 
-import { DEMO_PACKET, dollars } from "./packet";
+import { dollars, type PortalPacket } from "./packet";
 
 export const MODEL = process.env.EVE_COMPUTER_USE_MODEL || "claude-opus-5-5";
 type Effort = "low" | "medium" | "high" | "xhigh" | "max";
@@ -25,7 +25,7 @@ How to work:
 - Before each batch, write one short sentence saying what you are doing and why. Organizers read these as the audit trail.
 
 Hard limits:
-- Never type a taxpayer identification number (SSN, ITIN or EIN). The payee is a foreign person with Form W-8BEN on file and has none. If the portal will not continue without one, call escalate_to_controller naming the field, then stop.
+- Never type a taxpayer identification number (SSN, ITIN or EIN). Eve keeps them in its vault and never gives them to you. If the portal will not continue without one, call escalate_to_controller naming the field, then stop.
 - When the Review page appears, do not click or type anything. Compare it with the packet, then end your turn with a short summary. Submitting needs controller approval, which arrives as a system message.
 - After approval, click "Submit request" once. When the confirmation page appears, call report_submitted with the confirmation number.
 
@@ -66,12 +66,16 @@ export const TOOLS: BetaToolUnion[] = [
   },
 ];
 
-/** One agent turn. Fallbacks are on so a safety decline is retried on a fallback model instead of stopping the run. */
-export function nextTurn(messages: BetaMessageParam[]): Promise<BetaMessage> {
+/**
+ * One agent turn. Fallbacks are on so a safety decline is retried on a fallback model instead of
+ * stopping the run. `drill` appends a lab-only operator instruction that tells Claude to try to
+ * break a rule, so the guardrail drills can show the code blocking it; the product never sets it.
+ */
+export function nextTurn(messages: BetaMessageParam[], drill?: string): Promise<BetaMessage> {
   return anthropic().beta.messages.create({
     model: MODEL,
     max_tokens: 16000,
-    system: SYSTEM_PROMPT,
+    system: drill ? `${SYSTEM_PROMPT}\n\n${drill}` : SYSTEM_PROMPT,
     tools: TOOLS,
     messages,
     thinking: { type: "adaptive", display: "summarized" },
@@ -110,7 +114,7 @@ const fileName = (full: string) => full.split("/").pop() ?? full;
  * Reads the Review page from a screenshot and compares it with the packet, field by field.
  * Runs before a controller is asked to approve, so they see whether the portal matches Eve's numbers.
  */
-export async function checkReviewPage(screenshotBase64: string): Promise<ReviewCheck[]> {
+export async function checkReviewPage(screenshotBase64: string, p: PortalPacket): Promise<ReviewCheck[]> {
   const properties = Object.fromEntries(Object.keys(REVIEW_FIELDS).map((k) => [k, { type: "string" }]));
   const response = await anthropic().messages.create({
     model: MODEL,
@@ -129,7 +133,7 @@ export async function checkReviewPage(screenshotBase64: string): Promise<ReviewC
   });
   const text = response.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
   const seen = JSON.parse(text) as Record<ReviewKey, string>;
-  const p = DEMO_PACKET;
+  const taxForm = p.documents.taxForm;
   const expected: Record<ReviewKey, [string, (portal: string) => boolean]> = {
     payee: [p.payee.name, (v) => v.trim() === p.payee.name],
     country: [p.payee.country, (v) => v.trim() === p.payee.country],
@@ -140,7 +144,7 @@ export async function checkReviewPage(screenshotBase64: string): Promise<ReviewC
     account_code: [p.accountCode, (v) => v.includes("5300")],
     method: [p.paymentMethod, (v) => v.trim() === p.paymentMethod],
     supporting_document: [fileName(p.documents.supporting), (v) => v.includes(fileName(p.documents.supporting))],
-    tax_form: [fileName(p.documents.taxForm), (v) => v.includes(fileName(p.documents.taxForm))],
+    tax_form: taxForm ? [fileName(taxForm), (v) => v.includes(fileName(taxForm))] : ["Not required", (v) => /not required/i.test(v)],
   };
   return (Object.keys(REVIEW_FIELDS) as ReviewKey[]).map((key) => {
     const [packet, matches] = expected[key];

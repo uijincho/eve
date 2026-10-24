@@ -550,6 +550,9 @@ export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: 
   if (actor.role !== "controller") throw forbidden("Submitting a packet releases money through the sponsor, so only a controller can do it.");
   const { pk, payout: pk0 } = await loadPacket(tx, actor, p.id);
   if (pk.status !== "draft" && pk.status !== "questioned") throw conflict(`Packet is ${pk.status}.`);
+  const [portal] = await tx.select({ id: s.portalRun.id }).from(s.portalRun)
+    .where(and(eq(s.portalRun.packetId, pk.id), inArray(s.portalRun.status, [...s.PORTAL_RUN_ACTIVE])));
+  if (portal) throw conflict("Eve is entering this packet on the sponsor portal. Approve or stop that run instead, so the packet is not submitted twice.");
   const { org: orgNow } = await loadOrgEvent(tx, actor.orgId);
   if ((pk.feesPaidBy ?? "org") !== orgNow.feesPaidBy) {
     // The fee bearer is part of the authorized terms: a policy change after drafting needs a new packet.
@@ -777,6 +780,10 @@ async function flightRequest(tx: Executor, actor: ActorContext, p: { personId?: 
 
 // ----------------------------------------------------------------- table
 
+const portalRouteOnly: Handler = async () => {
+  throw new ActionError(400, "Portal runs are started from POST /api/actions, outside a database transaction.");
+};
+
 const handlers: Record<AppAction, Handler> = {
   "org.update": orgUpdate as Handler,
   "event.update": eventUpdate as Handler,
@@ -818,6 +825,10 @@ const handlers: Record<AppAction, Handler> = {
   "sponsor.create": sponsorCreate as Handler,
   "sponsor.submit": sponsorSubmit as Handler,
   "sponsor.reconcile": reconcilePacket as Handler,
+  // Started, resumed and stopped by the actions route (lib/computer-use/portal-run.ts), never inside a transaction.
+  "sponsor.portalStart": portalRouteOnly,
+  "sponsor.portalDecide": portalRouteOnly,
+  "sponsor.portalStop": portalRouteOnly,
   "period.lock": (async (tx, actor, p) => {
     const r = await lockPeriod(tx, { orgId: actor.orgId, month: p.period, lockedBy: actor.memberId });
     await recordDecision(tx, { orgId: actor.orgId, objectType: "period", objectId: p.period, action: "period.lock", summary: `Locked ${r.startsOn} to ${r.endsOn}. New entries in this period are rejected.`, actor, status: "done", tool: "lockPeriod" });

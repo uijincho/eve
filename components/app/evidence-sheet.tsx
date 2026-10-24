@@ -87,7 +87,12 @@ export function EvidenceSheet({
                     </dl>
                   ) : null}
                   {d.checks?.length ? <CheckList checks={d.checks} /> : null}
-                  {d.documentId ? (
+                  {d.documentId && d.tool === "portalAgent" ? (
+                    <a href={documentUrl(d.documentId)} target="_blank" rel="noreferrer" className="self-start overflow-hidden rounded-md border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- stored screenshot served by the documents route */}
+                      <img src={documentUrl(d.documentId)} alt="Portal screen after this step" width={256} height={192} loading="lazy" className="block aspect-[4/3] w-64 bg-rail" />
+                    </a>
+                  ) : d.documentId ? (
                     <a href={documentUrl(d.documentId)} target="_blank" rel="noreferrer" className="self-start text-small underline decoration-faint decoration-dotted underline-offset-4 hover:decoration-foreground">
                       Source document
                     </a>

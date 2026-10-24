@@ -92,6 +92,9 @@ export const payloads = {
 
   sponsorCreate: (payoutId: string) => call("sponsor.create", { payoutId }),
   sponsorSubmit: (id: string) => call("sponsor.submit", { id }),
+  portalStart: (packetId: string) => call("sponsor.portalStart", { id: packetId }),
+  portalDecide: (portalRunId: string, decision: "approve" | "reject") => call("sponsor.portalDecide", { id: portalRunId, decision }),
+  portalStop: (portalRunId: string) => call("sponsor.portalStop", { id: portalRunId }),
   sponsorReconcile: (id: string, fields: { acceptShortfall?: boolean; paidMinor?: string; note?: string }) =>
     call("sponsor.reconcile", { id, ...stripEmpty(fields) }),
 

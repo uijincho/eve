@@ -99,6 +99,7 @@ export function fixtureSnapshot(): AppSnapshot {
       { id: "b-prizes", name: "Prizes", capMinor: "2500000", spentMinor: "0", committedMinor: "2780000", fundingSource: "Sponsors" },
       { id: "b-food", name: "Food", capMinor: "3000000", spentMinor: "2210000", committedMinor: "300000", fundingSource: "Sponsors" },
     ],
+    portalRuns: [],
     packets: [
       { id: "SP-0112", payoutId: "PO-3", personName: "Ana Silva", requestedMinor: "100000", paidMinor: "97000", status: "exception", submittedAt: at(-60 * 24 * 9), dueAt: at(60 * 24 * 5), reason: "Remittance shows a $30.00 wire fee deducted." },
     ],

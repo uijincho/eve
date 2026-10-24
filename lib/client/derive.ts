@@ -9,6 +9,7 @@ import type {
   Decision,
   Payout,
   Person,
+  PortalRun,
   SponsorPacket,
 } from "@/lib/contracts";
 
@@ -258,8 +259,48 @@ export type InboxItem = {
     | { kind: "claim"; claim: Claim }
     | { kind: "award"; award: Award; person?: Person; payout?: Payout }
     | { kind: "packet"; packet: SponsorPacket }
+    | { kind: "portal"; run: PortalRun; packet: SponsorPacket }
     | { kind: "person"; person: Person };
 };
+
+// ── Sponsor portal runs (computer use) ────────────────────────────────────
+
+export const PORTAL_ACTIVE: PortalRun["status"][] = ["starting", "filling", "awaiting_approval", "submitting"];
+
+export function isPortalActive(run: Pick<PortalRun, "status">): boolean {
+  return PORTAL_ACTIVE.includes(run.status);
+}
+
+/** The newest portal run for a packet, if Eve has been asked to fill the sponsor portal for it. */
+export function portalRunFor(s: Pick<AppSnapshot, "portalRuns">, packetId: string): PortalRun | undefined {
+  return (s.portalRuns ?? []).filter((r) => r.packetId === packetId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+}
+
+export const PORTAL_STATUS: Record<PortalRun["status"], { label: string; variant: "outline" | "secondary" | "positive" | "critical" }> = {
+  starting: { label: "Starting", variant: "outline" },
+  filling: { label: "Filling", variant: "outline" },
+  awaiting_approval: { label: "Needs approval", variant: "outline" },
+  submitting: { label: "Submitting", variant: "outline" },
+  submitted: { label: "Submitted", variant: "positive" },
+  escalated: { label: "Escalated", variant: "outline" },
+  rejected: { label: "Rejected", variant: "critical" },
+  failed: { label: "Failed", variant: "critical" },
+  stopped: { label: "Stopped", variant: "secondary" },
+};
+
+export function portalStatusLine(run: PortalRun): string {
+  switch (run.status) {
+    case "starting": return "Creating a desktop with no internet and opening the sponsor portal.";
+    case "filling": return `Filling the ${run.pageLabel} page (turn ${run.turns}).`;
+    case "awaiting_approval": return "Stopped on the portal's Review page before Submit. Nothing is submitted until a controller approves.";
+    case "submitting": return `Approved by ${run.approvedByName ?? "a controller"}. Eve is pressing Submit once.`;
+    case "submitted": return `Submitted. Portal confirmation ${run.confirmation}.`;
+    case "escalated": return "Eve stopped and asked the controller to decide. Nothing was submitted.";
+    case "rejected": return "Rejected at Review. Nothing was submitted.";
+    case "failed": return run.error ?? "The run failed. Nothing was submitted.";
+    case "stopped": return "Stopped. Nothing was submitted.";
+  }
+}
 
 const CATEGORY_RANK: Record<InboxCategory, number> = { exceptions: 0, approvals: 1, holds: 2 };
 
@@ -485,6 +526,36 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
     });
   }
 
+  // Eve on the sponsor portal: a Review page waiting for a controller, or a run that needs a person.
+  for (const k of s.packets) {
+    const run = portalRunFor(s, k.id);
+    if (!run) continue;
+    const unreconciled = run.status === "failed" && !!run.confirmation;
+    if (run.status !== "awaiting_approval" && !(run.status === "escalated" && k.status === "draft") && !unreconciled) continue;
+    const checks = run.reviewCheck ?? [];
+    const differ = checks.filter((c) => !c.ok).length;
+    items.push({
+      id: `portal:${run.id}`,
+      category: run.status === "awaiting_approval" ? "approvals" : "exceptions",
+      title: run.status === "awaiting_approval" ? `Approve the sponsor portal submission for ${k.personName}`
+        : unreconciled ? `Portal accepted ${run.confirmation}, but the packet is not submitted in Eve`
+          : `Sponsor portal needs a person: ${run.escalation?.field ?? "Eve stopped"}`,
+      mark: "Portal",
+      meta: `Packet ${k.id} · ${k.personName} · sponsor portal (fictional demo)`,
+      detail: run.status === "awaiting_approval"
+        ? checks.length ? `Eve stopped on Review before Submit. ${checks.length - differ} of ${checks.length} values match the packet${differ ? `; ${differ} differ` : ""}.` : "Eve stopped on Review before Submit. Check the screenshot before approving."
+        : unreconciled ? run.error ?? ""
+          : run.escalation?.reason ?? portalStatusLine(run),
+      amountMinor: big(k.requestedMinor),
+      currency: "USD",
+      amountNote: "net to payee",
+      dueAt: run.status === "awaiting_approval" ? new Date(Date.parse(run.updatedAt) + 25 * 60_000).toISOString() : k.dueAt,
+      dueContext: run.status === "awaiting_approval" ? "desktop closes" : "packet",
+      critical: differ ? `${differ} ${differ === 1 ? "value differs" : "values differ"}` : undefined,
+      ref: { kind: "portal", run, packet: k },
+    });
+  }
+
   for (const p of s.people) {
     if (heldPeople.has(p.id)) continue;
     if ((p.taxStatus === "expired" || p.taxStatus === "review") && big(p.outstandingMinor) > 0n) {
@@ -632,6 +703,7 @@ export function runCounters(runs: Run[], now: string) {
 export function hasLiveWork(s: AppSnapshot | null): boolean {
   if (!s) return false;
   return (
+    (s.portalRuns ?? []).some(isPortalActive) ||
     s.decisions.some((d) => d.status === "running") ||
     s.payouts.some((p) => p.status === "processing") ||
     s.claims.some((c) => c.status === "processing" || c.status === "submitted")

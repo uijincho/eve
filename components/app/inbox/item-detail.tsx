@@ -3,6 +3,7 @@
 import { PenLineIcon } from "lucide-react";
 
 import { CheckList } from "@/components/app/evidence-sheet";
+import { PortalRunPanel } from "@/components/app/portal-run-panel";
 import { PrizeComparison } from "@/components/app/prize-comparison";
 import { StatusBadge } from "@/components/app/status-badge";
 import { BreakdownBar } from "@/components/eve/breakdown-bar";
@@ -58,6 +59,8 @@ export function ItemDetail({
 function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot }) {
   const ref = item.ref;
   switch (ref.kind) {
+    case "portal":
+      return <PortalRunPanel run={ref.run} packet={ref.packet} snapshot={snapshot} actions={false} />;
     case "award":
       return <PrizeComparison snapshot={snapshot} award={ref.award} person={ref.person} payout={ref.payout} />;
     case "payout":

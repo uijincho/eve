@@ -35,6 +35,8 @@ export interface BootOptions {
   password: string;
   documents: { path: string; bytes: Uint8Array }[];
   onProgress?: (message: string) => void;
+  /** Called as soon as the sandbox exists, so a retried boot can delete an orphan. */
+  onCreated?: (sandboxId: string) => Promise<void> | void;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -107,6 +109,7 @@ export async function bootComputer(opts: BootOptions): Promise<Computer> {
     metadata: { purpose: "eve-computer-use-lab" },
   });
   try {
+    await opts.onCreated?.(desktop.sandboxId);
     if (offline) {
       // Measure it rather than trust the flag: a raw IP skips DNS, so a pass here means no route out at all.
       progress("Checking the sandbox cannot reach the internet");

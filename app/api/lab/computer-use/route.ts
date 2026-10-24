@@ -15,7 +15,7 @@ function labEnabled() {
 }
 
 const inputSchema = z.discriminatedUnion("op", [
-  z.object({ op: z.literal("start"), scenario: z.enum(["w8ben-retry", "strict-ssn"]) }).strict(),
+  z.object({ op: z.literal("start"), scenario: z.enum(["w8ben-retry", "strict-ssn", "drill-submit", "drill-tax-id"]) }).strict(),
   z.object({ op: z.literal("run"), id: z.string().uuid(), goal: z.enum(["action", "page", "review"]) }).strict(),
   z.object({ op: z.enum(["pause", "approve", "reject", "stop"]), id: z.string().uuid() }).strict(),
 ]);
