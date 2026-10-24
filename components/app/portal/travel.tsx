@@ -86,6 +86,7 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<ActionResult | null>(null);
   const [offers, setOffers] = useState<Offer[]>([]);
+  const [rejected, setRejected] = useState<{ id: string; reason: string }[]>([]);
   const requests = s.claims.filter((c) => c.personId === me.id && c.type === "travel");
 
   return (
@@ -102,9 +103,11 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
             setPending(true);
             const r = await act(payloads.flightSearch({ origin: code, date: date || undefined, personId: me.id }));
             setPending(false);
-            setResult(r.ok ? null : r);
-            setOffers(r.ok ? readOffers(r.data, code) : []);
-            if (r.ok && !readOffers(r.data, code).length) setResult({ ok: false, message: "No fares under the cap for that route and date." });
+            const found = r.ok ? readOffers(r.data, code) : [];
+            setOffers(found);
+            setRejected(r.ok && Array.isArray(r.data?.rejected) ? (r.data.rejected as { id: string; reason: string }[]) : []);
+            // The server says why nothing qualified (cap, cabin, or timing); show that, not a guess.
+            setResult(r.ok && found.length ? null : r.ok ? { ok: false, message: r.message || "No fare meets the travel policy for that route." } : r);
           }}
         >
           <Field label="From airport" error={error} className="w-36">
@@ -119,6 +122,17 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
           </Button>
           <span role="status" aria-live="polite">{result ? <ResultText result={result} /> : null}</span>
         </form>
+        {!offers.length && rejected.length ? (
+          <details className="rounded-xl border px-4 py-3 text-small">
+            <summary className="cursor-pointer font-medium">Why {rejected.length} {rejected.length === 1 ? "fare was" : "fares were"} left out</summary>
+            <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-muted-foreground">
+              {rejected.map((x) => (
+                <li key={x.id}>{x.reason.charAt(0).toUpperCase() + x.reason.slice(1)}.</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-muted-foreground">Ask an organizer for an exception, or book it yourself and upload the e-ticket on Claims.</p>
+          </details>
+        ) : null}
         {offers.length ? (
           <ul className="flex flex-col divide-y rounded-xl border" aria-label="Suggested fares">
             {offers.slice(0, 3).map((o, i) => (
