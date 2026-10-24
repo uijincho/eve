@@ -87,6 +87,11 @@ export function claimStatusLabel(c: Pick<Claim, "category" | "status">): string 
   return isOrgBookedFlight(c) && c.status === "paid" ? "Booked" : undefined;
 }
 
+/** The currency Eve keeps its books in: payouts, budgets, claim totals and person totals. */
+export function booksCurrency(s: Pick<AppSnapshot, "org">): string {
+  return s.org.booksCurrency ?? "USD";
+}
+
 /** A persona's name for an actor id ("mem_demo_ari" -> "Ari Novak"); the id itself if unknown. */
 export function actorName(s: Pick<AppSnapshot, "personas">, id?: string): string {
   if (!id) return "";
@@ -561,12 +566,16 @@ export type PrizeOptions = {
   rule?: AppSnapshot["rules"][number];
   /** True when the figures come from a proposed payout rather than an estimate. */
   fromPayout: boolean;
+  /** Currency of gross, withholding and cashNet. */
+  currency: string;
 };
 
 export function prizeOptions(s: Pick<AppSnapshot, "rules" | "org"> & { now?: string }, award: Award, person?: Person, payout?: Payout): PrizeOptions {
   // A proposed payout names the rule it used; otherwise estimate one.
   const rule = (payout && s.rules.find((r) => r.id === payout.ruleId && r.version === payout.ruleVersion)) ?? prizeRule(s, person, award.kind);
-  const gross = big(award.amountMinor);
+  // A payout is in the books currency (converted on the payment date); before one exists, the award's own currency.
+  const gross = payout ? big(payout.grossMinor) : big(award.amountMinor);
+  const currency = payout ? payout.currency : award.currency;
   const withholding = payout ? big(payout.withholdingMinor) : rule ? (gross * BigInt(rule.rateBps)) / 10000n : 0n;
   // The engine leads with its choice ("Buy it locally. …", "Cash equivalent: …");
   // later text mentions the other options, so only the opening phrase decides.
@@ -585,6 +594,7 @@ export function prizeOptions(s: Pick<AppSnapshot, "rules" | "org"> & { now?: str
     gross,
     withholding,
     cashNet: payout ? big(payout.netMinor) : gross - withholding,
+    currency,
     ship: big(award.shippingMinor),
     local: big(award.localMinor),
     recommended,

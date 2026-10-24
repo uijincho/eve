@@ -9,6 +9,7 @@ import { EvidenceSheet } from "@/components/app/evidence-sheet";
 import { PayoutBreakdown } from "@/components/app/inbox/item-detail";
 import { heldOnUnverifiedRule, ResolvePayoutRule } from "@/components/app/resolve-rule";
 import { LinkButton } from "@/components/app/link-button";
+import { BooksCurrencyNote } from "@/components/app/books-currency-note";
 import { PageFrame } from "@/components/app/page-frame";
 import { VerifyCode } from "@/components/app/verify-code";
 import { Sheet } from "@/components/app/sheet";
@@ -104,6 +105,7 @@ export function PayoutsView() {
               />
             </div>
 
+            <BooksCurrencyNote snapshot={s} />
             {filter === "release" ? (
               <div className="flex flex-col gap-3 rounded-xl border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex flex-col">

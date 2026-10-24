@@ -132,10 +132,10 @@ export function LimitsForm({ snapshot: s, submitLabel = "Save limits", onSaved }
   return (
     <div className="flex max-w-xl flex-col gap-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Agent auto-approve limit (USD)" error={errors.agent} help="Clean, in-policy claims at or under this are approved by Eve. Payouts still need a controller.">
+        <Field label={`Agent auto-approve limit (${s.org.currency})`} error={errors.agent} help="Clean, in-policy claims at or under this are approved by Eve. Payouts still need a controller.">
           {(p) => <Input {...p} inputMode="decimal" value={agent} onChange={(e) => setAgent(e.target.value)} />}
         </Field>
-        <Field label="Organizer approval limit (USD)" error={errors.organizer} help="Above this, a controller decides.">
+        <Field label={`Organizer approval limit (${s.org.currency})`} error={errors.organizer} help="Above this, a controller decides.">
           {(p) => <Input {...p} inputMode="decimal" value={organizer} onChange={(e) => setOrganizer(e.target.value)} />}
         </Field>
       </div>
@@ -223,7 +223,7 @@ export function TravelPolicyForm({ snapshot: s }: { snapshot: AppSnapshot }) {
   return (
     <div className="flex max-w-xl flex-col gap-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Travel cap per person (USD)" error={errors.cap} help="Receipts in other currencies convert on the purchase date before the cap check.">
+        <Field label={`Travel cap per person (${s.org.currency})`} error={errors.cap} help="Receipts in other currencies convert on the purchase date before the cap check.">
           {(p) => <Input {...p} inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} />}
         </Field>
         <Field label="Booking deadline">{(p) => <Input {...p} type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} />}</Field>

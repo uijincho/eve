@@ -98,7 +98,7 @@ function BudgetTab({ snapshot: s }: { snapshot: AppSnapshot }) {
         <h2 className="text-subheading">Add a line</h2>
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Name" error={errors.name}>{(p) => <Input {...p} value={name} onChange={(e) => setName(e.target.value)} placeholder="Swag" />}</Field>
-          <Field label="Cap (USD)" error={errors.cap}>{(p) => <Input {...p} inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} placeholder="8000" />}</Field>
+          <Field label={`Cap (${s.org.currency})`} error={errors.cap}>{(p) => <Input {...p} inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} placeholder="8000" />}</Field>
           <Field label="Funding source">{(p) => <Input {...p} value={source} onChange={(e) => setSource(e.target.value)} />}</Field>
         </div>
         <ActionButton

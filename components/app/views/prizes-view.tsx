@@ -80,8 +80,8 @@ export function PrizesView() {
               const o = prizeOptions(s, a, people.get(a.personId), payout);
               return (
                 <span className="flex flex-col items-end">
-                  <Money amountMinor={o.gross} currency={a.currency} className="font-semibold" />
-                  <Money amountMinor={o.cashNet} currency={a.currency} estimate={!o.fromPayout} className="text-caption text-muted-foreground" />
+                  <Money amountMinor={big(a.amountMinor)} currency={a.currency} className="font-semibold" />
+                  <Money amountMinor={o.cashNet} currency={o.currency} estimate={!o.fromPayout} className="text-caption text-muted-foreground" />
                 </span>
               );
             },
@@ -247,6 +247,7 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
   const [track, setTrack] = useState("");
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<Award["kind"]>("item");
+  const [currency, setCurrency] = useState(s.org.currency);
   const [amount, setAmount] = useState("");
   const [team, setTeam] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -265,7 +266,7 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
         if (!personId && team.length < 2) next.person = team.length === 1 ? "A team needs at least two members, or choose one winner." : "Choose the winner.";
         if (!track.trim()) next.track = "Name the track, like First Overall.";
         if (!title.trim()) next.title = kind === "item" ? "Name the item, like MacBook Air." : "Name the prize.";
-        if (!minor || minor === "0") next.amount = kind === "item" ? "Enter the item's fair market value in USD." : "Enter the cash amount in USD.";
+        if (!minor || minor === "0") next.amount = kind === "item" ? `Enter the item's fair market value in ${currency}.` : `Enter the cash amount in ${currency}.`;
         setErrors(next);
         if (Object.keys(next).length) return;
         setPending(true);
@@ -276,7 +277,7 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
             title: title.trim(),
             kind,
             amountMinor: minor!,
-            currency: "USD",
+            currency,
           }),
         );
         setPending(false);
@@ -311,9 +312,18 @@ function WinnerForm({ snapshot: s, onCreated }: { snapshot: AppSnapshot; onCreat
             </NativeSelect>
           )}
         </Field>
-        <Field label={kind === "item" ? "Fair market value (USD)" : "Amount (USD)"} error={errors.amount}>
-          {(p) => <Input {...p} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1,299.00" />}
-        </Field>
+        <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
+          <Field label={kind === "item" ? "Fair market value" : "Amount"} error={errors.amount}>
+            {(p) => <Input {...p} inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1,299.00" />}
+          </Field>
+          <Field label="Currency">
+            {(p) => (
+              <NativeSelect {...p} value={currency} onChange={(e) => setCurrency(e.target.value)} disabled={s.org.currency === "USD"}>
+                {[...new Set([s.org.currency, "USD"])].map((c) => <option key={c}>{c}</option>)}
+              </NativeSelect>
+            )}
+          </Field>
+        </div>
       </div>
       <fieldset className="flex flex-col gap-1.5">
         <legend className="text-small font-medium">Team prize (optional)</legend>

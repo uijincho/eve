@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ActionButton } from "@/components/app/action-button";
+import { BooksCurrencyNote } from "@/components/app/books-currency-note";
 import { PageFrame } from "@/components/app/page-frame";
 import { Section } from "@/components/app/page-header";
 import { EmptyState } from "@/components/app/states";
@@ -32,6 +33,7 @@ export function BudgetView() {
         return s.budgets.length ? (
           <>
             <CapacityBar label="Whole event" capMinor={Number(t.cap)} spentMinor={Number(t.spent)} committedMinor={Number(t.committed)} className="max-w-3xl" />
+            <BooksCurrencyNote snapshot={s} />
             <Section title="Lines" aside="Spent, committed, and remaining against each cap">
               <ul className="grid max-w-3xl gap-6">
                 {s.budgets.map((b) => (

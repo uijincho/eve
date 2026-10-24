@@ -44,7 +44,7 @@ export function PrizeComparison({
         </div>
         <BreakdownBar
           grossMinor={Number(inKind ? BigInt(payout.grossMinor) : o.gross)}
-          currency={award.currency}
+          currency={inKind ? payout.currency : o.currency}
           estimate={!inKind && !o.fromPayout}
           netLabel={inKind ? `Item value delivered to ${first}` : `${o.fromPayout ? "Net" : "Est. net"} to ${first}`}
           deductions={[
@@ -72,7 +72,7 @@ export function PrizeComparison({
             <>
               <dt className="text-muted-foreground">Fees</dt>
               <dd>
-                <Money amountMinor={fees.org} currency={award.currency} /> paid by the organization
+                <Money amountMinor={fees.org} currency={payout?.currency ?? o.currency} /> paid by the organization
               </dd>
             </>
           ) : null}
@@ -98,7 +98,7 @@ export function PrizeComparison({
               <Money amountMinor={o.local} currency={award.currency} estimate />
             </Option>
             <Option label="Cash equivalent" note="net after withholding" chosen={award.fulfillment === "cash"}>
-              <Money amountMinor={o.cashNet} currency={award.currency} estimate={!o.fromPayout} />
+              <Money amountMinor={o.cashNet} currency={o.currency} estimate={!o.fromPayout} />
             </Option>
           </dl>
           <p className="text-small text-muted-foreground">

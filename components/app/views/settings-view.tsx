@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { AccountingExports } from "@/components/app/accounting-exports";
 import { ActionButton } from "@/components/app/action-button";
+import { BooksCurrencyNote } from "@/components/app/books-currency-note";
 import { PageFrame } from "@/components/app/page-frame";
 import { Section } from "@/components/app/page-header";
 import {
@@ -30,7 +31,10 @@ export function SettingsView() {
         <div className="flex max-w-3xl flex-col gap-12">
           <ReadOnlyNote permission={canManage(s.actor)} />
           <Section title="Organization"><OrgIdentityForm snapshot={s} /></Section>
-          <Section title="Approval limits"><LimitsForm snapshot={s} /></Section>
+          <Section title="Approval limits">
+            <BooksCurrencyNote snapshot={s} />
+            <LimitsForm snapshot={s} />
+          </Section>
           <Section title="Money movement"><MoneyMovementForm snapshot={s} /></Section>
           <Section title="Travel policy"><TravelPolicyForm snapshot={s} /></Section>
           <Section title="Notifications"><NotificationsForm snapshot={s} /></Section>
