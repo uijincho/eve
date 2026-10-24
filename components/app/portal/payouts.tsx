@@ -10,6 +10,7 @@ import { VerifyCode } from "@/components/app/verify-code";
 import { Input } from "@/components/ui/input";
 import type { Person } from "@/lib/contracts";
 import { fmtDateTime } from "@/lib/client/format";
+import { payoutSource } from "@/lib/client/derive";
 import { payloads } from "@/lib/client/payloads";
 
 import { PortalFrame } from "./portal-frame";
@@ -28,7 +29,7 @@ export function PortalPayouts() {
                   {mine.map((p) => (
                     <li key={p.id} className="flex flex-col gap-3 border-b pb-8 last:border-b-0">
                       <div className="flex flex-col">
-                        <span className="font-semibold">{p.sourceType === "award" ? "Prize" : "Reimbursement"} · {p.sourceId}</span>
+                        <span className="font-semibold">{p.sourceType === "award" ? "Prize" : "Reimbursement"} · {payoutSource(s, p)}</span>
                         <span className="text-small text-muted-foreground">{p.status === "paid" ? `Paid ${fmtDateTime(p.paidAt)}` : p.reason}</span>
                       </div>
                       <PayoutBreakdown payout={p} />
@@ -43,7 +44,7 @@ export function PortalPayouts() {
               {frozen ? (
                 <Section title="Confirm your new account">
                   <p className="text-small text-muted-foreground">We sent a 6-digit code to {me.email}, the address you registered with. It is also in your portal messages.</p>
-                  <VerifyCode personId={me.id} personName={me.name} primary />
+                  <VerifyCode personId={me.id} personName={me.name} self primary />
                 </Section>
               ) : null}
               <PayoutMethod me={me} />

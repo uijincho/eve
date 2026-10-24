@@ -1,6 +1,6 @@
 "use client";
 
-import { DownloadIcon } from "lucide-react";
+import { DownloadIcon, LoaderCircleIcon } from "lucide-react";
 import { useState } from "react";
 
 import { ActionButton } from "@/components/app/action-button";
@@ -18,7 +18,7 @@ import { Money } from "@/components/eve/money";
 import { Button } from "@/components/ui/button";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
 import { exportUrl } from "@/lib/client/api";
-import { big, canControl, canManage, canRelease, sumMinor, type Permission } from "@/lib/client/derive";
+import { big, canControl, canManage, canRelease, payoutSource, releaseInFlight, sumMinor, type Permission } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -64,7 +64,7 @@ export function PayoutsView() {
 
         const columns: Column<Payout>[] = [
           { key: "who", header: "Recipient", stack: "title", sort: (p) => p.personName, cell: (p) => p.personName },
-          { key: "src", header: "For", stack: "meta", cell: (p) => `${p.sourceType === "award" ? "Prize" : "Claim"} ${p.sourceId} · ${p.provider}` },
+          { key: "src", header: "For", stack: "meta", cell: (p) => `${payoutSource(s, p)} · ${p.provider}` },
           { key: "status", header: "Status", stack: "end", sort: (p) => p.status, cell: (p) => <StatusBadge status={p.status} /> },
           { key: "gross", header: "Gross", align: "end", stack: "hide", sort: (p) => big(p.grossMinor), cell: (p) => <Money amountMinor={big(p.grossMinor)} currency={p.currency} /> },
           { key: "wh", header: "Withheld", align: "end", stack: "hide", cell: (p) => <Money amountMinor={-big(p.withholdingMinor)} currency={p.currency} signDisplay="exceptZero" /> },
@@ -175,7 +175,7 @@ export function PayoutsView() {
               empty={<EmptyState title="No payouts here">Payouts appear when an approved claim or a prize with a valid tax form is proposed.</EmptyState>}
             />
 
-            <Sheet open={selected !== undefined} onOpenChange={(o) => !o && setOpenId(null)} title={selected ? `Payout ${selected.id}` : "Payout"} description={selected?.personName}>
+            <Sheet open={selected !== undefined} onOpenChange={(o) => !o && setOpenId(null)} title={selected ? `Payout to ${selected.personName}` : "Payout"} description={selected ? payoutSource(s, selected) : undefined}>
               {selected ? <PayoutDetail payout={selected} snapshot={s} onEvidence={() => setEvidence(selected)} /> : null}
             </Sheet>
             <EvidenceSheet open={evidence !== null} onOpenChange={(o) => !o && setEvidence(null)} title={evidence ? `Payout ${evidence.id}` : "Evidence"} objectIds={evidence ? [evidence.id, evidence.sourceId] : []} />
@@ -192,7 +192,16 @@ function PayoutDetail({ payout: p, snapshot: s, onEvidence }: { payout: Payout; 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <DueChip due={p.dueAt} now={s.now} context="release" />
+        {p.status === "paid" ? (
+          <p className="text-small text-muted-foreground">Paid {fmtDateTime(p.paidAt)}</p>
+        ) : releaseInFlight(s, p) ? (
+          <p className="flex items-center gap-2 text-small text-muted-foreground" role="status">
+            <LoaderCircleIcon aria-hidden className="size-3.5 animate-spin" />
+            Release accepted. Sending through {p.provider}; this updates on its own.
+          </p>
+        ) : (
+          <DueChip due={p.dueAt} now={s.now} context="release" />
+        )}
         {p.reason ? <p className="text-small">{p.reason}</p> : null}
       </div>
       <PayoutBreakdown payout={p} />

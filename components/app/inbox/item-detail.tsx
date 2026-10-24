@@ -12,7 +12,8 @@ import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { Badge } from "@/components/ui/badge";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
-import { big, payoutFees, type InboxItem } from "@/lib/client/derive";
+import { actorName, big, payoutFees, type InboxItem } from "@/lib/client/derive";
+import { useEve } from "@/lib/client/use-eve";
 import { documentUrl } from "@/lib/client/api";
 import { fmtDateTime } from "@/lib/client/format";
 
@@ -151,6 +152,7 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
 export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payout; showStatus?: boolean }) {
   const estimate = p.truth === "Estimate";
   const fees = payoutFees(p);
+  const { snapshot } = useEve();
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -194,7 +196,7 @@ export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payo
         {p.releasedBy ? (
           <>
             <dt className="text-muted-foreground">Released by</dt>
-            <dd className="text-right">{p.releasedBy}</dd>
+            <dd className="text-right">{snapshot ? actorName(snapshot, p.releasedBy) : p.releasedBy}</dd>
           </>
         ) : null}
       </dl>

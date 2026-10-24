@@ -33,7 +33,38 @@ export function controllerName(s: Pick<AppSnapshot, "personas">): string {
   return s.personas.find((p) => p.role === "controller")?.name ?? "the controller";
 }
 
-export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "personas">): Permission {
+/** What a payout pays for, in words: "Best Hardware Hack: 2nd place" or "Air Canada claim". */
+export function payoutSource(s: Pick<AppSnapshot, "awards" | "claims">, p: Pick<Payout, "sourceId" | "sourceType">): string {
+  if (p.sourceType === "award") {
+    const a = s.awards.find((x) => x.id === p.sourceId);
+    return a ? `${a.track}: ${a.title}` : "Prize";
+  }
+  const c = s.claims.find((x) => x.id === p.sourceId);
+  return c ? `${c.merchant || (c.type === "travel" ? "Travel" : "Expense")} claim` : "Claim";
+}
+
+/** A persona's name for an actor id ("mem_demo_ari" -> "Ari Novak"); the id itself if unknown. */
+export function actorName(s: Pick<AppSnapshot, "personas">, id?: string): string {
+  if (!id) return "";
+  if (id === "agent") return "Eve";
+  return s.personas.find((p) => p.id === id)?.name ?? id;
+}
+
+/**
+ * True while the server has accepted a release that has not finished: a
+ * running or waiting release decision for this payout. The payout itself can
+ * still read "proposed" until the queued run updates it.
+ */
+export function releaseInFlight(s: Pick<AppSnapshot, "decisions">, payout: Pick<Payout, "id" | "status">): boolean {
+  if (payout.status === "processing") return true;
+  if (payout.status !== "proposed" && payout.status !== "approved") return false;
+  return s.decisions.some(
+    (d) => d.objectId === payout.id && /release/i.test(d.action) && (d.status === "running" || d.status === "waiting"),
+  );
+}
+
+export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "personas"> & Partial<Pick<AppSnapshot, "decisions">>): Permission {
+  if (s.decisions && releaseInFlight({ decisions: s.decisions }, payout)) return no("Release accepted. Eve is sending it now; this updates on its own.");
   if (payout.status === "frozen") return no("Frozen until the bank change is confirmed through the original contact channel.");
   if (payout.status === "held") return no(payout.reason || "Held until the recipient's tax form is valid.");
   if (!["proposed", "approved"].includes(payout.status)) return no(`This payout is ${payout.status}.`);

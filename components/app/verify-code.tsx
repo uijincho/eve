@@ -16,11 +16,14 @@ export function VerifyCode({
   personName,
   permission,
   primary,
+  self,
 }: {
   personId: string;
   personName: string;
   permission?: Permission;
   primary?: boolean;
+  /** The recipient is confirming their own change. */
+  self?: boolean;
 }) {
   const id = useId();
   const [code, setCode] = useState("");
@@ -39,7 +42,7 @@ export function VerifyCode({
   return (
     <div className="flex w-full flex-col gap-2">
       <label htmlFor={id} className="text-small font-medium">
-        Code {first} received at their original email
+        {self ? "Code from your original email" : `Code ${first} received at their original email`}
       </label>
       <Input
         id={id}
@@ -57,7 +60,7 @@ export function VerifyCode({
         className="max-w-40 tabular-nums tracking-[0.2em]"
       />
       <p id={`${id}-help`} className={error ? "text-small text-critical" : "text-small text-muted-foreground"}>
-        {error ?? "Confirming re-quotes the payout on the new account; a controller must release it again."}
+        {error ?? (self ? "Confirming moves your payout to the new account. A controller then releases it again." : "Confirming re-quotes the payout on the new account; a controller must release it again.")}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <ActionButton

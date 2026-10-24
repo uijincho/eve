@@ -15,6 +15,8 @@ import {
 
 import type { ActionResult, AppSnapshot } from "@/lib/contracts";
 
+import { ResultText } from "@/components/app/action-button";
+
 import { ApiError, getSnapshot, runAction, switchPersona } from "./api";
 import { hasLiveWork } from "./derive";
 import type { ActionCall } from "./payloads";
@@ -31,6 +33,8 @@ type EveContext = {
   setPersona: (personaId: string) => Promise<ActionResult>;
   /** Components that show live agent work register here to poll every 2 s. */
   watchLive: () => () => void;
+  /** Shows a server answer whose button is gone (the state it changed removed it). */
+  announce: (result: ActionResult) => void;
 };
 
 const Ctx = createContext<EveContext | null>(null);
@@ -40,6 +44,7 @@ export function EveProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState(true);
   const [watchers, setWatchers] = useState(0);
+  const [notice, setNotice] = useState<{ result: ActionResult; key: number } | null>(null);
   const inflight = useRef<Promise<void> | null>(null);
 
   const refresh = useCallback(() => {
@@ -109,11 +114,38 @@ export function EveProvider({ children }: { children: React.ReactNode }) {
     return () => setWatchers((n) => n - 1);
   }, []);
 
+  const announce = useCallback((result: ActionResult) => setNotice({ result, key: Date.now() }), []);
+  useEffect(() => {
+    if (!notice) return;
+    const id = window.setTimeout(() => setNotice(null), 8_000);
+    return () => window.clearTimeout(id);
+  }, [notice]);
+
   const value = useMemo(
-    () => ({ snapshot, error, loading, refresh, act, setPersona, watchLive }),
-    [snapshot, error, loading, refresh, act, setPersona, watchLive],
+    () => ({ snapshot, error, loading, refresh, act, setPersona, watchLive, announce }),
+    [snapshot, error, loading, refresh, act, setPersona, watchLive, announce],
   );
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      <Announcer notice={notice?.result ?? null} onDismiss={() => setNotice(null)} />
+    </Ctx.Provider>
+  );
+}
+
+function Announcer({ notice, onDismiss }: { notice: ActionResult | null; onDismiss: () => void }) {
+  return (
+    <div role="status" aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
+      {notice ? (
+        <div className="pointer-events-auto flex max-w-md items-start gap-3 rounded-lg bg-surface-hover px-3 py-2 text-small shadow-[0_10px_15px_-3px_rgb(0_0_0/0.3),0_4px_6px_-4px_rgb(0_0_0/0.3)] ring-1 ring-border">
+          <ResultText result={notice} />
+          <button type="button" onClick={onDismiss} className="ml-auto rounded-md px-1 text-muted-foreground hover:text-foreground">
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function useEve(): EveContext {
@@ -135,16 +167,28 @@ export type ActionState =
 
 /** Runs one action with its own pending and result state. */
 export function useAction() {
-  const { act } = useEve();
+  const { act, announce } = useEve();
   const [state, setState] = useState<ActionState>({ status: "idle" });
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const run = useCallback(
     async (call: ActionCall) => {
       setState({ status: "pending" });
       const result = await act(call);
-      setState({ status: "done", result });
+      // The fresh snapshot often removes the control that asked (a released
+      // payout has no Release button). Let that render, then hand the answer
+      // to the page-level announcer so it is not lost.
+      await new Promise((r) => window.setTimeout(r, 0));
+      if (mounted.current) setState({ status: "done", result });
+      else announce(result);
       return result;
     },
-    [act],
+    [act, announce],
   );
   const reset = useCallback(() => setState({ status: "idle" }), []);
   return { state, run, reset, pending: state.status === "pending" };
