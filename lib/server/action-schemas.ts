@@ -17,10 +17,18 @@ const isoDateTime = z.string().refine((v) => !Number.isNaN(Date.parse(v)), "Inva
 const text = (max = 200) => z.string().trim().max(max);
 const idempotencyKey = z.string().min(8).max(120).optional();
 
+const projectStatus = z.enum(["unknown", "submitted", "none"]);
+const projectUrl = z.string().trim().max(500);
+
 const personInput = z.strictObject({
   name: text(160).min(1), email: z.email().max(200), country, citizenship: country.optional(),
   dateOfBirth: isoDate, address: text(400).optional(), role: text(40).optional(), payoutCurrency: currency.optional(),
+  projectStatus: projectStatus.optional(), projectUrl: projectUrl.optional(),
 });
+
+const submissionEntry = z.strictObject({
+  email: z.email().max(200).optional(), name: text(160).min(1).optional(), projectUrl: projectUrl.optional(),
+}).refine((v) => Boolean(v.email || v.name), "Each row needs an email or a name.");
 
 export const actionSchemas = {
   "org.update": z.strictObject({
@@ -38,9 +46,13 @@ export const actionSchemas = {
     id: id.optional(), name: text(120).min(1), category: text(60).min(1).optional(), capMinor: minor, fundingSource: text(120).min(1),
   }),
   "people.import": z.strictObject({ people: z.array(personInput).min(1).max(1000) }),
+  "people.markSubmitted": z.strictObject({ people: z.array(submissionEntry).min(1).max(1000) }),
   "person.update": z.strictObject({
     id, name: text(160).min(1).optional(), country: country.optional(), citizenship: country.optional(), dateOfBirth: isoDate.optional(),
     address: text(400).optional(), role: text(40).optional(), payoutCurrency: currency.optional(),
+  }),
+  "person.setProject": z.strictObject({
+    id, projectStatus, projectUrl: projectUrl.nullable().optional(),
   }),
   "tax.submit": z.strictObject({
     personId: id, form: z.enum(["W-9", "W-8BEN", "W-8BEN-E", "Residency declaration"]),

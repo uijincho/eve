@@ -15,7 +15,7 @@ const event: EventRecord = {
 };
 const person: Person = {
   id: "p1", name: "Marcus Lee", email: "m@example.test", country: "CA", citizenship: "CA", dateOfBirth: "2004-05-01",
-  address: "Toronto", role: "hacker", adult: true, taxForm: "W-8BEN", taxStatus: "valid", payoutCurrency: "CAD",
+  address: "Toronto", role: "hacker", adult: true, projectStatus: "submitted", taxForm: "W-8BEN", taxStatus: "valid", payoutCurrency: "CAD",
   payoutLast4: "1234", paidYtdMinor: "0", outstandingMinor: "0", chaseCount: 0,
 };
 const claim: Claim = {

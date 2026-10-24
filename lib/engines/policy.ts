@@ -5,6 +5,7 @@ import type { Check, Claim, EventRecord, Organization, Person } from "@/lib/cont
 import { formatMoney } from "@/lib/design/money";
 
 import { checkFare, checkFareMarket, type FareEvidence, type FarePolicy, type MarketEvidence, type MarketSnapshot } from "./fare-anomaly";
+import { checkProjectSubmission } from "./project-submission";
 import { EngineError, convertMinor, currencyExponent, parseMinor, parseRate } from "./money";
 
 export interface ClaimPolicy {
@@ -325,6 +326,13 @@ export function checkClaim(input: CheckClaimInput): CheckClaimResult {
       if (market.check) checks.push(market.check);
       marketEvidence = market.evidence;
     }
+
+    // Hacker travel only. A miss escalates below; it does not reject.
+    const project = checkProjectSubmission({
+      role: person.role, name: person.name, projectStatus: person.projectStatus, projectUrl: person.projectUrl,
+      claimType: claim.type, closingAt: event.closingAt, asOf,
+    });
+    if (project.applies) checks.push(project.check);
   }
 
   if (usd !== undefined) {

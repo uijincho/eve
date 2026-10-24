@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Claim } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
-import { big, canOrganize, canReview, isOrgBookedFlight, claimStatusLabel, claimReasonText } from "@/lib/client/derive";
+import { big, canOrganize, canReview, isOrgBookedFlight, claimStatusLabel, claimReasonText, projectStatusLabel } from "@/lib/client/derive";
 import { fmtDate, fmtDay, humanize } from "@/lib/client/format";
 import { initialParam } from "@/lib/client/url-param";
 import { payloads } from "@/lib/client/payloads";
@@ -229,6 +229,7 @@ function FareReviewPanel({ claim: c }: { claim: Claim }) {
 
 export function ClaimDetail({ claim: c, snapshot, onEvidence }: { claim: Claim; snapshot: AppSnapshot; onEvidence: () => void }) {
   const perm = canReview(snapshot.actor, c, snapshot);
+  const person = snapshot.people.find((p) => p.id === c.personId);
   const open = c.status === "escalated" || c.status === "needs_info" || c.status === "submitted";
   return (
     <div className="flex flex-col gap-6">
@@ -262,6 +263,14 @@ export function ClaimDetail({ claim: c, snapshot, onEvidence }: { claim: Claim; 
         ) : null}
         <dt className="text-muted-foreground">Category</dt>
         <dd className="text-right">{humanize(c.category)}</dd>
+        {c.type === "travel" && person ? (
+          <>
+            <dt className="text-muted-foreground">Project</dt>
+            <dd className={person.projectStatus === "none" ? "text-right text-critical" : "text-right"}>
+              {projectStatusLabel(person.projectStatus)}{person.projectUrl ? ` · ${person.projectUrl}` : ""}
+            </dd>
+          </>
+        ) : null}
       </dl>
       {c.fareReview ? <FareReviewPanel claim={c} /> : null}
       <CheckList checks={c.checks} />

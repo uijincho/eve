@@ -5,6 +5,7 @@
 export * from "./money";
 export * from "./policy";
 export * from "./fare-anomaly";
+export * from "./project-submission";
 export * from "./fulfillment";
 export * from "./splits";
 export {
