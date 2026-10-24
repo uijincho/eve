@@ -207,3 +207,20 @@ describe("releaseInFlight", () => {
     expect(releaseInFlight({ decisions: [] }, { id: "pay_1", status: "processing" })).toBe(true);
   });
 });
+
+describe("release outcomes", () => {
+  it("blocks direct release in sponsor mode and reports why a queued release stopped", async () => {
+    const { canRelease, releaseStopped } = await import("@/lib/client/derive");
+    const ari = { id: "u-ari", name: "Ari Novak", email: "a@x", role: "controller" as const };
+    const p = { ...s.payouts[1], id: "pay_9", status: "proposed" as const, requestedBy: "u-dana" };
+    expect(canRelease(ari, p, { ...s, org: { ...s.org, mode: "sponsor" } }).allowed).toBe(false);
+    expect(canRelease(ari, p, { ...s, org: { ...s.org, mode: "direct" }, decisions: [] }).allowed).toBe(true);
+    const dec = (over: Partial<AppSnapshot["decisions"][number]>) =>
+      ({ id: over.tool ?? "x", runId: "r", objectId: "pay_9", objectType: "payout", personName: "", action: "", summary: "", actor: "", facts: {}, status: "done", tool: "", createdAt: "2026-10-24T10:00:00Z", ...over }) as AppSnapshot["decisions"][number];
+    const quote = dec({ action: "payout.propose", tool: "quotePayouts", createdAt: "2026-10-24T10:00:00Z" });
+    const stopped = dec({ tool: "waitForController", status: "escalated", summary: "Pays through its fiscal sponsor.", createdAt: "2026-10-24T10:05:00Z" });
+    expect(releaseStopped({ decisions: [quote, stopped] }, p)?.summary).toBe("Pays through its fiscal sponsor.");
+    const requote = dec({ action: "payout.requote", tool: "quotePayouts", createdAt: "2026-10-24T10:06:00Z" });
+    expect(releaseStopped({ decisions: [quote, stopped, requote] }, p)).toBeUndefined();
+  });
+});

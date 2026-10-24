@@ -20,7 +20,7 @@ import { Money } from "@/components/eve/money";
 import { Button } from "@/components/ui/button";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
 import { exportUrl } from "@/lib/client/api";
-import { big, canControl, canManage, canRelease, payoutSource, type Permission, providerLabel, releaseInFlight, sumMinor, payoutValue, isInKind } from "@/lib/client/derive";
+import { big, canControl, canManage, canRelease, payoutSource, type Permission, providerLabel, releaseInFlight, releaseStopped, sumMinor, payoutValue, isInKind } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -207,6 +207,9 @@ function PayoutDetail({ payout: p, snapshot: s, onEvidence }: { payout: Payout; 
         )}
         {p.reason ? <p className="text-small">{p.reason}</p> : null}
       </div>
+      {releaseStopped(s, p) ? (
+        <p role="alert" className="text-small text-critical">Release stopped: {releaseStopped(s, p)!.summary}</p>
+      ) : null}
       <PayoutBreakdown payout={p} />
       <div className="flex flex-col gap-2 border-t pt-4">
         {p.status === "frozen" ? (

@@ -135,7 +135,22 @@ export function releaseInFlight(s: Pick<AppSnapshot, "decisions">, payout: Pick<
   });
 }
 
-export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "personas"> & Partial<Pick<AppSnapshot, "decisions">>): Permission {
+/**
+ * Why the last queued release for this payout stopped, if it stopped after
+ * the current terms were quoted (a sponsor-mode org, a changed quote, a
+ * failed check). Undefined when there is nothing newer to report.
+ */
+export function releaseStopped(s: Pick<AppSnapshot, "decisions">, payout: Pick<Payout, "id" | "status">): Decision | undefined {
+  if (payout.status !== "proposed" && payout.status !== "approved") return undefined;
+  const mine = s.decisions.filter((d) => d.objectId === payout.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const lastQuote = mine.find((d) => /propose|quote/i.test(`${d.action} ${d.tool}`))?.createdAt ?? "";
+  return mine.find(
+    (d) => d.status === "escalated" && (d.tool === "waitForController" || d.tool === "executePayout") && d.createdAt > lastQuote,
+  );
+}
+
+export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "personas"> & Partial<Pick<AppSnapshot, "decisions" | "org">>): Permission {
+  if (s.org?.mode === "sponsor") return no(`${s.org.sponsorName || "The fiscal sponsor"} pays for this organization. Create a sponsor packet instead; a controller submits it.`);
   if (s.decisions && releaseInFlight({ decisions: s.decisions }, payout)) return no("Release accepted. Eve is sending it now; this updates on its own.");
   if (payout.status === "frozen") return no("Frozen until the bank change is confirmed through the original contact channel.");
   if (payout.status === "held") return no(payout.reason || "Held until the recipient's tax form is valid.");
