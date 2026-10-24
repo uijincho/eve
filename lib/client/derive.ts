@@ -548,9 +548,9 @@ export function runLine(run: Run, s: Pick<AppSnapshot, "payouts">): string {
   const p = run.objectType === "payout" ? s.payouts.find((x) => x.id === run.objectId) : undefined;
   const amount = p ? ` ${fmtPlain(payoutValue(p), p.currency)}` : "";
   if (run.objectType === "packet" || run.objectType === "sponsor_packet") {
-    // "Sponsor paid $970.00 on a $1,000.00 request (short $30.00)." -> "Sponsor short $30.00 · paid $970.00"
-    const short = /paid (\S+) on a \S+ request \(short (\S+?)\)/.exec(last.summary);
-    if (short) return `Sponsor short ${short[2]} · paid ${short[1]}`;
+    // "Sponsor paid $970.00 on a $1,000.00 request (short $30.00)." -> "Short $30.00"; the rest is in the expanded steps.
+    const short = /\(short (\S+?)\)/.exec(last.summary);
+    if (short) return `Short ${short[1]}`;
   }
   if (run.objectType === "filings") {
     const count = Number(last.facts?.count ?? NaN);

@@ -278,5 +278,7 @@ describe("agent rail lines", () => {
     const [filings] = groupRuns([d({ runId: "f", objectType: "filings", objectId: "2026", tool: "draftFilings", summary: "Drafted 0 filing(s) for 2026.", facts: { year: 2026, count: 0 } })]);
     expect(runSubject(filings, { payouts: [], packets: [] })).toBe("Filing drafts 2026");
     expect(runLine(filings, { payouts: [] })).toBe("No new filings to draft");
+    const [packet] = groupRuns([d({ runId: "k", objectType: "packet", objectId: "sp_1", tool: "reconcile", status: "escalated", summary: "Sponsor paid $970.00 on a $1,000.00 request (short $30.00). Nothing posted." })]);
+    expect(runLine(packet, { payouts: [] })).toBe("Short $30.00");
   });
 });
