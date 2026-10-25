@@ -82,6 +82,8 @@ export const payloads = {
     form: Person["taxForm"];
     signature: string;
     tin?: string;
+    /** W-8BEN line 6b; never sent with `tin`. */
+    ftinNotRequired?: boolean;
     treatyCountry?: string;
     treatyArticle?: string;
   }) => call("tax.submit", { ...stripEmpty(fields), certify: true }),

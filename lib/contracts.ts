@@ -31,6 +31,14 @@ export interface Person {
   taxForm: "W-9" | "W-8BEN" | "W-8BEN-E" | "Residency declaration";
   taxStatus: "missing" | "valid" | "expired" | "review";
   taxSignedAt?: string; taxExpiresAt?: string; taxLast4?: string;
+  /**
+   * PDF of the current signed form (GET /api/documents/:id). For a W-8BEN, the
+   * filled IRS form plus Eve's signature record; for other forms, Eve's receipt.
+   * Only in the person's own snapshot and staff snapshots.
+   */
+  taxDocumentId?: string;
+  /** The form that document records; can differ from taxForm when the signed form is not the expected one. */
+  taxDocumentForm?: "W-9" | "W-8BEN" | "W-8BEN-E" | "Residency declaration";
   payoutCurrency: string; payoutLast4: string; payoutChangedAt?: string;
   paidYtdMinor: Minor; outstandingMinor: Minor; chaseCount: number;
 }
