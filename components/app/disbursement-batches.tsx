@@ -60,14 +60,15 @@ export function DisbursementBatches({ snapshot: s }: { snapshot: AppSnapshot }) 
       <div className="flex flex-col gap-4">{batches.map((b) => {
         const paid = b.packetIds.filter((id) => s.packets.some((p) => p.id === id && p.status === "paid")).length;
         return <section key={b.id} aria-label={`Batch of ${b.count} payments`} className="flex flex-col gap-3 rounded-xl border p-4">
-          <div className="flex flex-wrap justify-between gap-3"><h3 className="font-semibold">{b.count} payments · <Money amountMinor={big(b.netMinor)} /></h3><span className={b.status === "failed" ? "text-critical" : "text-muted-foreground"}>{b.status === "submitted" && paid === b.count ? "Paid" : STATUS[b.status]}</span></div>
+          <div className="flex flex-wrap justify-between gap-3"><h3 className="font-semibold">{b.count} payments · <Money amountMinor={big(b.netMinor)} /></h3><span aria-live="polite" className={b.status === "failed" ? "text-critical" : "text-muted-foreground"}>{b.status === "submitted" && paid === b.count ? "Paid" : b.validating ? "Checking payments before submission" : STATUS[b.status]}</span></div>
+          {b.validating ? <p className="text-small text-muted-foreground">Eve is checking all {b.count} payments against the controller’s release before submitting automatically.</p> : null}
           <p className="text-small text-muted-foreground">Released by {b.approvedByName}{b.status === "submitted" ? ` · ${paid} of ${b.count} paid` : ""}</p>
           {b.error ? <p className="text-small text-critical">{b.error}</p> : null}
           {b.confirmation ? <p className="text-small">Portal confirmation: <strong>{b.confirmation}</strong></p> : null}
           {b.streamUrl ? <LiveDesktop
             src={b.streamUrl}
             title={`Live portal submission for ${b.count} payments, view only`}
-            caption={`Eve is submitting ${b.count} payments in one portal session. Live view only.`}
+            caption={`${b.provider === "browser-use" ? "Browser Use" : "Eve"} is submitting ${b.count} payments in one portal session. Live view only.`}
             className="w-full max-w-3xl"
           /> : null}
           <div className="flex flex-wrap gap-2">

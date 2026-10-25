@@ -4,6 +4,9 @@ import { withWorkflow } from "workflow/next";
 const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
+  outputFileTracingIncludes: {
+    "/api/sponsor-portal/**": ["./lab/westbrook-portal/index.html"],
+  },
   // Overview is the organizer home. The inbox used to live at "/", so bare
   // root links (bookmarks, old notifications) land on the new home.
   redirects() {

@@ -265,20 +265,30 @@ export function buildPayout(ctx: PayoutContext, source: PayoutSource, requestedB
   return { row, tax, quote, ytdMinor };
 }
 
-export async function loadPayoutContext(db: Executor, orgId: string, personId: string, excludePayoutId?: string): Promise<PayoutContext> {
+/** One current rule snapshot can be shared by payments in the same locked batch transaction. */
+export async function loadReleaseRules(db: Executor): Promise<TaxRule[]> {
+  const rules = await loadRules(db);
+  const converted: TaxRule[] = [];
+  for (const r of rules) {
+    converted.push(r.payerCountry !== "CA" || r.thresholdMinor === "0" ? r
+      : { ...r, thresholdMinor: (await toUsd(db, BigInt(r.thresholdMinor), "CAD", new Date())).usdMinor.toString() });
+  }
+  return converted;
+}
+
+export async function loadPayoutContext(db: Executor, orgId: string, personId: string, excludePayoutId?: string, releaseRules?: TaxRule[]): Promise<PayoutContext> {
   // Sequential: this often runs on a single transaction client.
   const { org, event } = await loadOrgEvent(db, orgId);
   const person = await loadPerson(db, orgId, personId);
   const profile = await currentProfile(db, personId);
   const methods = await methodsFor(db, personId);
-  const { rules, payments } = await loadPayoutTaxContext(db, personId, excludePayoutId);
+  const { rules, payments } = await loadPayoutTaxContext(db, personId, excludePayoutId, releaseRules);
   return { org, event, person, profile, active: methods.active, pending: methods.pending, payments, rules, now: new Date() };
 }
 
-async function loadPayoutTaxContext(db: Executor, personId: string, excludePayoutId?: string) {
+async function loadPayoutTaxContext(db: Executor, personId: string, excludePayoutId?: string, releaseRules?: TaxRule[]) {
   // CRA thresholds are stated in CAD; the books are USD, so convert them before comparing.
-  const rules = await Promise.all((await loadRules(db)).map(async (r) => r.payerCountry !== "CA" || r.thresholdMinor === "0" ? r
-    : { ...r, thresholdMinor: (await toUsd(db, BigInt(r.thresholdMinor), "CAD", new Date())).usdMinor.toString() }));
+  const rules = releaseRules ?? await loadReleaseRules(db);
   const payments = await paymentsFor(db, personId, excludePayoutId);
   return { rules, payments };
 }
@@ -470,7 +480,7 @@ export async function assertNotInBatch(tx: Executor, payoutId: string, allowedBa
  * written back (status proposed, approval void) and returned as "requoted".
  */
 
-export async function prepareRelease(tx: Executor, actor: ActorContext, payoutId: string, route: "direct" | "sponsor", opts: { expectTerms?: string; batchId?: string } = {}): Promise<ReleaseCheck> {
+export async function prepareRelease(tx: Executor, actor: ActorContext, payoutId: string, route: "direct" | "sponsor", opts: { expectTerms?: string; batchId?: string; releaseRules?: TaxRule[] } = {}): Promise<ReleaseCheck> {
   if (actor.role !== "controller") throw forbidden(actor.role === "agent" ? "The agent can never release money." : "Only a controller can release payouts.");
   const { person, p } = await lockPayoutChain(tx, actor.orgId, payoutId);
   await assertNotInBatch(tx, payoutId, opts.batchId);
@@ -510,7 +520,7 @@ export async function prepareRelease(tx: Executor, actor: ActorContext, payoutId
   // them, but always read current finalized payments for the YTD calculation.
   const ctx: PayoutContext = {
     org, event, person, profile, active: methods.active, pending: methods.pending,
-    ...await loadPayoutTaxContext(tx, p.personId, p.id), now: new Date(),
+    ...await loadPayoutTaxContext(tx, p.personId, p.id, opts.releaseRules), now: new Date(),
   };
   const { row } = buildPayout(ctx, loaded.source, p.requestedBy, [], loaded.override);
   if (termsKey(row) !== termsKey(p)) {

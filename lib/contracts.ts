@@ -102,7 +102,7 @@ export interface DisbursementBatch {
   id: string; status: "preparing" | "filling" | "submitting" | "submitted" | "failed" | "cancelled";
   payoutIds: string[]; packetIds: string[]; count: number; grossMinor: Minor; withholdingMinor: Minor; netMinor: Minor;
   documentId?: string; approvedBy: string; approvedByName: string; streamUrl?: string; confirmation?: string; error?: string;
-  canRetry: boolean; canCancel: boolean; turns: number; createdAt: string;
+  canRetry: boolean; canCancel: boolean; validating?: boolean; provider?: "browser-use" | "computer-use"; turns: number; createdAt: string;
 }
 export interface Decision {
   id: string; runId: string; objectId: string; objectType: string; personName: string;
