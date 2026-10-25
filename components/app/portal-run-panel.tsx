@@ -4,6 +4,7 @@ import { cn } from "cn";
 import { CheckIcon, ChevronRightIcon, XIcon } from "lucide-react";
 
 import { ActionButton } from "@/components/app/action-button";
+import { LiveDesktop } from "@/components/app/live-desktop";
 import { Badge } from "@/components/ui/badge";
 import type { AppSnapshot, PortalRun, SponsorPacket } from "@/lib/contracts";
 import { canControl, canManage, isPortalActive, PORTAL_STATUS, portalStatusLine } from "@/lib/client/derive";
@@ -58,12 +59,11 @@ export function PortalRunPanel({ run, packet, snapshot, live = true, actions = t
       </ol>
 
       {live && run.streamUrl ? (
-        <div className="flex flex-col gap-1.5">
-          <div className="overflow-hidden rounded-lg border bg-rail">
-            <iframe src={run.streamUrl} title={`Live view of Eve filling the sponsor portal for ${packet.personName}, view only`} className="block aspect-[4/3] w-full" />
-          </div>
-          <p className="text-caption text-muted-foreground">Live view only. The desktop has no internet, and Chrome opens the portal and nothing else.</p>
-        </div>
+        <LiveDesktop
+          src={run.streamUrl}
+          title={`Live view of Eve filling the sponsor portal for ${packet.personName}, view only`}
+          caption="Live view only. The desktop has no internet, and Chrome opens the portal and nothing else."
+        />
       ) : null}
 
       {run.status === "awaiting_approval" ? (
