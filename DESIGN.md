@@ -252,7 +252,7 @@ The same ledger after sundown, set on the logo's ink: the ground is the mark's t
 - **Fills:** lime and apricot keep their values. Text on lime stays Ink in both themes (`on-money`); hatching pairs each fill with a dark stripe of itself.
 - **Logo:** the tile is the ground colour, so it gains a faint white edge (`mark-edge`) to keep its shape on the ground and on cards.
 
-The organizer rail, the mobile navigation sheet, the portal account sheet and `/design` carry a Light / Dark / System control. System follows the operating system and is the default; a choice is kept in the browser and applied before first paint.
+The account menu (the signed-in person's button at the foot of the organizer rail and in the portal header) and `/design` carry a Light / Dark / System control. System follows the operating system and is the default; a choice is kept in the browser and applied before first paint.
 
 ### Named Rules
 **The Fill Not Text Rule.** Lime and apricot are fills. When a pill needs that meaning as text, it uses Moss on a lime tint or Burnt Apricot on an apricot tint.
@@ -286,7 +286,7 @@ One humanist grotesk carries everything. Its figures line up in columns, which m
 
 Space runs on a 4px rhythm (4, 8, 12, 16, 20, 24, 32, 48). Cards pad 20px and sit 16px apart.
 
-**Organizer shell.** From 1280px a 240px navigation card floats 12px in from the left edge (white, hairline, 15px corners): the Eve mark and wordmark, the event card with the closing-ceremony time, primary navigation, records, setup, and the persona switcher at the foot. Under 1280px it becomes a top bar with the same navigation in a sheet.
+**Organizer shell.** From 1280px a 240px navigation card floats 12px in from the left edge (white, hairline, 15px corners): the Eve mark and wordmark, the event card with the closing-ceremony time, primary navigation, records, setup, and the account button at the foot: avatar, name and role. It opens a menu with the demo persona switcher (Sign out for a real account) and the theme control. Under 1280px it becomes a top bar with the same navigation in a sheet.
 
 **Overview.** A title row with the event-phase control (Before · During · After), then two columns that wrap: a wide work column (`flex: 999 1 620px`) and a 300–384px side column. The work column holds the budget hero beside a three-figure stack, the prize pipeline, travel budget beside the agent finding, and a responsive grid of budget lines, payout readiness and funding sources. The side column holds the release console and recent activity. Below roughly 960px the side column drops beneath; every card reflows, and nothing scrolls sideways.
 
@@ -353,7 +353,7 @@ Unchanged in behaviour: a 6px dusk dot with time remaining in Small 600 and its 
 **The Fixed Scale Rule.** Bars meant for comparison share one scale.
 
 ### Inbox Row, Blocked Action, Tables, Empty States
-Rows: who in body 600 with state chips beside it, one Graphite meta line, amount and due chip at the right, actions beneath; the reason in full lives in the detail pane; hover lifts to white, selection to Stone. A blocked action stays visible, disabled but focusable, with the reason beside it ("Ari Novak is the controller"). Tables right-align figures and become stacked lists under 768px. Empty states are a dashed hairline box with one sentence saying what will appear.
+Rows: who in body 600 with state chips beside it, one Graphite meta line, amount and due chip at the right, actions beneath; the reason in full lives in the detail pane; hover lifts to white, selection to Stone. A blocked action stays visible, disabled but focusable, with a lock icon; the reason ("Ari Novak is the controller") shows in a tooltip on hover or focus and is its accessible description. Tables right-align figures and become stacked lists under 768px. Empty states are a dashed hairline box with one sentence saying what will appear.
 
 ## Do's and Don'ts
 

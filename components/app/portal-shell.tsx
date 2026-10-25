@@ -5,12 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { AccountMenu } from "@/components/app/account-menu";
 import { EveMark } from "@/components/eve/logo";
-import { PersonaSwitcher } from "@/components/app/persona-switcher";
-import { Sheet } from "@/components/app/sheet";
-import { ThemeSwitcher } from "@/components/app/theme-switcher";
-import { TruthLabel } from "@/components/eve/truth-label";
-import { initials } from "@/lib/client/format";
 import { useEve } from "@/lib/client/use-eve";
 
 const NAV = [
@@ -25,7 +21,6 @@ const NAV = [
 export function PortalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { snapshot } = useEve();
-  const [personaOpen, setPersonaOpen] = useState(false);
   const { navRef, edges } = useOverflowEdges(pathname);
   return (
     <div className="flex min-h-dvh flex-col">
@@ -36,18 +31,7 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex h-12 max-w-5xl items-center gap-3 px-4">
           <Link href="/portal" className="flex items-center gap-2 rounded-md text-subheading font-semibold"><EveMark className="size-6" />Eve</Link>
           <span className="truncate text-small text-muted-foreground">{snapshot?.event.name ?? "Portal"}</span>
-          {snapshot?.demo ? <TruthLabel kind="sample" className="max-sm:hidden" /> : null}
-          <button
-            type="button"
-            onClick={() => setPersonaOpen(true)}
-            aria-label={snapshot ? `${initials(snapshot.actor.name)} — ${snapshot.actor.name}, ${snapshot.demo ? "switch demo persona" : "account"}` : "Account"}
-            className="ml-auto flex items-center gap-2 rounded-md px-1.5 py-1 text-small hover:bg-surface"
-          >
-            <span aria-hidden className="grid size-7 place-items-center rounded-full bg-border text-caption font-semibold">
-              {snapshot ? initials(snapshot.actor.name) : ""}
-            </span>
-            <span className="max-sm:hidden">{snapshot?.actor.name}</span>
-          </button>
+          <AccountMenu variant="bar" />
         </div>
         <nav
           ref={navRef}
@@ -79,17 +63,6 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
       <div id="main" className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6">
         {children}
       </div>
-      <Sheet
-        open={personaOpen}
-        onOpenChange={setPersonaOpen}
-        title={snapshot?.demo ? "Demo persona" : "Your account"}
-        description={snapshot?.demo ? "Sample data only. The server decides what each persona may see and do." : snapshot?.actor.email}
-      >
-        <div className="flex flex-col gap-4">
-          <PersonaSwitcher />
-          <ThemeSwitcher className="border-t pt-3" />
-        </div>
-      </Sheet>
     </div>
   );
 }

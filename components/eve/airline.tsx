@@ -43,18 +43,19 @@ export function Airline({ name, withName = false, className }: { name: string; w
   if (!code) {
     return withName ? <span className={className}>{name}</span> : <Badge variant="outline" className={className}>{name}</Badge>;
   }
-  const logo = <Image src={`/airlines/${code}.svg`} alt={withName ? "" : name} width={20} height={20} unoptimized className={withName ? "size-4 object-contain" : "size-5 object-contain"} />;
   if (withName) {
     return (
       <span className={cn("inline-flex items-center gap-1.5", className)}>
-        {logo}
+        <span className="grid size-5 shrink-0 place-items-center rounded-full bg-logo-tile">
+          <Image src={`/airlines/${code}.svg`} alt="" width={14} height={14} unoptimized className="size-3.5 object-contain" />
+        </span>
         {name}
       </span>
     );
   }
   return (
-    <span title={name} className={cn("inline-flex h-6 items-center rounded-full border bg-surface px-2", className)}>
-      {logo}
+    <span title={name} className={cn("inline-flex h-6 items-center rounded-full border bg-logo-tile px-2", className)}>
+      <Image src={`/airlines/${code}.svg`} alt={name} width={20} height={20} unoptimized className="size-5 object-contain" />
     </span>
   );
 }

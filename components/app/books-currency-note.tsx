@@ -11,8 +11,7 @@ export function BooksCurrencyNote({ snapshot: s, className }: { snapshot: AppSna
   if (s.org.currency === books) return null;
   return (
     <p className={className ?? "max-w-[64ch] text-small text-muted-foreground"}>
-      Eve keeps the books in {books}. You enter limits, the travel cap, budget caps and prizes in {s.org.currency}; payouts, budgets and
-      people&rsquo;s totals show in {books}, converted on the payment date, and each recipient is paid in their own currency.
+      Books are in {books}. Enter limits, caps and prizes in {s.org.currency}; totals show in {books}, converted on the payment date.
     </p>
   );
 }

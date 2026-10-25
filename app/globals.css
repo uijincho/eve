@@ -37,6 +37,7 @@
   --color-money: var(--money);
   --color-on-money: var(--on-money);
   --color-mark-edge: var(--mark-edge);
+  --color-logo-tile: var(--logo-tile);
   --color-pending: var(--pending);
   --color-critical: var(--critical);
   --color-dusk-1: var(--dusk-1);
@@ -148,6 +149,8 @@
   --selection: #ddedc2;
   /* An edge for the ink logo tile, needed only where the ground is dark too. */
   --mark-edge: transparent;
+  /* Airline logos are drawn for a light ground, so their tile stays light in both themes. */
+  --logo-tile: #ffffff;
 
   /* shadcn mapping */
   --card: var(--surface);
@@ -210,6 +213,7 @@
   --hatch-pending-stripe: #5e442c;
   --selection: #3e4c2a;
   --mark-edge: #ffffff24;
+  --logo-tile: #e6e7eb;
 
   --primary-foreground: #0e0f13;
   --ring: #ecedf1;

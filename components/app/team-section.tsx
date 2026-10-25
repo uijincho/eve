@@ -37,7 +37,7 @@ export function TeamSection({ snapshot: s }: { snapshot: AppSnapshot }) {
   if (s.demo) {
     return (
       <p className="max-w-[64ch] text-small text-muted-foreground">
-        The sample organization has no member list, and invitations are off. Create your own organization to see and invite staff.
+        Sample personas aren&apos;t accounts, so invitations are off.
       </p>
     );
   }
