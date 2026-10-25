@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 
 import { PersonaSwitcher } from "@/components/app/persona-switcher";
 import { Sheet } from "@/components/app/sheet";
+import { ThemeSwitcher } from "@/components/app/theme-switcher";
 import { EveMark } from "@/components/eve/logo";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { Button } from "@/components/ui/button";
@@ -104,8 +105,9 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
         <Brand demo={snapshot?.demo} />
         {eventCard}
         {nav()}
-        <div className="mt-auto border-t pt-3">
+        <div className="mt-auto flex flex-col gap-3 border-t pt-3">
           <PersonaSwitcher />
+          <ThemeSwitcher />
         </div>
         </div>
       </aside>
@@ -130,8 +132,9 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
       <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="Eve" side="left" description={snapshot?.event.name}>
         <div className="flex flex-col gap-4">
           {nav(() => setMenuOpen(false))}
-          <div className="border-t pt-3">
+          <div className="flex flex-col gap-3 border-t pt-3">
             <PersonaSwitcher />
+            <ThemeSwitcher />
           </div>
         </div>
       </Sheet>
@@ -198,7 +201,7 @@ function NavLink({
         <span
           className={cn(
             "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-caption font-semibold tabular-nums",
-            active ? "bg-money text-foreground" : "bg-surface-hover text-muted-foreground",
+            active ? "bg-money text-on-money" : "bg-surface-hover text-muted-foreground",
           )}
         >
           {n}

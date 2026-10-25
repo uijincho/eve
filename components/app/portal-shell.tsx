@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { EveMark } from "@/components/eve/logo";
 import { PersonaSwitcher } from "@/components/app/persona-switcher";
 import { Sheet } from "@/components/app/sheet";
+import { ThemeSwitcher } from "@/components/app/theme-switcher";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { initials } from "@/lib/client/format";
 import { useEve } from "@/lib/client/use-eve";
@@ -84,7 +85,10 @@ export function PortalShell({ children }: { children: React.ReactNode }) {
         title={snapshot?.demo ? "Demo persona" : "Your account"}
         description={snapshot?.demo ? "Sample data only. The server decides what each persona may see and do." : snapshot?.actor.email}
       >
-        <PersonaSwitcher />
+        <div className="flex flex-col gap-4">
+          <PersonaSwitcher />
+          <ThemeSwitcher className="border-t pt-3" />
+        </div>
       </Sheet>
     </div>
   );

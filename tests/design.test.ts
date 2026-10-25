@@ -4,7 +4,18 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { formatMoney, minorToDecimalString } from "@/lib/design/money";
-import { DUSK, FILL, GROUND, RAISED, STATE, STRUCTURE, TEXT, contrastRatio } from "@/lib/design/tokens";
+import {
+  DARK_GROUND,
+  DARK_RAISED,
+  DUSK,
+  FILL,
+  GROUND,
+  RAISED,
+  STATE,
+  STRUCTURE,
+  TEXT,
+  contrastRatio,
+} from "@/lib/design/tokens";
 import { describeDue, duskBand, formatDue, horizonX } from "@/lib/design/urgency";
 
 const NOW = new Date("2026-10-25T13:42:00-07:00");
@@ -67,17 +78,32 @@ describe("formatMoney", () => {
 describe("tokens", () => {
   const css = readFileSync(join(process.cwd(), "app/globals.css"), "utf8");
 
+  const darkBlock = css.match(/:root\[data-theme="dark"\] \{([^}]*)\}/)?.[1] ?? "";
+
   it("match app/globals.css", () => {
     for (const token of [...STRUCTURE, ...TEXT, ...DUSK, ...STATE, ...FILL]) {
       expect(css, token.name).toContain(`${token.name}: ${token.value};`);
+      if (token.dark === token.value) expect(darkBlock, token.name).not.toContain(`${token.name}:`);
+      else expect(darkBlock, token.name).toContain(`${token.name}: ${token.dark};`);
     }
   });
 
-  it("keep every text colour at AA on the ground and on raised surfaces", () => {
+  it.each([
+    ["light", "value", GROUND, RAISED],
+    ["dark", "dark", DARK_GROUND, DARK_RAISED],
+  ] as const)("keep every %s text colour at AA on the ground and on raised surfaces", (_, key, ground, raised) => {
+    expect(darkBlock).toContain(`--background: ${DARK_GROUND};`);
+    expect(darkBlock).toContain(`--surface: ${DARK_RAISED};`);
     for (const token of [...TEXT.filter((t) => t.name !== "--faint"), ...DUSK, ...STATE]) {
-      expect(contrastRatio(token.value, GROUND), token.name).toBeGreaterThanOrEqual(4.5);
-      expect(contrastRatio(token.value, RAISED), token.name).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(token[key], ground), token.name).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(token[key], raised), token.name).toBeGreaterThanOrEqual(4.5);
     }
-    expect(contrastRatio(TEXT.find((t) => t.name === "--faint")!.value, GROUND)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(TEXT.find((t) => t.name === "--faint")![key], ground)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("keep ink on the lime fill in both themes", () => {
+    expect(css).toContain("--on-money: #17181a;");
+    expect(darkBlock).not.toContain("--on-money:");
+    expect(contrastRatio("#17181a", FILL.find((t) => t.name === "--money")!.dark)).toBeGreaterThanOrEqual(4.5);
   });
 });
