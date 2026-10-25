@@ -216,7 +216,7 @@ export const document = pgTable("document", {
   orgId: text("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
   personId: text("person_id").references(() => person.id, { onDelete: "set null" }),
   uploadedBy: text("uploaded_by").notNull(),
-  kind: text("kind", { enum: ["receipt", "tax_form", "sponsor_packet", "filing", "upload"] }).notNull(),
+  kind: text("kind", { enum: ["receipt", "tax_form", "sponsor_packet", "filing", "upload", "screenshot"] }).notNull(),
   name: text("name").notNull(),
   mimeType: text("mime_type").notNull(),
   sizeBytes: integer("size_bytes").notNull(),
@@ -526,6 +526,46 @@ export const sponsorPacket = pgTable("sponsor_packet", {
   feesPaidBy: text("fees_paid_by", { enum: ["org", "recipient"] }),
   createdAt: createdAt(),
 }, (t) => [uniqueIndex("sponsor_packet_payout_uq").on(t.payoutId)]);
+
+export const PORTAL_RUN_ACTIVE = ["starting", "filling", "awaiting_approval", "submitting"] as const;
+
+/**
+ * Eve filling the sponsor's web portal for one packet (computer use). The workflow
+ * (workflows/sponsor-portal.ts) owns the run; this row carries what must survive between
+ * its steps. `state` holds the agent conversation, screenshots included; no taxpayer ID,
+ * bank number or portal password is ever written here.
+ */
+export const portalRun = pgTable("portal_run", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  packetId: text("packet_id").notNull().references(() => sponsorPacket.id, { onDelete: "cascade" }),
+  workflowRunId: text("workflow_run_id"),
+  status: text("status", { enum: [...PORTAL_RUN_ACTIVE, "submitted", "escalated", "rejected", "failed", "stopped"] }).notNull().default("starting"),
+  requestedBy: text("requested_by").notNull(),
+  sandboxId: text("sandbox_id"),
+  /** View-only live stream of the desktop, cleared when the desktop is deleted. */
+  streamUrl: text("stream_url"),
+  page: text("page").notNull().default("other"),
+  pagesVisited: jsonb("pages_visited").$type<string[]>().notNull().default([]),
+  turns: integer("turns").notNull().default(0),
+  state: jsonb("state").$type<Record<string, unknown>>(),
+  reviewCheck: jsonb("review_check").$type<{ label: string; packet: string; portal: string; ok: boolean }[]>(),
+  escalation: jsonb("escalation").$type<{ field: string; reason: string }>(),
+  confirmation: text("confirmation"),
+  portalRecord: jsonb("portal_record").$type<Record<string, unknown>>(),
+  approvedBy: text("approved_by"),
+  approvedByName: text("approved_by_name"),
+  approvedAt: ts("approved_at"),
+  stopRequested: boolean("stop_requested").notNull().default(false),
+  error: text("error"),
+  usage: jsonb("usage").$type<{ inputTokens: number; outputTokens: number; cacheReadTokens: number }>().notNull().default({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 }),
+  createdAt: createdAt(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+}, (t) => [
+  index("portal_run_org_idx").on(t.orgId, t.createdAt),
+  // One live run per packet: a second start while one is filling or waiting is refused by the database.
+  uniqueIndex("portal_run_active_uq").on(t.packetId).where(sql`${t.status} in ('starting', 'filling', 'awaiting_approval', 'submitting')`),
+]);
 
 export const filing = pgTable("filing", {
   id: text("id").primaryKey(),

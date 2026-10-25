@@ -8,6 +8,7 @@ import { DataTable, type Column } from "@/components/app/data-table";
 import { Field } from "@/components/app/field";
 import { LinkButton } from "@/components/app/link-button";
 import { PageFrame } from "@/components/app/page-frame";
+import { PortalRunPanel } from "@/components/app/portal-run-panel";
 import { Section } from "@/components/app/page-header";
 import { ReasonAction } from "@/components/app/reason-action";
 import { Sheet } from "@/components/app/sheet";
@@ -19,7 +20,7 @@ import { TruthLabel } from "@/components/eve/truth-label";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, SponsorPacket } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
-import { big, canControl, canManage, canOrganize, payoutSource } from "@/lib/client/derive";
+import { big, canControl, canManage, canOrganize, isPortalActive, payoutSource, portalRunFor } from "@/lib/client/derive";
 import { fmtDate } from "@/lib/client/format";
 import { payloads, toMinor } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -87,6 +88,8 @@ function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snaps
   const manage = canManage(s.actor);
   const control = canControl(s.actor, s);
   const diff = big(k.paidMinor) - big(k.requestedMinor);
+  const portal = portalRunFor(s, k.id);
+  const portalBusy = !!portal && isPortalActive(portal);
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2">
@@ -94,6 +97,7 @@ function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snaps
         <DueChip due={k.dueAt} now={s.now} context="expected remittance" />
       </div>
       {k.reason ? <p className="text-small">{k.reason}</p> : null}
+      {portal ? <PortalRunPanel run={portal} packet={k} snapshot={s} /> : null}
       <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-small">
         <dt className="text-muted-foreground">Requested</dt>
         <dd className="text-right"><Money amountMinor={big(k.requestedMinor)} /></dd>
@@ -122,7 +126,13 @@ function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snaps
         {["submitted", "exception", "questioned"].includes(k.status) ? <RecordRemittance key={`${k.id}:${k.status}`} packet={k} snapshot={s} /> : null}
         {k.status === "draft" ? (
           <>
-            <ActionButton wide size="default" variant="default" label="Authorize and submit to sponsor" pendingLabel="Submitting" permission={control} call={payloads.sponsorSubmit(k.id)} />
+            {!portalBusy ? (
+              <>
+                <ActionButton wide size="default" variant="secondary" label="Have Eve fill the sponsor portal" pendingLabel="Starting" permission={manage} call={payloads.portalStart(k.id)} />
+                <p className="text-small text-muted-foreground">Eve enters this packet on the sponsor&apos;s portal (a fictional demo portal) on a locked-down desktop and stops before the final Submit for a controller.</p>
+              </>
+            ) : null}
+            <ActionButton wide size="default" variant="default" label="Authorize and submit to sponsor" pendingLabel="Submitting" permission={portalBusy ? { allowed: false, reason: "Eve is entering this packet on the sponsor portal. Approve or stop that run instead, so it is not submitted twice." } : control} call={payloads.sponsorSubmit(k.id)} />
             <p className="text-small text-muted-foreground">Submitting is the release: the sponsor pays from this packet. Organizers prepare packets; a controller submits them.</p>
           </>
         ) : k.status === "exception" || k.status === "questioned" ? (

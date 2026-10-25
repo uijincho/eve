@@ -52,4 +52,4 @@ This records the implemented scope against `PRD.md` and `PRODUCT.md`. It is a de
 
 ## Deferred stretch and presentation work
 
-The fictional sponsor portal and computer-use stream, production filing, organizer interviews and a Devpost submission are outside this overnight build. A customer interview or claimed improvement in real payout time must not be inferred from the synthetic demonstration.
+The fictional sponsor portal and computer-use stream are now built (see [computer use](computer-use.md)). Production filing, organizer interviews and a Devpost submission are outside this overnight build. A customer interview or claimed improvement in real payout time must not be inferred from the synthetic demonstration.

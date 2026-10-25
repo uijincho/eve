@@ -116,6 +116,7 @@ function RunEntry({ run, onStep, snapshot }: { run: Run; onStep: (d: Decision) =
   const expanded = open || live;
   const last = run.steps[run.steps.length - 1];
   const heading = runHeading(run, snapshot);
+  const portal = (snapshot.portalRuns ?? []).find((r) => r.workflowRunId === run.runId);
   return (
     <li className="flex flex-col">
       <button
@@ -163,6 +164,14 @@ function RunEntry({ run, onStep, snapshot }: { run: Run; onStep: (d: Decision) =
             </li>
           ))}
         </ol>
+      ) : null}
+      {expanded && portal?.streamUrl ? (
+        <div className="flex flex-col gap-1 px-3 pb-3 pl-8">
+          <div className="overflow-hidden rounded-lg border bg-rail">
+            <iframe src={portal.streamUrl} title={`Live view of Eve on the sponsor portal for ${heading.name}, view only`} className="block aspect-[4/3] w-full" />
+          </div>
+          <p className="text-caption text-muted-foreground">Live desktop, view only. On the portal&apos;s {portal.pageLabel} page.</p>
+        </div>
       ) : null}
     </li>
   );

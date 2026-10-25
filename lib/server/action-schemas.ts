@@ -100,6 +100,10 @@ export const actionSchemas = {
   "sponsor.create": z.strictObject({ payoutId: id }),
   "sponsor.submit": z.strictObject({ id }),
   "sponsor.reconcile": z.strictObject({ id, paidMinor: minor.optional(), acceptShortfall: z.boolean().optional(), note: text(500).optional() }),
+  // Portal runs start and resume workflows, so the actions route handles them outside a transaction.
+  "sponsor.portalStart": z.strictObject({ id }),
+  "sponsor.portalDecide": z.strictObject({ id, decision: z.enum(["approve", "reject"]), reason: text(300).optional() }),
+  "sponsor.portalStop": z.strictObject({ id }),
   "period.lock": z.strictObject({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) }),
   "filings.generate": z.strictObject({ year: z.number().int().min(2020).max(2100).optional() }),
   "demo.reset": z.strictObject({}),

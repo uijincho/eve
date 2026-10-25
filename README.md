@@ -71,4 +71,4 @@ The Vercel project is `eve-calhacks`. Preview deployments use the CLI; GitHub au
 
 See [workflow operations](workflows/README.md) for triggers, reminders and recovery. Vercel's configured daily cron runs on production deployments; a Preview needs a manual authenticated `/api/cron` invocation to exercise that sweep. Durable jobs started by an action run on the Preview itself.
 
-Computer use against a sponsor portal, historical fare intelligence and real tax filing are outside the shipped demo scope. See [requirement coverage](docs/requirement-coverage.md) for the completed behavior and boundaries of each workflow.
+Eve can enter a drafted sponsor packet on a fictional sponsor portal with computer use (E2B desktop and Claude), stopping before the final Submit for a controller; see [computer use](docs/computer-use.md), including a standalone lab at `/lab/computer-use`. Real tax filing is outside the shipped demo scope. See [requirement coverage](docs/requirement-coverage.md) for the completed behavior and boundaries of each workflow.

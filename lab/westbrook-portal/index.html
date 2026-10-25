@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Westbrook Finance · Sign in</title>
+<style>
+  :root {
+    --navy: #1d3557; --navy-2: #2b4a73; --ink: #1b1f24; --muted: #56606c; --line: #cfd6df;
+    --bg: #eef1f5; --white: #ffffff; --error: #a8200d; --error-bg: #fdecea; --ok: #17663d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.4 "DejaVu Sans", Arial, sans-serif; color: var(--ink); background: var(--bg); }
+  header { background: var(--navy); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 8px 24px; }
+  .brand { font-family: "DejaVu Serif", Georgia, serif; font-size: 18px; }
+  .brand small { display: block; font-family: "DejaVu Sans", Arial, sans-serif; font-size: 12px; opacity: .85; }
+  .session { font-size: 12px; text-align: right; line-height: 1.5; }
+  .session button { padding: 2px 8px; font-size: 12px; background: transparent; border-color: #9fb3cc; }
+  .demo { background: #fff4d6; color: #5c4300; font-size: 12px; padding: 3px 24px; border-bottom: 1px solid #ecd9a3; }
+  main { max-width: 780px; margin: 14px auto; background: var(--white); border: 1px solid var(--line); border-radius: 6px; padding: 18px 28px 20px; }
+  h1 { font-family: "DejaVu Serif", Georgia, serif; font-size: 21px; margin: 0 0 2px; color: var(--navy); font-weight: 600; }
+  .lede { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+  .steps { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin: 0 0 10px; padding: 0; list-style: none; }
+  .steps li.on { color: var(--navy); font-weight: 700; }
+  .steps li.done { color: var(--ok); }
+  label { display: block; font-weight: 600; font-size: 13px; margin: 9px 0 3px; }
+  .hint { display: block; font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+  input[type=text], input[type=password], input[type=email], select, textarea {
+    width: 100%; height: 32px; border: 1px solid #8e99a6; border-radius: 4px; padding: 4px 8px; font: inherit; font-size: 14px; background: #fff; color: var(--ink);
+  }
+  input[readonly] { background: #f1f3f6; }
+  input[type=file] { font: inherit; font-size: 13px; }
+  textarea { height: 48px; resize: none; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 18px; }
+  .search { display: flex; gap: 8px; }
+  .search input { flex: 1; }
+  .actions { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
+  button { font: inherit; font-weight: 600; font-size: 14px; padding: 7px 18px; border-radius: 4px; border: 1px solid var(--navy); background: var(--navy); color: #fff; cursor: pointer; }
+  button.secondary { background: #fff; color: var(--navy); }
+  .error { background: var(--error-bg); color: var(--error); border: 1px solid #f0b5ad; padding: 7px 12px; border-radius: 4px; margin: 6px 0; font-size: 14px; font-weight: 600; }
+  .notice { background: #eef3f9; border: 1px solid #c9d6e6; padding: 6px 12px; border-radius: 4px; font-size: 13px; margin: 6px 0; }
+  .box { border: 1px solid var(--line); border-radius: 4px; padding: 4px 12px 10px; margin-top: 10px; }
+  .hidden { display: none !important; }
+  table.review { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.review th { text-align: left; color: var(--muted); font-weight: 600; width: 34%; padding: 4px 8px; border-bottom: 1px solid #e5e9ef; vertical-align: top; }
+  table.review td { padding: 4px 8px; border-bottom: 1px solid #e5e9ef; }
+  .confirm { font-size: 16px; }
+  .confirm strong { display: block; font-size: 26px; color: var(--ok); letter-spacing: .5px; margin: 6px 0; }
+  .login { max-width: 380px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Westbrook University<small>Student Organization Finance</small></div>
+  <div class="session" id="session"></div>
+</header>
+<div class="demo">Demo portal for a fictional university. Nothing entered here is filed or paid.</div>
+
+<main>
+  <ol class="steps hidden" id="steps">
+    <li data-step="payee">1 · Payee</li>
+    <li data-step="payment">2 · Payment</li>
+    <li data-step="documents">3 · Documents</li>
+    <li data-step="review">Review</li>
+  </ol>
+
+  <section data-page="login">
+    <h1>Sign in</h1>
+    <p class="lede">Use your student organization finance account.</p>
+    <form id="login-form" class="login" autocomplete="off">
+      <label for="username">Username</label>
+      <input type="text" id="username" autocomplete="off">
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="off">
+      <div class="error hidden" id="login-error"></div>
+      <div class="actions"><button type="submit">Sign in</button></div>
+    </form>
+  </section>
+
+  <section data-page="payee" class="hidden">
+    <h1>New payment request: Payee</h1>
+    <p class="lede">Who is being paid, and how are they identified for tax?</p>
+    <label for="request-type">Request type</label>
+    <select id="request-type">
+      <option value="">Select…</option>
+      <option>Prize or award</option>
+      <option>Reimbursement</option>
+      <option>Vendor payment</option>
+      <option>Honorarium</option>
+    </select>
+    <label for="payee-search">Search existing payees</label>
+    <div class="search">
+      <input type="text" id="payee-search" placeholder="Name or email">
+      <button type="button" class="secondary" id="search-button">Search</button>
+    </div>
+    <div class="notice hidden" id="search-result"></div>
+    <div class="box">
+      <div class="row">
+        <div><label for="payee-name">Payee legal name</label><input type="text" id="payee-name"></div>
+        <div><label for="payee-email">Payee email</label><input type="email" id="payee-email"></div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="payee-country">Country of tax residence</label>
+          <select id="payee-country">
+            <option value="">Select…</option>
+            <option>United States</option>
+            <option>Canada</option>
+            <option>Mexico</option>
+            <option>United Kingdom</option>
+            <option>India</option>
+            <option>Brazil</option>
+            <option>Germany</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div id="tin-type-field">
+          <label for="tin-type">Taxpayer ID type</label>
+          <select id="tin-type">
+            <option value="">Select…</option>
+            <option value="ssn">SSN</option>
+            <option value="itin">ITIN</option>
+            <option value="foreign">None: foreign person (Form W-8BEN)</option>
+          </select>
+        </div>
+      </div>
+      <div id="tin-number-field" class="hidden">
+        <label for="tin-number"><span id="tin-label">Taxpayer ID number</span><span class="hint" id="tin-hint"></span></label>
+        <input type="text" id="tin-number" autocomplete="off">
+      </div>
+    </div>
+    <div class="error hidden" id="payee-error"></div>
+    <div class="actions"><span></span><button type="button" id="payee-next">Continue</button></div>
+  </section>
+
+  <section data-page="payment" class="hidden">
+    <h1>New payment request: Payment</h1>
+    <p class="lede">Amounts are in US dollars. The finance office pays the net amount.</p>
+    <div class="row3">
+      <div><label for="gross">Gross amount (USD)</label><input type="text" id="gross" inputmode="decimal"></div>
+      <div><label for="withheld">Federal tax withheld (USD)</label><input type="text" id="withheld" inputmode="decimal"></div>
+      <div><label for="net">Net payment (USD)</label><input type="text" id="net" readonly tabindex="-1"></div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="account-code">Account code</label>
+        <select id="account-code">
+          <option value="">Select…</option>
+          <option value="5100">5100 · Travel reimbursement</option>
+          <option value="5200">5200 · Event supplies and food</option>
+          <option value="5300">5300 · Prizes and awards</option>
+          <option value="5400">5400 · Honoraria and stipends</option>
+          <option value="5900">5900 · Other</option>
+        </select>
+      </div>
+      <div>
+        <label for="method">Payment method</label>
+        <select id="method">
+          <option value="">Select…</option>
+          <option>ACH direct deposit (US bank accounts only)</option>
+          <option>Check by mail</option>
+          <option>International wire</option>
+        </select>
+      </div>
+    </div>
+    <label for="purpose">Business purpose</label>
+    <textarea id="purpose"></textarea>
+    <div class="error hidden" id="payment-error"></div>
+    <div class="actions"><button type="button" class="secondary" data-back="payee">Back</button><button type="button" id="payment-next">Continue</button></div>
+  </section>
+
+  <section data-page="documents" class="hidden">
+    <h1>New payment request: Documents</h1>
+    <p class="lede">Attach PDFs. Requests without documents are returned unprocessed.</p>
+    <label for="supporting">Supporting document<span class="hint">Award letter, receipt or invoice</span></label>
+    <input type="file" id="supporting" accept=".pdf,application/pdf">
+    <div id="tax-form-field" class="hidden">
+      <label for="tax-form">Tax form (Form W-8BEN)<span class="hint">Required for payees who are not US persons</span></label>
+      <input type="file" id="tax-form" accept=".pdf,application/pdf">
+    </div>
+    <div class="error hidden" id="documents-error"></div>
+    <div class="actions"><button type="button" class="secondary" data-back="payment">Back</button><button type="button" id="documents-next">Continue</button></div>
+  </section>
+
+  <section data-page="review" class="hidden">
+    <h1>Review and submit</h1>
+    <p class="lede">Check every value. Submitting sends this request to the finance office.</p>
+    <table class="review"><tbody id="review-table"></tbody></table>
+    <div class="error hidden" id="review-error"></div>
+    <div class="actions"><button type="button" class="secondary" data-back="documents">Back</button><button type="button" id="submit-request">Submit request</button></div>
+  </section>
+
+  <section data-page="submitted" class="hidden">
+    <h1>Request submitted</h1>
+    <p class="confirm">Confirmation number<strong id="confirmation"></strong>Status: pending finance office review (usually 10 business days).</p>
+    <div class="actions"><span></span><button type="button" id="new-request">Start another request</button></div>
+  </section>
+
+  <section data-page="expired" class="hidden">
+    <h1>Session expired</h1>
+    <p class="lede">You were signed out after a period without activity. Entries that were not submitted were cleared.</p>
+    <div class="actions"><span></span><button type="button" id="sign-in-again">Sign in again</button></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const TITLES = { login: "Sign in", payee: "Payee", payment: "Payment details", documents: "Documents", review: "Review and submit", submitted: "Submitted", expired: "Session expired" };
+  const ORDER = ["payee", "payment", "documents", "review"];
+  const $ = (id) => document.getElementById(id);
+  let config = { strictSsn: false, timeoutSeconds: 900 };
+  let user = null;
+  let draft = {};
+  let lastActivity = Date.now();
+
+  // The portal's own activity log, read by Eve's lab to show what the portal said.
+  function report(type, detail) {
+    fetch("/api/event", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type, detail }), keepalive: true }).catch(() => {});
+  }
+
+  function show(page) {
+    report("page", page);
+    document.querySelectorAll("section[data-page]").forEach((s) => s.classList.toggle("hidden", s.dataset.page !== page));
+    document.title = "Westbrook Finance · " + TITLES[page];
+    const index = ORDER.indexOf(page);
+    $("steps").classList.toggle("hidden", index < 0);
+    document.querySelectorAll("#steps li").forEach((li) => {
+      const i = ORDER.indexOf(li.dataset.step);
+      li.className = i === index ? "on" : i < index ? "done" : "";
+    });
+    window.scrollTo(0, 0);
+  }
+
+  function fail(id, message) { const el = $(id); el.textContent = message; el.classList.remove("hidden"); report("error", message); }
+  function clear(id) { $(id).classList.add("hidden"); }
+  function money(text) { return /^\d{1,7}(\.\d{1,2})?$/.test(text.trim()) ? Math.round(parseFloat(text) * 100) : null; }
+  function usd(cents) { return "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function foreign() { return draft.country !== "United States"; }
+
+  function renderSession() {
+    if (!user) { $("session").textContent = ""; return; }
+    const left = Math.max(0, config.timeoutSeconds - Math.floor((Date.now() - lastActivity) / 1000));
+    const m = Math.floor(left / 60), s = String(left % 60).padStart(2, "0");
+    $("session").innerHTML = "";
+    const who = document.createElement("div"); who.textContent = "Signed in as " + user;
+    const timer = document.createElement("div"); timer.textContent = "Session expires in " + m + ":" + s;
+    $("session").append(who, timer);
+    if (left === 0) { user = null; draft = {}; resetForms(); show("expired"); renderSession(); }
+  }
+  ["click", "keydown", "input", "change"].forEach((type) => document.addEventListener(type, () => { lastActivity = Date.now(); }, true));
+  setInterval(renderSession, 1000);
+
+  function resetForms() {
+    document.querySelectorAll("input, select, textarea").forEach((el) => { if (el.type === "file" || el.tagName !== "SELECT") el.value = ""; else el.selectedIndex = 0; });
+    $("tax-form-field").classList.add("hidden");
+    $("tin-number-field").classList.add("hidden");
+    $("search-result").classList.add("hidden");
+    applyTinMode();
+  }
+
+  function applyTinMode() {
+    if (config.strictSsn) {
+      $("tin-type-field").classList.add("hidden");
+      $("tin-number-field").classList.remove("hidden");
+      $("tin-label").textContent = "Social Security Number";
+      $("tin-hint").textContent = "Required for every payee. Requests without an SSN cannot be processed.";
+    } else {
+      $("tin-type-field").classList.remove("hidden");
+      const type = $("tin-type").value;
+      $("tin-number-field").classList.toggle("hidden", type !== "ssn" && type !== "itin");
+      $("tin-label").textContent = type === "itin" ? "ITIN" : "SSN";
+      $("tin-hint").textContent = "9 digits";
+    }
+  }
+  $("tin-type").addEventListener("change", applyTinMode);
+
+  $("login-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    clear("login-error");
+    const response = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: $("username").value.trim(), password: $("password").value }) });
+    if (!response.ok) { fail("login-error", "Incorrect username or password."); return; }
+    user = $("username").value.trim();
+    $("password").value = "";
+    lastActivity = Date.now();
+    renderSession();
+    show("payee");
+  });
+
+  $("search-button").addEventListener("click", () => {
+    const q = $("payee-search").value.trim();
+    const el = $("search-result");
+    el.textContent = q ? "No payee matching “" + q + "” is on file. Enter a new payee below." : "Enter a name or email to search.";
+    el.classList.remove("hidden");
+  });
+
+  $("payee-next").addEventListener("click", () => {
+    clear("payee-error");
+    const name = $("payee-name").value.trim(), email = $("payee-email").value.trim(), country = $("payee-country").value;
+    const type = config.strictSsn ? "ssn" : $("tin-type").value;
+    const digits = $("tin-number").value.replace(/\D/g, "");
+    if (!$("request-type").value) return fail("payee-error", "Choose a request type.");
+    if (!name || !email || !country) return fail("payee-error", "Enter the payee's legal name, email and country of tax residence.");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail("payee-error", "Enter a valid email address.");
+    if (config.strictSsn && digits.length !== 9) return fail("payee-error", "Enter the payee's 9-digit Social Security Number. Every payee needs one.");
+    if (!type) return fail("payee-error", "Choose a taxpayer ID type.");
+    if ((type === "ssn" || type === "itin") && digits.length !== 9) return fail("payee-error", "Enter a 9-digit " + type.toUpperCase() + ".");
+    if (type === "foreign" && country === "United States") return fail("payee-error", "US persons must provide an SSN or ITIN.");
+    Object.assign(draft, { requestType: $("request-type").value, name, email, country, tinType: type, tinDigits: type === "foreign" ? "" : digits });
+    show("payment");
+  });
+
+  function updateNet() {
+    const g = money($("gross").value), w = money($("withheld").value || "0");
+    $("net").value = g !== null && w !== null && w <= g ? usd(g - w).slice(1) : "";
+  }
+  $("gross").addEventListener("input", updateNet);
+  $("withheld").addEventListener("input", updateNet);
+
+  $("payment-next").addEventListener("click", () => {
+    clear("payment-error");
+    const gross = money($("gross").value), withheld = money($("withheld").value || "0");
+    const account = $("account-code").value, method = $("method").value, purpose = $("purpose").value.trim();
+    if (gross === null || gross === 0) return fail("payment-error", "Enter the gross amount as dollars and cents, for example 1250.00.");
+    if (withheld === null || withheld > gross) return fail("payment-error", "Tax withheld must be a dollar amount no larger than the gross amount.");
+    if (!account) return fail("payment-error", "Choose an account code.");
+    if (draft.requestType === "Prize or award" && account !== "5300") return fail("payment-error", "Prizes and awards must use account code 5300.");
+    if (!method) return fail("payment-error", "Choose a payment method.");
+    if (foreign() && method.startsWith("ACH")) return fail("payment-error", "ACH is only available for US bank accounts. Choose another payment method.");
+    if (purpose.length < 10) return fail("payment-error", "Describe the business purpose in a sentence.");
+    Object.assign(draft, { grossCents: gross, withheldCents: withheld, netCents: gross - withheld, accountCode: account, accountLabel: $("account-code").selectedOptions[0].textContent, method, purpose });
+    show("documents");
+  });
+
+  $("documents-next").addEventListener("click", () => {
+    clear("documents-error");
+    const supporting = $("supporting").files[0];
+    const taxForm = $("tax-form").files[0];
+    if (!supporting) return fail("documents-error", "Attach a supporting document.");
+    if (foreign()) {
+      if ($("tax-form-field").classList.contains("hidden") || !taxForm) {
+        $("tax-form-field").classList.remove("hidden");
+        return fail("documents-error", "Non-US payees require Form W-8BEN attached. Use the Tax form field below.");
+      }
+      if (!/w-?8\s?ben/i.test(taxForm.name)) return fail("documents-error", "The tax form must be a Form W-8BEN.");
+    }
+    Object.assign(draft, { supportingDocument: supporting.name, taxForm: foreign() ? taxForm.name : "" });
+    renderReview();
+    show("review");
+  });
+
+  function renderReview() {
+    const tin = draft.tinType === "foreign" ? "None: foreign person (Form W-8BEN)" : draft.tinType.toUpperCase() + " ending " + draft.tinDigits.slice(-4);
+    const rows = [
+      ["Request type", draft.requestType], ["Payee", draft.name], ["Email", draft.email], ["Country of tax residence", draft.country],
+      ["Taxpayer ID", tin], ["Gross amount", usd(draft.grossCents)], ["Federal tax withheld", usd(draft.withheldCents)],
+      ["Net payment", usd(draft.netCents)], ["Account code", draft.accountLabel], ["Payment method", draft.method],
+      ["Business purpose", draft.purpose], ["Supporting document", draft.supportingDocument], ["Tax form", draft.taxForm || "Not required"],
+    ];
+    const body = $("review-table");
+    body.innerHTML = "";
+    for (const [k, v] of rows) {
+      const tr = document.createElement("tr");
+      const th = document.createElement("th"); th.textContent = k;
+      const td = document.createElement("td"); td.textContent = v;
+      tr.append(th, td); body.append(tr);
+    }
+  }
+
+  $("submit-request").addEventListener("click", async () => {
+    clear("review-error");
+    const response = await fetch("/api/submit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ draft: { ...draft, submittedBy: user } }) });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) return fail("review-error", result.message || "The request could not be submitted.");
+    $("confirmation").textContent = result.confirmation;
+    show("submitted");
+  });
+
+  document.querySelectorAll("[data-back]").forEach((b) => b.addEventListener("click", () => show(b.dataset.back)));
+  $("new-request").addEventListener("click", () => { draft = {}; resetForms(); show("payee"); });
+  $("sign-in-again").addEventListener("click", () => show("login"));
+
+  fetch("/api/config").then((r) => r.json()).then((c) => { config = c; applyTinMode(); }).catch(() => applyTinMode());
+  show("login");
+})();
+</script>
+</body>
+</html>

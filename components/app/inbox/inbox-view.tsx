@@ -179,7 +179,9 @@ function Inbox({ snapshot }: { snapshot: AppSnapshot }) {
             </ul>
             {selected ? (
               <aside aria-label="Selected item" className="border-l bg-background px-5 py-5 max-md:hidden">
-                <div className="sticky top-5">
+                {/* A detail taller than the screen scrolls on its own, so its actions stay reachable. */}
+                <div className="sticky top-5 max-h-[calc(100dvh-2.5rem)] overflow-y-auto overscroll-contain">
+
                   <ItemDetail key={selected.id} item={selected} snapshot={snapshot} onEvidence={() => setEvidenceFor(selected)} />
                 </div>
               </aside>
@@ -254,6 +256,8 @@ function objectIdsOf(item: InboxItem): string[] {
     case "award":
       return [r.award.id, ...(r.payout ? [r.payout.id] : [])];
     case "packet":
+      return [r.packet.id, r.packet.payoutId];
+    case "portal":
       return [r.packet.id, r.packet.payoutId];
     case "person":
       return [r.person.id];

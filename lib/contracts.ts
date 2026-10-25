@@ -76,6 +76,18 @@ export interface SponsorPacket {
   status: "draft" | "submitted" | "questioned" | "paid" | "exception";
   submittedAt?: string; dueAt: string; reason: string; documentId?: string;
 }
+/** Eve entering a sponsor packet on the sponsor's web portal (computer use). Staff only. */
+export interface PortalRun {
+  id: string; packetId: string; workflowRunId?: string;
+  status: "starting" | "filling" | "awaiting_approval" | "submitting" | "submitted" | "escalated" | "rejected" | "failed" | "stopped";
+  page: string; pageLabel: string; pagesVisited: string[]; turns: number;
+  /** View-only live desktop, present only while the run is active. */
+  streamUrl?: string;
+  reviewCheck?: { label: string; packet: string; portal: string; ok: boolean }[];
+  escalation?: { field: string; reason: string };
+  confirmation?: string; approvedByName?: string; approvedAt?: string; error?: string;
+  requestedBy: string; createdAt: string; updatedAt: string;
+}
 export interface Decision {
   id: string; runId: string; objectId: string; objectType: string; personName: string;
   action: string; summary: string; actor: string; createdAt: string;
@@ -90,7 +102,7 @@ export interface Scoreboard { total: number; evaluated: number; caught: number; 
 export interface AppSnapshot {
   actor: Actor; personas: Actor[]; org: Organization; event: EventRecord;
   people: Person[]; claims: Claim[]; awards: Award[]; payouts: Payout[];
-  budgets: BudgetLine[]; packets: SponsorPacket[]; decisions: Decision[];
+  budgets: BudgetLine[]; packets: SponsorPacket[]; portalRuns: PortalRun[]; decisions: Decision[];
   filings: Filing[]; rules: TaxRule[]; notices: Notice[]; scoreboard: Scoreboard;
   demo: boolean; now: string; integrationStatus: { name: string; mode: string; detail: string }[];
 }
@@ -99,7 +111,8 @@ export type AppAction =
   | "tax.submit" | "claim.submit" | "claim.review" | "claim.explain" | "award.create" | "award.choose"
   | "award.split" | "award.confirm" | "award.fulfill" | "payout.resolveRule" | "payout.propose" | "payout.release"
   | "payout.bankChange" | "payout.verify" | "payout.retry" | "sponsor.create"
-  | "sponsor.submit" | "sponsor.reconcile" | "period.lock" | "filings.generate"
+  | "sponsor.submit" | "sponsor.reconcile" | "sponsor.portalStart" | "sponsor.portalDecide" | "sponsor.portalStop"
+  | "period.lock" | "filings.generate"
   | "demo.reset" | "demo.run" | "agent.run" | "flight.search" | "flight.request";
 export interface ActionRequest { action: AppAction; payload: Record<string, unknown> }
 export interface ActionResult { ok: boolean; message: string; data?: Record<string, unknown> }

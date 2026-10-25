@@ -246,6 +246,24 @@ export function ItemActions({
         </div>
       );
     }
+    case "portal": {
+      const { run, packet: k } = ref;
+      const control = canControl(actor, snapshot);
+      return (
+        <div className={wrap}>
+          {run.status === "awaiting_approval" ? (
+            <>
+              <ActionButton variant={first} size={pane ? "default" : "sm"} wide={pane} label="Approve and submit" pendingLabel="Approving" permission={control} call={payloads.portalDecide(run.id, "approve")} />
+              {control.allowed ? <ActionButton variant="ghost" label="Reject" pendingLabel="Rejecting" call={payloads.portalDecide(run.id, "reject")} /> : null}
+            </>
+          ) : null}
+          <LinkButton href={`/sponsor?packet=${encodeURIComponent(k.id)}`} size="sm" variant={run.status === "awaiting_approval" ? "ghost" : first}>
+            Open packet
+          </LinkButton>
+          {trailing}
+        </div>
+      );
+    }
     case "person": {
       return (
         <div className={wrap}>

@@ -104,6 +104,7 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
   }
 
   const personas: C.Actor[] = members.map((m) => ({ id: m.id, name: m.name, email: m.email, role: m.role, personId: m.personId ?? undefined }));
+  const portalRuns: C.PortalRun[] = self ? [] : await (await import("@/lib/computer-use/portal-run")).portalRunsFor(orgId);
   const scoreboard: C.Scoreboard = self || !org.isDemo
     ? { total: 0, evaluated: 0, caught: 0, missed: 0, falsePositives: 0, wrongfulPayouts: 0, results: [] }
     : await loadScoreboardView(db, orgId);
@@ -122,6 +123,7 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
       id: pk.id, payoutId: pk.payoutId, personName: names.get(payoutPerson.get(pk.payoutId) ?? "") ?? "", requestedMinor: str(pk.requestedMinor),
       paidMinor: str(pk.paidMinor), status: pk.status, submittedAt: iso(pk.submittedAt), dueAt: pk.dueAt.toISOString(), reason: pk.reason, documentId: pk.documentId ?? undefined,
     })),
+    portalRuns,
     decisions: decisions.map((d) => ({
       id: d.id, runId: d.runId, objectId: d.objectId, objectType: d.objectType, personName: d.personName, action: d.action, summary: d.summary,
       actor: d.actor, createdAt: d.createdAt.toISOString(), status: d.status, tool: d.tool, ruleId: d.ruleId ?? undefined, ruleVersion: d.ruleVersion ?? undefined,

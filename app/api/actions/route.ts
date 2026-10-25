@@ -29,6 +29,20 @@ export async function POST(request: Request) {
     const parsed = actionSchemas["payout.release"].safeParse(payload ?? {});
     if (!parsed.success) return json({ ok: false, message: "Choose the payout ids to release." }, 400);
     response = await queueControllerRelease(actor, "id" in parsed.data ? [parsed.data.id] : parsed.data.ids);
+  } else if (action === "sponsor.portalStart" || action === "sponsor.portalDecide" || action === "sponsor.portalStop") {
+    // Computer use on the sponsor portal: these start or resume a workflow, so no transaction wraps them.
+    const parsed = actionSchemas[action].safeParse(payload ?? {});
+    if (!parsed.success) return json({ ok: false, message: "Invalid portal request." }, 400);
+    const portal = await import("@/lib/computer-use/portal-run");
+    try {
+      const p = parsed.data as { id: string; decision?: "approve" | "reject"; reason?: string };
+      response = action === "sponsor.portalStart" ? await portal.startPortalRun(actor, p.id)
+        : action === "sponsor.portalDecide" ? await portal.decidePortalRun(actor, p.id, p.decision!, p.reason)
+          : await portal.stopPortalRun(actor, p.id);
+    } catch (error) {
+      console.error(`[actions] ${action} failed`, error instanceof Error ? error.name : "error");
+      return json({ ok: false, message: "The background service is unavailable. Nothing was submitted; try again shortly." }, 503);
+    }
   } else if (action === "agent.run" || action === "demo.run") {
     const parsed = actionSchemas[action].safeParse(payload ?? {});
     if (!parsed.success) return json({ ok: false, message: "Invalid agent run request." }, 400);
