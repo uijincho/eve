@@ -147,7 +147,9 @@ describe.skipIf(!hasDatabase)("bulk sponsor releases", { timeout: 180000 }, () =
     expect(released.ok, released.message).toBe(true);
     const target = { orgId, batchId: String(released.data!.batchId) };
     await batch.beginBatch(target, "cloud-test");
-    for (const p of payouts) await batch.prepareBatchItem(target, p.id);
+    const { prepareBatchDrafts } = await import("@/lib/computer-use/batch-prepare");
+    expect(await prepareBatchDrafts(target)).toBe(true);
+    expect(await prepareBatchDrafts(target)).toBe(true);
     await batch.prepareBatchBundle(target);
     expect(await preflightCloudBatch(target)).toBe(true);
     cloud.cloudRequest.mockImplementation(async (path: string) => {
@@ -251,4 +253,85 @@ describe.skipIf(!hasDatabase)("bulk sponsor releases", { timeout: 180000 }, () =
     expect((await batch.cancelBatch(actor("controller"), target.batchId)).ok).toBe(true);
     expect(await batch.prepareBatchItems(target, ids!)).toBe(false);
   });
+  it("prepares 99 payments with bounded SQL work and replays without duplicate documents", async () => {
+    const { prepareBatchDrafts } = await import("@/lib/computer-use/batch-prepare");
+    const { Client } = await import("pg");
+    const base = await proposed();
+    const [p] = await db.select().from(s.payout).where(eq(s.payout.id, base.id));
+    const [person] = await db.select().from(s.person).where(eq(s.person.id, p.personId));
+    const [profile] = await db.select().from(s.taxProfile).where(eq(s.taxProfile.personId, p.personId));
+    const [method] = await db.select().from(s.payoutMethod).where(eq(s.payoutMethod.id, p.payoutMethodId!));
+    const [award] = await db.select().from(s.award).where(eq(s.award.id, p.awardId!));
+    const ids = Array.from({ length: 99 }, (_, i) => `${orgId}_bulk${i}`);
+    await db.insert(s.person).values(ids.map((id) => ({ ...person, id, email: `${id}@example.test` })));
+    await db.insert(s.taxProfile).values(ids.map((id) => ({ ...profile, id: `${id}_tax`, personId: id })));
+    await db.insert(s.payoutMethod).values(ids.map((id) => ({ ...method, id: `${id}_method`, personId: id })));
+    await db.insert(s.award).values(ids.map((id) => ({ ...award, id: `${id}_award`, personId: id })));
+    const payments = await db.insert(s.payout).values(ids.map((id) => ({ ...p, id: `${id}_payout`, personId: id, awardId: `${id}_award`, payoutMethodId: `${id}_method`, idempotencyKey: `${id}_key` }))).returning();
+    const release = await batch.releaseBatch(actor("controller"), { payouts: payments.map((row) => ({ id: row.id, quote: batchQuoteKey(row) })) });
+    expect(release.ok, release.message).toBe(true);
+    const target = { orgId, batchId: String(release.data!.batchId) };
+    await batch.beginBatch(target, "bulk-draft-test");
+    const query = vi.spyOn(Client.prototype, "query");
+    const started = performance.now();
+    let count = 0;
+    try {
+      expect(await prepareBatchDrafts(target)).toBe(true);
+      count = query.mock.calls.length;
+      expect(count).toBeGreaterThan(10);
+      expect(count).toBeLessThan(40);
+    } finally { query.mockRestore(); }
+    console.log(`Prepared 99 payments in ${((performance.now() - started) / 1000).toFixed(2)}s using ${count} SQL calls.`);
+    const docs = await db.select({ id: s.document.id }).from(s.document).where(eq(s.document.orgId, orgId));
+    expect(await prepareBatchDrafts(target)).toBe(true);
+    expect(await db.select({ id: s.document.id }).from(s.document).where(eq(s.document.orgId, orgId))).toEqual(docs);
+    const [saved] = await db.select().from(s.disbursementBatch).where(eq(s.disbursementBatch.id, target.batchId));
+    expect(saved.evidence).toHaveLength(99);
+    expect(new Set(saved.evidence.map((e) => e.packetId)).size).toBe(99);
+    expect(await batch.prepareBatchBundle(target)).toBe(true);
+    const [bundled] = await db.select().from(s.disbursementBatch).where(eq(s.disbursementBatch.id, target.batchId));
+    expect(bundled.manifest.totals.count).toBe(99);
+    expect(bundled.manifest.payments).toHaveLength(99);
+    const persisted = await db.select().from(s.payout).where(eq(s.payout.orgId, orgId));
+    expect(persisted.filter((row) => payments.some((p) => p.id === row.id)).every((row) => row.status === "proposed")).toBe(true);
+  });
+  it("allows cancellation while rendering and refuses documents built from changed financial inputs", async () => {
+    const { prepareBatchDrafts } = await import("@/lib/computer-use/batch-prepare");
+    const renderer = await import("@/lib/server/sponsor-document");
+    const original = renderer.renderSponsorDocument;
+    for (const change of ["cancel", "bank"] as const) {
+      const p = await proposed();
+      const release = await batch.releaseBatch(actor("controller"), { payouts: [p] });
+      const target = { orgId, batchId: String(release.data!.batchId) };
+      await batch.beginBatch(target, `race-${change}`);
+      const spy = vi.spyOn(renderer, "renderSponsorDocument").mockImplementationOnce(async (...args) => {
+        if (change === "cancel") expect((await batch.cancelBatch(actor("controller"), target.batchId)).ok).toBe(true);
+        else await db.update(s.payout).set({ bankVersion: 100 }).where(eq(s.payout.id, p.id));
+        return original(...args);
+      });
+      try {
+        if (change === "cancel") expect(await prepareBatchDrafts(target)).toBe(false);
+        else await expect(prepareBatchDrafts(target)).rejects.toThrow("Payment details changed");
+      } finally { spy.mockRestore(); }
+      expect(await db.select().from(s.sponsorPacket).where(eq(s.sponsorPacket.payoutId, p.id))).toHaveLength(0);
+      const [saved] = await db.select().from(s.disbursementBatch).where(eq(s.disbursementBatch.id, target.batchId));
+      expect(saved.evidence).toHaveLength(0);
+    }
+  });
+
+  it("preserves earlier preparation evidence and rolls back new drafts if it changed", async () => {
+    const { prepareBatchDrafts } = await import("@/lib/computer-use/batch-prepare");
+    const payments = [await proposed(), await proposed()];
+    const release = await batch.releaseBatch(actor("controller"), { payouts: payments });
+    const target = { orgId, batchId: String(release.data!.batchId) };
+    await batch.beginBatch(target, "partial-draft-test");
+    await batch.prepareBatchItem(target, payments[0].id);
+    const [p] = await db.select().from(s.payout).where(eq(s.payout.id, payments[0].id));
+    await db.update(s.award).set({ title: "Changed after preparation" }).where(eq(s.award.id, p.awardId!));
+    const before = await db.select({ id: s.document.id }).from(s.document).where(eq(s.document.orgId, orgId));
+    await expect(prepareBatchDrafts(target)).rejects.toThrow("previously prepared packet changed");
+    expect(await db.select().from(s.sponsorPacket).where(eq(s.sponsorPacket.payoutId, payments[1].id))).toHaveLength(0);
+    expect(await db.select({ id: s.document.id }).from(s.document).where(eq(s.document.orgId, orgId))).toEqual(before);
+  });
+
 });

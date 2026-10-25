@@ -16,7 +16,9 @@ pnpm seed
 pnpm dev
 ```
 
-Open <http://localhost:3000>. Migrations use the direct Postgres connection with TLS verification; normal traffic uses the pooled connection. The seed is a fictional 300-person event and can take about a minute across a remote database connection. It does not create real payments or send external notifications.
+Open <http://localhost:3000>. Migrations use the direct Postgres connection with TLS verification; normal traffic uses the pooled connection. The default seed is a fictional 60-person event with 15 release-ready payments: seven reimbursements (flights, ground transport, baggage and supplies) and eight prizes, spanning US and international recipients. It also includes blocked and pending cases for the live review. It does not create real payments or send external notifications.
+
+Use `pnpm seed --reset` (or Reset demo in the app) to replace the shared sample with this smaller dataset. Existing samples are not changed automatically. The original 300-person benchmark is available with `pnpm seed --reset --benchmark`; `pnpm verify:demo --reset` also uses that larger dataset.
 
 With `EVE_DEMO_MODE=true`, `/login` offers sample organizer, controller, auditor and attendee personas. Anonymous demo visitors enter as the sample organizer. The attendee portal is `/portal`; the organizer home is `/overview` (`/` redirects there) and the inbox is `/inbox`. Disable demo mode for a private installation. Real-account onboarding and invitation endpoint contracts are in [ONBOARDING.md](lib/server/ONBOARDING.md).
 

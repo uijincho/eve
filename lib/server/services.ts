@@ -22,10 +22,11 @@ import { destinationFor, fixtureOrigins, fixtureOffers, suggestFlights } from "@
 import { offerSigningKeyFromEnv, signOffers, verifyFlightRequest } from "@/lib/flights/verify";
 import { lockPeriod, postJournal, type JournalLineInput } from "@/lib/ledger";
 import { convertMinor as convertFx } from "@/lib/engines/money";
-import { renderPayoutPacket, renderTaxFormReceipt } from "@/lib/pdf";
+import { renderTaxFormReceipt } from "@/lib/pdf";
 import { renderW8ben } from "@/lib/pdf/w8ben";
 import { W8BEN_REVISION } from "@/lib/tax/w8ben";
 
+import { renderSponsorDocument } from "./sponsor-document";
 import { actionSchemas } from "./action-schemas";
 import { explainClaim, prepareClaim, processClaim, reviewClaim, submitClaim, type ClaimEvidence } from "./claims";
 import {
@@ -620,15 +621,7 @@ export async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payo
   if (methods.pending) throw conflict("Bank details are pending verification; the packet cannot carry payout instructions yet.");
   const id = newId("sp");
   const requested = payout.grossMinor - payout.withholdingMinor;
-  const converts = payout.destinationCurrency !== payout.currency;
-  const pdf = await renderPayoutPacket({
-    packetId: id, sponsorName: org.sponsorName || "Fiscal sponsor", preparedAt: new Date().toISOString(),
-    payee: { name: person.name, country: person.country, taxForm: profile?.form ?? expectedForm(person, org.country), taxStatus: effectiveTaxStatus(profile, new Date()), payoutLast4: methods.active?.last4 },
-    source: { type: payout.sourceType, id: (payout.claimId ?? payout.awardId)!, description: payout.reason.slice(0, 120) },
-    amounts: { currency: payout.currency, grossMinor: payout.grossMinor.toString(), withholdingMinor: payout.withholdingMinor.toString(), feeMinor: "0", netMinor: requested.toString(), destinationCurrency: payout.destinationCurrency, destinationNetMinor: sponsorDestination(payout, requested).toString(), fxRate: payout.fxRate, ...(converts ? { fxSource: "payout's quoted rate; estimate, the sponsor's rate may differ" } : {}) },
-    provider: SPONSOR_PROVIDER, truth: "Simulated", rule: { id: payout.ruleId, version: payout.ruleVersion, verified: payout.ruleVerified, reportingForm: payout.reportingForm ?? undefined },
-    approvals: [], attachments: [],
-  });
+  const pdf = await renderSponsorDocument(id, org, person, payout, profile, methods.active);
   const doc = await storeDocument(tx, { orgId: actor.orgId, personId: person.id, uploadedBy: actor.memberId, kind: "sponsor_packet", name: `${id}.pdf`, mimeType: "application/pdf", bytes: pdf });
   await tx.insert(s.sponsorPacket).values({ id, orgId: actor.orgId, payoutId: payout.id, requestedMinor: requested, status: "draft", feesPaidBy: org.feesPaidBy, dueAt: new Date(Date.now() + org.sponsorTurnaroundDays * 86_400_000), documentId: doc.id });
   await recordDecision(tx, { orgId: actor.orgId, objectType: "packet", objectId: id, personId: person.id, personName: person.name, action: "sponsor.create", summary: `Sponsor packet drafted for ${usd(requested)} (gross ${usd(payout.grossMinor)} less ${usd(payout.withholdingMinor)} withholding). A controller must submit it; it cannot also be released directly.`, actor, status: "waiting", tool: "sponsorPacket", documentId: doc.id, facts: { payoutId: payout.id, terms: termsKey(payout) } });

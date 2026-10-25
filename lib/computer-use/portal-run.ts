@@ -23,6 +23,7 @@ import { assertNotInBatch, assertNotBeneficiary } from "@/lib/server/payouts";
 import { checkReviewPage, type ReviewCheck } from "./agent";
 import { bootComputer, capture, currentPage, portalEvents } from "./computer";
 import { samplePdf } from "./documents";
+import { mapConcurrent } from "./concurrent";
 import { PAGE_LABELS, type PortalPage } from "./guards";
 import { packetBrief, PORTAL_NAME, type PortalPacket } from "./packet";
 import { PortalPacketError, toPortalPacket } from "./portal-packet";
@@ -124,9 +125,8 @@ export async function loadPortalPackets(orgId: string, packetIds: string[], db: 
   const documents = documentIds.length ? await db.select({ id: s.document.id, bytes: s.document.bytes }).from(s.document)
     .where(and(inArray(s.document.id, documentIds), eq(s.document.orgId, orgId), eq(s.document.mimeType, "application/pdf"))) : [];
   const stored = new Map(documents.map((doc) => [doc.id, new Uint8Array(doc.bytes)]));
-  const loaded: LoadedPortalPacket[] = [];
-  // Generate any fallback PDFs sequentially rather than scheduling up to 200 CPU-heavy tasks.
-  for (const { row, packet } of prepared) {
+  // Bound PDF work instead of queuing every recipient at once.
+  return mapConcurrent(prepared, 4, async ({ row, packet }) => {
     const { profile } = row;
     const files = [{
       path: packet.documents.supporting,
@@ -141,9 +141,8 @@ export async function loadPortalPackets(orgId: string, packetIds: string[], db: 
         ]),
       });
     }
-    loaded.push({ packet, documents: files, person: row.person });
-  }
-  return loaded;
+    return { packet, documents: files, person: row.person };
+  });
 }
 
 // ---------------------------------------------------------------- actions

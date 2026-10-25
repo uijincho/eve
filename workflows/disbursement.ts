@@ -2,7 +2,7 @@ import { createHook, getWorkflowMetadata, sleep } from "workflow";
 import type { BatchTarget } from "@/lib/computer-use/batch-run";
 
 /** One hosted Browser Use run owns the entire batch. Polling starts no models. */
-export async function disbursementWorkflow(target: BatchTarget, options?: { batchPreparation: boolean }) {
+export async function disbursementWorkflow(target: BatchTarget, options?: { batchPreparation: boolean; bulkDrafts?: boolean }) {
   "use workflow";
   using hook = createHook({ token: `bulk:${target.orgId}:${target.batchId}` });
   if (await hook.getConflict()) return;
@@ -12,7 +12,9 @@ export async function disbursementWorkflow(target: BatchTarget, options?: { batc
     if (!payoutIds) return;
     // Keep per-payment database checkpoints while amortizing step dispatch.
     // Existing cloud runs have no options; retain their recorded step sequence.
-    if (options?.batchPreparation) {
+    if (options?.bulkDrafts) {
+      if (!await prepareDrafts(target)) return;
+    } else if (options?.batchPreparation) {
       for (let offset = 0; offset < payoutIds.length; offset += 10) {
         if (!await prepareItems(target, payoutIds.slice(offset, offset + 10))) return;
         if (offset + 10 <= payoutIds.length) await sleep("1s");
@@ -56,6 +58,10 @@ async function prepareItem(t: BatchTarget, id: string) {
 async function prepareItems(t: BatchTarget, ids: string[]) {
   "use step";
   return (await import("@/lib/computer-use/batch-run")).prepareBatchItems(t, ids);
+}
+async function prepareDrafts(t: BatchTarget) {
+  "use step";
+  return (await import("@/lib/computer-use/batch-prepare")).prepareBatchDrafts(t);
 }
 async function bundle(t: BatchTarget) {
   "use step";

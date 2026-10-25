@@ -4,6 +4,10 @@ Disburse groups eligible approved/proposed payouts into a batch. A controller re
 
 `workflows/disbursement.ts` creates one ZIP and runs the payment checks before opening a browser. It starts **one Browser Use Cloud V4 run and one session for the entire batch**. That run signs in, uploads the bundle, reviews the totals and submits once. There is no per-recipient agent. Durable polling observes Cloud status and live-view events; it does not start additional model tasks.
 
+New releases bulk-load draft inputs and render up to four PDFs concurrently, outside the finance lock. A second locked transaction verifies that the inputs and preparation attempt are unchanged, then inserts documents, packets and per-packet audit records together. Retries reuse complete drafts; cancellation during rendering saves nothing. Existing workflows retain their recorded preparation step sequence. Full release-policy checks happen before Cloud starts, rather than once per draft and again before submission.
+
+The batch card shows the saved packet count and explains that the browser preview starts after preparation and validation. Once Cloud connects, the live view appears automatically with the existing Enlarge control. Preparation itself uses no model calls.
+
 The fictional Westbrook bulk portal is hosted at a private, expiring, batch-scoped URL in Eve. It uses a separate HttpOnly login cookie and a run-scoped secret binding. The agent never receives the password in its prompt. The bundle contains the manifest, generated supporting PDFs and available W-8 forms. The hosted upload limit is 4 MB and 200 payments; this stays below Vercel's request-body ceiling. No real funds are sent.
 
 ## Release integrity
@@ -36,7 +40,9 @@ After deploying, release a small batch first. Watch the live browser in Disburse
 
 `pnpm verify:browser-use` runs the real Cloud flow for two synthetic payments through a local HTTP server and a temporary HTTPS tunnel. It uses Cloud credits and removes its disposable organization afterward. Start the server and script with the same `WORKFLOW_TARGET_WORLD=local`, `WORKFLOW_LOCAL_DATA_DIR` and `WORKFLOW_LOCAL_BASE_URL`; set `EVE_LOCAL_URL` to that local server and `EVE_APP_URL` to its public tunnel URL. Explicitly setting the workflow world keeps Next's plugin from replacing the isolated data directory. Do not point the check at the shared production organization.
 
-Large batches still perform individual database policy checks during preparation and settlement. One Cloud run reduces model usage; it does not make those database phases instantaneous.
+Large batches still perform individual database policy checks before submission and during settlement. One Cloud run reduces model usage; it does not make those database phases instantaneous.
+
+Bulk draft preparation benchmark (October 25, 2026): 99 synthetic prize packets, including PDF rendering and persistence, completed in 4.49 seconds with 23 SQL calls against the configured database. This excludes release, bundle construction, full policy preflight, Cloud execution and settlement. Regression checks cover replay without duplicate documents, cancellation during rendering, changed bank data and rollback when earlier preparation evidence changes. The preparation UI was checked with rendered component fixtures at 390px and 1440px.
 
 Live acceptance verified on October 25, 2026: one Browser Use Cloud task uploaded and submitted two synthetic payments, received portal confirmation, and produced exactly two processing payouts and two accrual entries. The task completed, and the test organization and temporary local server were removed. A live 49-payment Cloud run has not been benchmarked.
 

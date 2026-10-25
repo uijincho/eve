@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Monitor } from "lucide-react";
 import { ActionButton } from "@/components/app/action-button";
 import { LinkButton } from "@/components/app/link-button";
 import { LiveDesktop } from "@/components/app/live-desktop";
@@ -13,9 +14,32 @@ import { payloads } from "@/lib/client/payloads";
 import { batchBlocker, batchQuoteKey } from "@/lib/disbursement";
 
 const STATUS: Record<DisbursementBatch["status"], string> = {
-  preparing: "Preparing documents", filling: "Uploading to portal", submitting: "Submitting batch",
+  preparing: "Preparing documents", filling: "Submitting in browser", submitting: "Recording confirmation",
   submitted: "Submitted · awaiting payment", failed: "Needs attention", cancelled: "Cancelled",
 };
+
+export function BatchProgress({ batch: b }: { batch: DisbursementBatch }) {
+  const preparing = b.status === "preparing";
+  const label = b.validating ? "Checking payments before submission"
+    : preparing && b.packetIds.length === b.count ? "Building upload bundle"
+    : b.status === "filling" && !b.streamUrl ? "Opening browser"
+    : STATUS[b.status];
+  const awaitingBrowser = !b.streamUrl && (preparing || b.status === "filling");
+  return <div className="flex flex-col gap-3">
+    <p role="status" className={b.status === "failed" ? "text-critical" : "text-muted-foreground"}>
+      {label}{preparing && !b.validating ? ` · ${b.packetIds.length} of ${b.count} packets saved` : ""}
+    </p>
+    {awaitingBrowser ? <div className="flex items-start gap-3 border-t pt-3 text-small text-muted-foreground">
+      <Monitor className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <div className="flex flex-col gap-1">
+        <p className="font-medium text-foreground">{preparing ? "Browser preview starts after preparation" : "Connecting to the live browser"}</p>
+        <p>{b.validating ? `Eve is checking all ${b.count} payments. The live browser will appear here when submission starts.`
+          : preparing ? "Eve prepares the documents first, then submits the whole batch in one browser session."
+          : "The live view will appear here automatically. You can enlarge it to follow the upload and submission."}</p>
+      </div>
+    </div> : null}
+  </div>;
+}
 
 export function DisbursementBatches({ snapshot: s }: { snapshot: AppSnapshot }) {
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
@@ -60,8 +84,8 @@ export function DisbursementBatches({ snapshot: s }: { snapshot: AppSnapshot }) 
       <div className="flex flex-col gap-4">{batches.map((b) => {
         const paid = b.packetIds.filter((id) => s.packets.some((p) => p.id === id && p.status === "paid")).length;
         return <section key={b.id} aria-label={`Batch of ${b.count} payments`} className="flex flex-col gap-3 rounded-xl border p-4">
-          <div className="flex flex-wrap justify-between gap-3"><h3 className="font-semibold">{b.count} payments · <Money amountMinor={big(b.netMinor)} /></h3><span aria-live="polite" className={b.status === "failed" ? "text-critical" : "text-muted-foreground"}>{b.status === "submitted" && paid === b.count ? "Paid" : b.validating ? "Checking payments before submission" : STATUS[b.status]}</span></div>
-          {b.validating ? <p className="text-small text-muted-foreground">Eve is checking all {b.count} payments against the controller’s release before submitting automatically.</p> : null}
+          <div className="flex flex-wrap justify-between gap-3"><h3 className="font-semibold">{b.count} payments · <Money amountMinor={big(b.netMinor)} /></h3>{b.status === "submitted" && paid === b.count ? <span>Paid</span> : null}</div>
+          {b.status !== "submitted" || paid !== b.count ? <BatchProgress batch={b} /> : null}
           <p className="text-small text-muted-foreground">Released by {b.approvedByName}{b.status === "submitted" ? ` · ${paid} of ${b.count} paid` : ""}</p>
           {b.error ? <p className="text-small text-critical">{b.error}</p> : null}
           {b.confirmation ? <p className="text-small">Portal confirmation: <strong>{b.confirmation}</strong></p> : null}

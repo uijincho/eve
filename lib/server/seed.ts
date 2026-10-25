@@ -1,5 +1,5 @@
-// Synthetic demo organization: 300 people across 12 countries, 120 travel
-// claims, 40 expenses, 25 prizes, the Blue Hour sample characters, and 40
+// Synthetic demo organization: a compact demo with 15 release-ready payments.
+// The optional benchmark preset retains 300 people, 160 claims and 40
 // planted errors. The answer key is written to its own table and is never read
 // by checks; claims are evaluated by the real engine and payouts go through
 // the real services, so the scoreboard measures actual behavior.
@@ -88,7 +88,11 @@ function routeFareCents(airport: string): number {
 
 interface Planted { scenario: string; objectType: "claim" | "person" | "packet"; objectId: string; expected: "flag" | "hold" | "freeze" | "exception" | "reportable"; code?: string; description: string }
 
-export async function seedDemoOrg(tx: Executor): Promise<void> {
+export type DemoSeedPreset = "demo" | "benchmark";
+
+export async function seedDemoOrg(tx: Executor, preset: DemoSeedPreset = "demo"): Promise<void> {
+  const benchmark = preset === "benchmark";
+  const countryCount = (c: typeof COUNTRIES[number]) => benchmark ? c.count : c.code === "US" ? 12 : c.code === "CA" ? 8 : 4;
   const rand = rng(20261024);
   const pick = <T,>(xs: T[]) => xs[Math.floor(rand() * xs.length)];
   const planted: Planted[] = [];
@@ -102,7 +106,7 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   });
   await tx.insert(s.event).values({
     id: DEMO_EVENT_ID, orgId: ORG, name: "Bayview Hacks 2026", startsAt, endsAt: D("2026-10-25T22:00:00Z"), venue: "Pier 48, San Francisco (fictional)",
-    expectedHeadcount: 300, travelCapMinor: 50000n, economyOnly: true, bookingDeadline: D("2026-10-10T23:59:00Z"),
+    expectedHeadcount: COUNTRIES.reduce((sum, c) => sum + countryCount(c), 0), travelCapMinor: 50000n, economyOnly: true, bookingDeadline: D("2026-10-10T23:59:00Z"),
     checkInAt: D("2026-10-24T20:30:00Z"), closingAt: D("2026-10-25T22:00:00Z"),
   });
   await tx.insert(s.taxRule).values(startingRules.map((r) => ({ ...r, thresholdMinor: BigInt(r.thresholdMinor), effectiveTo: r.effectiveTo ?? null }))).onConflictDoNothing();
@@ -150,7 +154,7 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
 
   for (const c of COUNTRIES) {
     const existing = people.filter((p) => p.country === c.code).length;
-    for (let i = existing; i < c.count; i++) {
+    for (let i = existing; i < countryCount(c); i++) {
       let name = "";
       let email = "";
       for (let tries = 0; tries < 50; tries++) {
@@ -159,7 +163,7 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
         if (!used.has(email)) break;
       }
       const year = 1980 + Math.floor(rand() * 26);
-      add({ id: `per_demo_${c.code.toLowerCase()}${i}`, name, email, country: c.code, citizenship: c.code, dateOfBirth: `${year}-${String(1 + Math.floor(rand() * 12)).padStart(2, "0")}-${String(1 + Math.floor(rand() * 28)).padStart(2, "0")}`, address: `${c.city} (synthetic)`, role: rand() < 0.06 ? "mentor" : "hacker", payoutCurrency: c.currency, airport: pick(c.airports), form: rand() < 0.06 ? "missing" : "valid" });
+      add({ id: `per_demo_${c.code.toLowerCase()}${i}`, name, email, country: c.code, citizenship: c.code, dateOfBirth: `${year}-${String(1 + Math.floor(rand() * 12)).padStart(2, "0")}-${String(1 + Math.floor(rand() * 28)).padStart(2, "0")}`, address: `${c.city} (synthetic)`, role: rand() < 0.06 ? "mentor" : "hacker", payoutCurrency: c.currency, airport: pick(c.airports), form: rand() < 0.06 && benchmark ? "missing" : "valid" });
     }
   }
   const byCountry = (code: string, skip: Set<string>) => people.filter((p) => p.country === code && !skip.has(p.id) && p.form === "valid" && p.adult);
@@ -274,45 +278,59 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
   plant(samDup, "Duplicate receipt", "duplicate", "Sam submitted the same Lyft receipt twice.");
   claimRow(wei, { type: "expense", usdCents: 3500, merchant: "United", description: "Checked bag", category: "baggage" });
 
-  // Planted claim errors.
-  for (let i = 0; i < 4; i++) { const p = next(); const a = claimRow(p, { type: i < 2 ? "travel" : "expense", usdCents: 12000 + i * 900 }); plant(claimRow(p, { type: a.type, usdCents: 12000 + i * 900, merchant: a.merchant, receiptHash: a.receiptHash, currency: a.currency, amountMinor: a.amountMinor }), "Duplicate receipt", "duplicate", "Same receipt submitted twice."); }
-  for (let i = 0; i < 5; i++) plant(claimRow(next(), { type: "travel", usdCents: 28000 + i * 1500, travelDate: D(`2026-10-0${2 + i}T10:00:00Z`) }), "Flight on the wrong dates", "travel_dates", "Travel date is weeks before the event.");
-  for (let i = 0; i < 3; i++) plant(claimRow(next(), { type: "travel", usdCents: 26000 + i * 2000, cabin: "business" }), "Business-class ticket", "cabin", "Policy is economy only.");
-  for (let i = 0; i < 2; i++) { const p = people.filter((x) => (x.country === "DE" || x.country === "FR") && x.adult && !reserved.has(x.id))[i]; reserved.add(p.id); plant(claimRow(p, { type: "travel", usdCents: 0, currency: "EUR", amountMinor: 49500n + BigInt(i) * 1000n }), "EUR receipt above the cap after conversion", "cap", "€495+ converts to more than $500."); }
-  for (let i = 0; i < 4; i++) plant(claimRow(next(), { type: "travel", usdCents: 24000 + i * 1000, nameOnReceipt: pick(["J. Doe", "Alex Rivera", "Kim Morales", "Pat Chen"]) }), "Name mismatch", "name_match", "Name on the ticket differs from the profile.");
-  plant(claimRow(next(), { type: "travel", usdCents: 48900, currency: "USD" }), "Cap-hugging fare", "cap_hugging", "$489 against a $500 cap.");
-  for (let i = 0; i < 3; i++) plant(claimRow(next(), { type: "expense", usdCents: 4500 + i * 700, receiptName: null, receiptHash: null }), "Missing receipt", "receipt", "No receipt attached.");
-  for (let i = 0; i < 2; i++) plant(claimRow(next(), { type: "travel", usdCents: 23000 + i * 1500, purchasedAt: D(`2026-10-1${4 + i}T12:00:00Z`) }), "Booked after the deadline", "booking_deadline", "Booked after the Oct 10 deadline.");
-  for (const m of minors) claimRow(m, { type: "travel", usdCents: 21000 });
+  if (benchmark) {
+    // Planted claim errors.
+    for (let i = 0; i < 4; i++) { const p = next(); const a = claimRow(p, { type: i < 2 ? "travel" : "expense", usdCents: 12000 + i * 900 }); plant(claimRow(p, { type: a.type, usdCents: 12000 + i * 900, merchant: a.merchant, receiptHash: a.receiptHash, currency: a.currency, amountMinor: a.amountMinor }), "Duplicate receipt", "duplicate", "Same receipt submitted twice."); }
+    for (let i = 0; i < 5; i++) plant(claimRow(next(), { type: "travel", usdCents: 28000 + i * 1500, travelDate: D(`2026-10-0${2 + i}T10:00:00Z`) }), "Flight on the wrong dates", "travel_dates", "Travel date is weeks before the event.");
+    for (let i = 0; i < 3; i++) plant(claimRow(next(), { type: "travel", usdCents: 26000 + i * 2000, cabin: "business" }), "Business-class ticket", "cabin", "Policy is economy only.");
+    for (let i = 0; i < 2; i++) { const p = people.filter((x) => (x.country === "DE" || x.country === "FR") && x.adult && !reserved.has(x.id))[i]; reserved.add(p.id); plant(claimRow(p, { type: "travel", usdCents: 0, currency: "EUR", amountMinor: 49500n + BigInt(i) * 1000n }), "EUR receipt above the cap after conversion", "cap", "€495+ converts to more than $500."); }
+    for (let i = 0; i < 4; i++) plant(claimRow(next(), { type: "travel", usdCents: 24000 + i * 1000, nameOnReceipt: pick(["J. Doe", "Alex Rivera", "Kim Morales", "Pat Chen"]) }), "Name mismatch", "name_match", "Name on the ticket differs from the profile.");
+    plant(claimRow(next(), { type: "travel", usdCents: 48900, currency: "USD" }), "Cap-hugging fare", "cap_hugging", "$489 against a $500 cap.");
+    for (let i = 0; i < 3; i++) plant(claimRow(next(), { type: "expense", usdCents: 4500 + i * 700, receiptName: null, receiptHash: null }), "Missing receipt", "receipt", "No receipt attached.");
+    for (let i = 0; i < 2; i++) plant(claimRow(next(), { type: "travel", usdCents: 23000 + i * 1500, purchasedAt: D(`2026-10-1${4 + i}T12:00:00Z`) }), "Booked after the deadline", "booking_deadline", "Booked after the Oct 10 deadline.");
+    for (const m of minors) claimRow(m, { type: "travel", usdCents: 21000 });
 
-  // Peer fares for the fare check: enough clean YYZ and SEA claims to say what those routes usually cost.
-  for (const airport of ["YYZ", "SEA"]) {
-    const base = routeFareCents(airport);
-    pool.filter((p) => p.airport === airport).slice(0, 6).forEach((p, i) => claimRow(p, { type: "travel", usdCents: Math.round(base * (0.92 + i * 0.03)) }));
-  }
-  // Well under the cap and the auto-approve limit, so only the peer comparison catches it.
-  const seaPricey = pool.filter((p) => p.airport === "SEA")[6];
-  plant(claimRow(seaPricey, { type: "travel", usdCents: 28500, currency: "USD", merchant: "Alaska Airlines", description: "SEA → SFO" }), "Unusually expensive fare", "fare_peer", "$285 for SEA → SFO, where other attendees paid about $170.");
+    // Peer fares for the fare check: enough clean YYZ and SEA claims to say what those routes usually cost.
+    for (const airport of ["YYZ", "SEA"]) {
+      const base = routeFareCents(airport);
+      pool.filter((p) => p.airport === airport).slice(0, 6).forEach((p, i) => claimRow(p, { type: "travel", usdCents: Math.round(base * (0.92 + i * 0.03)) }));
+    }
+    // Well under the cap and the auto-approve limit, so only the peer comparison catches it.
+    const seaPricey = pool.filter((p) => p.airport === "SEA")[6];
+    plant(claimRow(seaPricey, { type: "travel", usdCents: 28500, currency: "USD", merchant: "Alaska Airlines", description: "SEA → SFO" }), "Unusually expensive fare", "fare_peer", "$285 for SEA → SFO, where other attendees paid about $170.");
 
-  // Clean claims up to 120 travel / 40 expense.
-  while (claims.filter((c) => c.type === "travel").length < 120) {
-    const p = next();
-    rand(); // Kept so the rest of the seeded sequence does not shift.
-    claimRow(p, { type: "travel", usdCents: Math.round(routeFareCents(p.airport) * (0.9 + 0.2 * rand())) });
-  }
-  while (claims.filter((c) => c.type === "expense").length < 40) {
-    const p = next();
-    const kind = pick([{ merchant: "Lyft", category: "ground_transport", d: "Ride to venue" }, { merchant: "BART", category: "ground_transport", d: "Transit" }, { merchant: "Staples", category: "supplies", d: "Team supplies" }, { merchant: "United", category: "baggage", d: "Checked bag" }]);
-    claimRow(p, { type: "expense", usdCents: 1500 + Math.floor(rand() * 9000), merchant: kind.merchant, category: kind.category, description: kind.d });
+    // Clean claims up to 120 travel / 40 expense.
+    while (claims.filter((c) => c.type === "travel").length < 120) {
+      const p = next();
+      rand(); // Kept so the rest of the seeded sequence does not shift.
+      claimRow(p, { type: "travel", usdCents: Math.round(routeFareCents(p.airport) * (0.9 + 0.2 * rand())) });
+    }
+    while (claims.filter((c) => c.type === "expense").length < 40) {
+      const p = next();
+      const kind = pick([{ merchant: "Lyft", category: "ground_transport", d: "Ride to venue" }, { merchant: "BART", category: "ground_transport", d: "Transit" }, { merchant: "Staples", category: "supplies", d: "Team supplies" }, { merchant: "United", category: "baggage", d: "Checked bag" }]);
+      claimRow(p, { type: "expense", usdCents: 1500 + Math.floor(rand() * 9000), merchant: kind.merchant, category: kind.category, description: kind.d });
+    }
+  } else {
+    // Seven approved reimbursements: Sam and Wei above, four flights in
+    // different currencies, and team supplies. These join eight cash prizes.
+    for (const code of ["CA", "DE", "IN", "JP"]) {
+      const p = byCountry(code, reserved)[0];
+      claimRow(p, { type: "travel", usdCents: Math.min(25000, routeFareCents(p.airport)), purchasedAt: D("2026-09-15T12:00:00Z") });
+    }
+    claimRow(byCountry("GB", reserved)[0], { type: "expense", usdCents: 6400, merchant: "Staples", category: "supplies", description: "Team supplies" });
+    // Two pending failures let the live review show useful work without
+    // expanding the release batch. Keep the named duplicate and cap cases.
+    plant(claimRow(byCountry("FR", reserved)[0], { type: "travel", usdCents: 24000, travelDate: D("2026-10-04T10:00:00Z") }), "Flight on the wrong dates", "travel_dates", "Travel date is weeks before the event.");
+    plant(claimRow(byCountry("AU", reserved)[0], { type: "travel", usdCents: 26000, cabin: "business" }), "Business-class ticket", "cabin", "Policy is economy only.");
   }
 
-  // Leave 30 claims for the live agent run: the wrong-date and business-class plants plus a sample of clean travel.
+  // Leave policy failures for the live review; benchmark also includes clean travel.
   const ordered = [...claims].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   const plantedIds = new Set(planted.filter((x) => x.objectType === "claim").map((x) => x.objectId));
   const liveIds = new Set(planted.filter((x) => x.scenario === "Flight on the wrong dates" || x.scenario === "Business-class ticket").map((x) => x.objectId));
   // Originals of planted duplicates stay in the seeded pass, so the copy is the one checked against them.
   const plantedHashes = new Set(claims.filter((c) => plantedIds.has(c.id) && c.receiptHash).map((c) => c.receiptHash));
-  for (const c of ordered) if (liveIds.size < 30 && c.type === "travel" && !plantedIds.has(c.id) && !plantedHashes.has(c.receiptHash) && rand() < 0.3 && c.personId !== marcus.id) liveIds.add(c.id);
+  for (const c of ordered) if (benchmark && liveIds.size < 30 && c.type === "travel" && !plantedIds.has(c.id) && !plantedHashes.has(c.receiptHash) && rand() < 0.3 && c.personId !== marcus.id) liveIds.add(c.id);
   const personById = new Map(people.map((p) => [p.id, p]));
   const names = new Map(people.map((p) => [p.id, p.name]));
   const processed: ClaimRow[] = [];
@@ -421,20 +439,20 @@ export async function seedDemoOrg(tx: Executor): Promise<void> {
 }
 
 /** Deletes and re-seeds only the demo org. */
-export async function resetDemoOrg(tx: Executor) {
+export async function resetDemoOrg(tx: Executor, preset: DemoSeedPreset = "demo") {
   await purgeOrg(tx, ORG, { deleteOrg: true });
-  await seedDemoOrg(tx);
+  await seedDemoOrg(tx, preset);
 }
 
 /** Seeds the demo org once (serialized with a transaction-scoped advisory lock). */
-export async function ensureDemoOrg(db = getDb()) {
+export async function ensureDemoOrg(db = getDb(), preset: DemoSeedPreset = "demo") {
   const [exists] = await db.select({ id: s.organization.id }).from(s.organization).where(eq(s.organization.id, ORG));
   if (exists) return false;
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('eve-demo-seed'))`);
     const [again] = await tx.select({ id: s.organization.id }).from(s.organization).where(eq(s.organization.id, ORG));
     if (again) return false;
-    await seedDemoOrg(tx);
+    await seedDemoOrg(tx, preset);
     return true;
   });
 }

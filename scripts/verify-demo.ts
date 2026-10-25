@@ -23,8 +23,8 @@ async function main() {
   try {
     if (process.argv.includes("--reset")) {
       console.log("Resetting only the fictional shared event. Do not run while another demo is in progress.");
-      await db.transaction((tx) => resetDemoOrg(tx));
-    } else await ensureDemoOrg(db);
+      await db.transaction((tx) => resetDemoOrg(tx, "benchmark"));
+    } else await ensureDemoOrg(db, "benchmark");
     const members = await db.select().from(s.orgMember).where(and(eq(s.orgMember.orgId, orgId), eq(s.orgMember.demoPersona, true)));
     const organizer = members.find((m) => m.role === "organizer")!;
     const controller = members.find((m) => m.role === "controller")!;

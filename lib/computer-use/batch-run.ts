@@ -183,7 +183,7 @@ export async function prepareBatchBundle(t: BatchTarget): Promise<boolean> {
 async function launch(target: BatchTarget): Promise<Result> {
   try {
     const { disbursementWorkflow } = await import("@/workflows/disbursement");
-    const run = await start(disbursementWorkflow, [target, { batchPreparation: true }]);
+    const run = await start(disbursementWorkflow, [target, { batchPreparation: true, bulkDrafts: true }]);
     // The workflow claims workflowRunId at boot; do not overwrite a worker's final state here.
     return { ok: true, status: 202, message: "Batch released. Eve is uploading one bundle to the sponsor portal.", data: { batchId: target.batchId, runId: run.runId } };
   } catch {
