@@ -1,17 +1,18 @@
 "use client";
 
 import { cn } from "cn";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, ClockIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { LinkButton } from "@/components/app/link-button";
 import { ErrorState, ListSkeleton } from "@/components/app/states";
 import { Money } from "@/components/eve/money";
+import { TagList } from "@/components/eve/tag-list";
 import { Button } from "@/components/ui/button";
 import type { AppSnapshot, Award, Decision, Payout } from "@/lib/contracts";
-import { awardName, big, booksCurrency, budgetTotals, buildInbox, controllerName, sumMinor } from "@/lib/client/derive";
-import { ROLE_LABEL, fmtDate, fmtDateTime, fmtTime, initials } from "@/lib/client/format";
+import { awardName, big, booksCurrency, budgetTotals, buildInbox, checkTag, controllerName, failedChecks, sumMinor, type Tag } from "@/lib/client/derive";
+import { fmtDate, fmtDateTime, fmtTime, initials } from "@/lib/client/format";
 import { useEve } from "@/lib/client/use-eve";
 
 type Phase = "before" | "during" | "after";
@@ -108,7 +109,9 @@ function Overview({ s }: { s: AppSnapshot }) {
   const waiting = prizes.filter((x) => x.stage === "forms" || x.stage === "frozen" || x.stage === "split");
 
   const claimsForPerson = s.claims.filter((c) => c.status === "escalated" || c.status === "needs_info");
+  const reasons = countTags(claimsForPerson.flatMap((c) => failedChecks(c).slice(0, 1).map(checkTag)));
   const inbox = buildInbox(s);
+  const unverified = releasable.filter((p) => !p.ruleVerified).length;
 
   const travel = s.budgets.find((b) => /travel/i.test(b.name));
   const sources = groupBy(s.budgets, (b) => b.fundingSource || "Unassigned").map(([name, lines]) => ({
@@ -313,22 +316,20 @@ function Overview({ s }: { s: AppSnapshot }) {
                 <p className="text-caption text-muted-foreground">Controller: {controllerName(s)}</p>
               </div>
             </div>
-            <div className="flex flex-col gap-3 rounded-2xl bg-money p-4 text-on-money">
-              <div className="flex justify-between gap-2 text-caption font-semibold">
-                <span>Proposed for release</span>
-                <span>{ROLE_LABEL[s.actor.role]} view</span>
-              </div>
-              <div>
-                <Money amountMinor={sumGross(releasable)} currency={currency} className="text-title" />
-                <p className="text-small">
-                  {releasable.length} {releasable.length === 1 ? "payout" : "payouts"} waiting for a controller release
-                </p>
-              </div>
-              <div className="flex justify-between gap-2 text-caption">
-                <span>{releasable.filter((p) => !p.ruleVerified).length} use an unverified rule</span>
-                <span>Closing {fmtTime(s.event.closingAt)}</span>
-              </div>
-            </div>
+            <Link href="/payouts" className="flex flex-col gap-2 rounded-2xl bg-money p-4 text-on-money transition-opacity duration-150 hover:opacity-90">
+              <span className="text-caption font-semibold">Ready to release</span>
+              <Money amountMinor={sumGross(releasable)} currency={currency} className="text-title" />
+              <span className="flex flex-wrap gap-1.5">
+                <MoneyChip>
+                  {releasable.length} {releasable.length === 1 ? "payout" : "payouts"}
+                </MoneyChip>
+                {unverified ? <MoneyChip title={`${unverified} use an unverified rule`}>{unverified} unverified</MoneyChip> : null}
+                <MoneyChip title="Closing ceremony">
+                  <ClockIcon aria-hidden />
+                  {fmtTime(s.event.closingAt)}
+                </MoneyChip>
+              </span>
+            </Link>
             <div className="grid grid-cols-4 gap-2">
               {[
                 { href: "/payouts", label: "Release", glyph: "✓" },
@@ -346,13 +347,10 @@ function Overview({ s }: { s: AppSnapshot }) {
             </div>
             {waiting.length ? (
               <div className="flex flex-col gap-2.5">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-small font-semibold">Waiting on a winner</span>
-                  <span className="text-caption text-muted-foreground">Ring shows the blocker</span>
-                </div>
+                <span className="text-small font-semibold">Waiting on a winner</span>
                 <ul className="flex flex-wrap gap-2.5">
                   {waiting.slice(0, 5).map(({ award, stage: st }) => (
-                    <li key={award.id} className="flex w-14 flex-col items-center gap-1 text-center">
+                    <li key={award.id} title={`${award.personName}: ${STAGES.find((x) => x.id === st)?.label}`} className="flex w-14 flex-col items-center gap-1 text-center">
                       <Avatar name={award.personName} ring={STAGES.find((x) => x.id === st)?.tone ?? "neutral"} />
                       <span className="w-full truncate text-caption">{award.personName.split(" ")[0]}</span>
                     </li>
@@ -426,21 +424,20 @@ function Overview({ s }: { s: AppSnapshot }) {
         </Card>
 
         {/* Needs a person */}
-        <Card className="flex flex-[1_1_300px] flex-col gap-2.5 bg-background">
+        <Card className="flex flex-[1_1_300px] flex-col gap-3">
           {findingOpen && claimsForPerson.length ? (
             <>
               <div className="flex items-center justify-between gap-2">
                 <Pill tone="neutral">Agent finding</Pill>
-                <span className="text-caption text-muted-foreground">{inbox.length} items in the inbox</span>
+                <Link href="/inbox" className="text-caption text-muted-foreground hover:text-foreground">
+                  {inbox.length} in the inbox
+                </Link>
               </div>
               <h2 className="text-subheading">
-                {claimsForPerson.length} {claimsForPerson.length === 1 ? "claim needs" : "claims need"} a person before anything is paid
+                {claimsForPerson.length} {claimsForPerson.length === 1 ? "claim needs" : "claims need"} a person
               </h2>
-              <p className="text-small text-muted-foreground">
-                {claimsForPerson[0].personName}: {claimsForPerson[0].reason || claimsForPerson[0].description}
-                {claimsForPerson.length > 1 ? ` And ${claimsForPerson.length - 1} more.` : ""} Eve escalated these; it has not approved or rejected them.
-              </p>
-              <div className="mt-1 flex flex-wrap gap-2">
+              <TagList tags={reasons} max={4} />
+              <div className="mt-auto flex flex-wrap gap-2 pt-1">
                 <LinkButton href="/claims">Review claims</LinkButton>
                 <Button variant="outline" onClick={() => setFindingOpen(false)}>
                   Dismiss
@@ -450,7 +447,7 @@ function Overview({ s }: { s: AppSnapshot }) {
           ) : (
             <>
               <Pill tone="positive" className="self-start">Nothing open</Pill>
-              <h2 className="text-subheading">No escalated claims waiting here</h2>
+              <h2 className="text-subheading">No escalated claims</h2>
               {claimsForPerson.length ? (
                 <Button variant="outline" className="self-start" onClick={() => setFindingOpen(true)}>
                   Show the finding again
@@ -575,6 +572,19 @@ function stageNote(a: Award, p: Payout | undefined, stage: Stage): string {
   return a.status === "draft" ? "Draft" : "Not proposed";
 }
 
+/** One chip per distinct tag, most common first, with how many share it. */
+function countTags(tags: Tag[]): Tag[] {
+  const byLabel = new Map<string, { tag: Tag; n: number }>();
+  for (const t of tags) {
+    const hit = byLabel.get(t.label);
+    if (hit) hit.n += 1;
+    else byLabel.set(t.label, { tag: t, n: 1 });
+  }
+  return [...byLabel.values()]
+    .sort((a, b) => b.n - a.n)
+    .map(({ tag, n }) => ({ label: `${tag.label} · ${n}`, tone: tag.tone, title: n === 1 ? tag.title : `${n} claims: ${tag.label}` }));
+}
+
 function groupBy<T>(xs: T[], key: (x: T) => string): [string, T[]][] {
   const m = new Map<string, T[]>();
   for (const x of xs) m.set(key(x), [...(m.get(key(x)) ?? []), x]);
@@ -631,6 +641,14 @@ function Stat({ label, amount, currency, note, tone }: { label: string; amount: 
       <Money amountMinor={amount} currency={currency} className={cn("text-title", tone === "critical" && amount > 0n && "text-critical")} />
       <p className="text-caption text-muted-foreground">{note}</p>
     </div>
+  );
+}
+
+function MoneyChip({ title, children }: { title?: string; children: React.ReactNode }) {
+  return (
+    <span title={title} className="inline-flex h-6 items-center gap-1 rounded-full bg-on-money/10 px-2.5 text-caption font-semibold whitespace-nowrap [&>svg]:size-3.5">
+      {children}
+    </span>
   );
 }
 

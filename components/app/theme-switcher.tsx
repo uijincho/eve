@@ -13,14 +13,14 @@ import {
   type ThemePreference,
 } from "@/lib/client/theme";
 
-const OPTIONS: { id: ThemePreference; label: string; Icon: typeof SunIcon }[] = [
+export const THEME_OPTIONS: { id: ThemePreference; label: string; Icon: typeof SunIcon }[] = [
   { id: "light", label: "Light", Icon: SunIcon },
   { id: "dark", label: "Dark", Icon: MoonIcon },
   { id: "system", label: "System", Icon: MonitorIcon },
 ];
 
 /** Null while server-rendered: the saved choice is only known in the browser. */
-function useThemePreference(): ThemePreference | null {
+export function useThemePreference(): ThemePreference | null {
   return useSyncExternalStore(subscribeTheme, readThemePreference, () => null);
 }
 
@@ -62,7 +62,7 @@ export function ThemeSwitcher({ className }: { className?: string }) {
         Theme
       </span>
       <div role="group" aria-labelledby={id} className="flex gap-0.5 rounded-lg bg-surface-hover p-0.5">
-        {OPTIONS.map(({ id: option, label, Icon }) => (
+        {THEME_OPTIONS.map(({ id: option, label, Icon }) => (
           <button
             key={option}
             type="button"

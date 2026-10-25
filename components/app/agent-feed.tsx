@@ -5,6 +5,7 @@ import { ChevronRightIcon, CircleCheckIcon, InboxIcon, LoaderCircleIcon, SearchI
 import { useMemo, useState } from "react";
 
 import { EvidenceSheet } from "@/components/app/evidence-sheet";
+import { LiveDesktop } from "@/components/app/live-desktop";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Decision } from "@/lib/contracts";
@@ -166,12 +167,12 @@ function RunEntry({ run, onStep, snapshot }: { run: Run; onStep: (d: Decision) =
         </ol>
       ) : null}
       {expanded && portal?.streamUrl ? (
-        <div className="flex flex-col gap-1 px-3 pb-3 pl-8">
-          <div className="overflow-hidden rounded-lg border bg-rail">
-            <iframe src={portal.streamUrl} title={`Live view of Eve on the sponsor portal for ${heading.name}, view only`} className="block aspect-[4/3] w-full" />
-          </div>
-          <p className="text-caption text-muted-foreground">Live desktop, view only. On the portal&apos;s {portal.pageLabel} page.</p>
-        </div>
+        <LiveDesktop
+          src={portal.streamUrl}
+          title={`Live view of Eve on the sponsor portal for ${heading.name}, view only`}
+          className="gap-1 px-3 pb-3 pl-8"
+          caption={<>Live desktop, view only. On the portal&apos;s {portal.pageLabel} page.</>}
+        />
       ) : null}
     </li>
   );

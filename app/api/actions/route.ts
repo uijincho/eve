@@ -25,7 +25,14 @@ export async function POST(request: Request) {
   const { action, payload } = (body ?? {}) as { action?: unknown; payload?: unknown };
   if (typeof action !== "string") return json({ ok: false, message: "Missing action." }, 400);
   let response;
-  if (action === "payout.release") {
+  if (action === "sponsor.batchRelease" || action === "sponsor.batchRetry" || action === "sponsor.batchCancel") {
+    const parsed = actionSchemas[action].safeParse(payload ?? {});
+    if (!parsed.success) return json({ ok: false, message: "Choose a valid batch of 1–200 payouts." }, 400);
+    const batch = await import("@/lib/computer-use/batch-run");
+    response = "payouts" in parsed.data ? await batch.releaseBatch(actor, parsed.data)
+      : action === "sponsor.batchRetry" ? await batch.retryBatch(actor, parsed.data.id)
+        : await batch.cancelBatch(actor, parsed.data.id);
+  } else if (action === "payout.release") {
     const parsed = actionSchemas["payout.release"].safeParse(payload ?? {});
     if (!parsed.success) return json({ ok: false, message: "Choose the payout ids to release." }, 400);
     response = await queueControllerRelease(actor, "id" in parsed.data ? [parsed.data.id] : parsed.data.ids);

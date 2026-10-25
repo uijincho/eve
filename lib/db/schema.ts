@@ -567,6 +567,36 @@ export const portalRun = pgTable("portal_run", {
   uniqueIndex("portal_run_active_uq").on(t.packetId).where(sql`${t.status} in ('starting', 'filling', 'awaiting_approval', 'submitting')`),
 ]);
 
+/** A controller-authorized bulk submission. Evidence survives packet withdrawal/re-quoting. */
+export const disbursementBatch = pgTable("disbursement_batch", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  status: text("status", { enum: ["preparing", "filling", "submitting", "submitted", "failed", "cancelled"] }).notNull().default("preparing"),
+  approvedBy: text("approved_by").notNull(),
+  approvedByName: text("approved_by_name").notNull(),
+  requestedPayouts: jsonb("requested_payouts").$type<{ id: string; quote: string }[]>().notNull().default([]),
+  manifest: jsonb("manifest").$type<import("@/lib/computer-use/batch-packet").BatchManifest>().notNull(),
+  manifestHash: text("manifest_hash").notNull(),
+  evidence: jsonb("evidence").$type<{ payoutId: string; packetId: string; terms: string; packet: import("@/lib/computer-use/packet").PortalPacket }[]>().notNull(),
+  feesPaidBy: text("fees_paid_by").notNull(),
+  documentId: text("document_id").references(() => document.id),
+  workflowRunId: text("workflow_run_id"),
+  sandboxId: text("sandbox_id"),
+  streamUrl: text("stream_url"),
+  state: jsonb("state").$type<Record<string, unknown>>(),
+  turns: integer("turns").notNull().default(0),
+  confirmation: text("confirmation"),
+  error: text("error"),
+  createdAt: createdAt(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+}, (t) => [index("disbursement_batch_org_idx").on(t.orgId, t.createdAt)]);
+
+/** One reservation per payout, including failed/uncertain submissions, until explicitly cancelled. */
+export const disbursementBatchItem = pgTable("disbursement_batch_item", {
+  payoutId: text("payout_id").primaryKey().references(() => payout.id, { onDelete: "cascade" }),
+  batchId: text("batch_id").notNull().references(() => disbursementBatch.id, { onDelete: "cascade" }),
+});
+
 export const filing = pgTable("filing", {
   id: text("id").primaryKey(),
   orgId: text("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),

@@ -46,7 +46,7 @@ export interface QboAccount {
  * QBO requires a matching vendor on every A/P journal line.
  */
 export const QBO_ACCOUNT_MAP: Record<string, QboAccount> = {
-  "1000": { code: "1000", eveName: "Cash - simulated payouts", qboName: "Eve Simulated Payout Clearing", type: "Other Current Asset", detailType: "Other Current Assets", note: "Simulated money. Do not import into production books." },
+  "1000": { code: "1000", eveName: "Cash - simulated payouts", qboName: "Eve Payout Clearing", type: "Other Current Asset", detailType: "Other Current Assets", note: "Sandbox companies only." },
   "1010": { code: "1010", eveName: "Cash - Stripe test mode", qboName: "Eve Stripe Test Clearing", type: "Bank", detailType: "Cash on hand", note: "Stripe test mode. Sandbox companies only." },
   "1100": { code: "1100", eveName: "Due from sponsor", qboName: "Due from Fiscal Sponsor", type: "Other Current Asset", detailType: "Other Current Assets" },
   "2000": { code: "2000", eveName: "Accounts payable - attendees", qboName: "Eve Attendee Payables", type: "Other Current Liability", detailType: "Other Current Liabilities" },
@@ -247,7 +247,7 @@ export function exportLedgerCsv(entries: readonly ExportJournalEntry[]): string 
 }
 
 export const QBO_IMPORT_INSTRUCTIONS = `QuickBooks Online journal import (fallback for the QBO API push)
-1. Use a QBO sandbox or test company. These files contain simulated and Stripe test-mode money.
+1. Use a QBO sandbox or test company. These files contain test money.
 2. Turn off account numbers (Settings > Account and settings > Advanced > Chart of accounts) during the import.
 3. Create the accounts listed in the accounts CSV (Type and Detail Type columns) if they do not exist. Names must match exactly.
 4. Match the company date format: the default export is MM/DD/YYYY; pass dateFormat "DMY" for DD/MM/YYYY companies.

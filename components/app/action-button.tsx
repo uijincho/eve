@@ -1,10 +1,11 @@
 "use client";
 
 import { cn } from "cn";
-import { LoaderCircleIcon, LockIcon } from "lucide-react";
+import { LoaderCircleIcon } from "lucide-react";
 import { useId } from "react";
 
 import { ResultText } from "@/components/app/result-text";
+import { BlockedAction } from "@/components/eve/blocked-action";
 import { Button } from "@/components/ui/button";
 import type { ActionResult } from "@/lib/contracts";
 import type { Permission } from "@/lib/client/derive";
@@ -16,7 +17,7 @@ type Variant = "default" | "secondary" | "ghost" | "outline" | "destructive";
 /**
  * A button that runs one named action against the server, shows it pending
  * ("Releasing"), and reports the server's answer beside it. When the current
- * persona may not act, it stays visible, locked, with the reason.
+ * persona may not act, it stays visible and locked, with the reason in a tooltip.
  */
 export function ActionButton({
   call,
@@ -50,22 +51,13 @@ export function ActionButton({
 
   if (permission && !permission.allowed) {
     return (
-      <span className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5", wide && "w-full", grow && "min-w-0 flex-1", className)}>
-        <Button
-          variant="secondary"
-          size={size}
-          disabled
-          focusableWhenDisabled
-          aria-describedby={statusId}
-          className={cn((wide || grow) && "w-full")}
-        >
-          <LockIcon aria-hidden />
-          {label}
-        </Button>
-        <span id={statusId} className="text-small text-muted-foreground">
-          {permission.reason}
-        </span>
-      </span>
+      <BlockedAction
+        action={label}
+        reason={permission.reason}
+        size={size}
+        fill={wide || grow}
+        className={cn(grow && "min-w-0 flex-1", className)}
+      />
     );
   }
 

@@ -9,6 +9,7 @@ import { Section } from "@/components/app/page-header";
 import { EmptyState } from "@/components/app/states";
 import { CapacityBar } from "@/components/eve/capacity-bar";
 import { Money } from "@/components/eve/money";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, BudgetLine } from "@/lib/contracts";
@@ -33,10 +34,10 @@ export function BudgetView() {
         const t = budgetTotals(s);
         return s.budgets.length ? (
           <>
-            <CapacityBar label="Whole event" capMinor={Number(t.cap)} spentMinor={Number(t.spent)} committedMinor={Number(t.committed)} currency={booksCurrency(s)} className="max-w-3xl" />
+            <CapacityBar label="Whole event" capMinor={Number(t.cap)} spentMinor={Number(t.spent)} committedMinor={Number(t.committed)} currency={booksCurrency(s)} className="rounded-2xl border bg-surface p-5" />
             <BooksCurrencyNote snapshot={s} />
-            <Section title="Lines" aside="Spent, committed, and remaining against each cap">
-              <ul className="grid max-w-3xl gap-6">
+            <Section title="Lines">
+              <ul className="grid gap-4 md:grid-cols-2">
                 {s.budgets.map((b) => (
                   <BudgetRow key={b.id} line={b} snapshot={s} />
                 ))}
@@ -61,15 +62,15 @@ function BudgetRow({ line: b, snapshot }: { line: BudgetLine; snapshot: AppSnaps
   const [error, setError] = useState<string | null>(null);
   const manage = canOrganize(snapshot.actor);
   return (
-    <li className="flex flex-col gap-2 border-b pb-6 last:border-b-0">
+    <li className="flex flex-col gap-2 rounded-2xl border bg-surface p-5">
       <CapacityBar label={b.name} capMinor={Number(big(b.capMinor))} spentMinor={Number(big(b.spentMinor))} committedMinor={Number(big(b.committedMinor))} currency={books} />
-      <div className="flex flex-wrap items-center justify-between gap-2 text-caption text-muted-foreground">
-        <span>
-          Funded by {b.fundingSource}
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 text-caption text-muted-foreground">
+        <span className="flex flex-wrap items-center gap-2">
+          {b.fundingSource ? <Badge variant="secondary" title="Funding source">{b.fundingSource}</Badge> : null}
           {entered !== books && b.enteredCapMinor ? (
-            <>
-              {" · "}cap set as <Money amountMinor={big(b.enteredCapMinor)} currency={entered} />{b.fxSource ? `, converted at ${b.fxSource}` : ""}
-            </>
+            <span>
+              Cap set as <Money amountMinor={big(b.enteredCapMinor)} currency={entered} />{b.fxSource ? `, converted at ${b.fxSource}` : ""}
+            </span>
           ) : null}
         </span>
         {manage.allowed && !editing ? (

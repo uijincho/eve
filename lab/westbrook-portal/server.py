@@ -8,6 +8,8 @@ import hmac
 import json
 import os
 import random
+import threading
+from bulk import import_bundle, MAX_BYTES
 import re
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -25,6 +27,15 @@ CONFIG = {
 NINE_DIGITS = re.compile(r"^\d{9}$")
 records = []
 events = []
+imports = {}
+write_lock = threading.RLock()
+IMPORTS_PATH = os.path.join(ROOT, "imports.json")
+AUTH_PATH = os.path.join(ROOT, "authorization.json")
+
+def save_imports():
+    with open(IMPORTS_PATH, "w", encoding="utf-8") as handle:
+        json.dump(imports, handle)
+
 
 
 def is_foreign(draft):
@@ -78,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
             return {}
 
     def do_GET(self):
-        if self.path in ("/", "/index.html"):
+        if self.path.split("?", 1)[0] in ("/", "/index.html"):
             with open(os.path.join(ROOT, "index.html"), "rb") as handle:
                 data = handle.read()
             self.send_response(200)
@@ -95,7 +106,50 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(404, {"ok": False, "message": "Not found."})
 
     def do_POST(self):
+        if self.path == "/api/bulk-import":
+            length = int(self.headers.get("Content-Length") or 0)
+            if not 0 < length <= MAX_BYTES:
+                self.send_json(413, {"ok": False, "message": "Upload a ZIP no larger than 30 MB."})
+                return
+            try:
+                imported = import_bundle(self.rfile.read(length), CONFIG["strictSsn"])
+                with write_lock:
+                    prior = imports.get(imported["batchId"])
+                    if prior and prior["manifestHash"] != imported["manifestHash"]:
+                        raise ValueError("This batch ID already has different contents. Regenerate the batch in Eve.")
+                    imports[imported["batchId"]] = imported
+                    save_imports()
+                record_event("imported", "%s: %d payments" % (imported["batchId"], imported["manifest"]["totals"]["count"]))
+                self.send_json(200, {"ok": True, **imported})
+            except ValueError as error:
+                record_event("error", str(error))
+                self.send_json(422, {"ok": False, "message": str(error)})
+            return
         body = self.read_json()
+        if self.path == "/api/bulk-submit":
+            with write_lock:
+                imported = imports.get(body.get("batchId"))
+                if not imported:
+                    self.send_json(422, {"ok": False, "message": "Upload and validate the bundle first."})
+                    return
+                existing = next((r for r in records if r.get("batchId") == imported["batchId"]), None)
+                if existing:
+                    self.send_json(200, {"ok": True, "confirmation": existing["confirmation"]})
+                    return
+                try:
+                    with open(AUTH_PATH, encoding="utf-8") as handle:
+                        authorization = json.load(handle)
+                except (OSError, ValueError):
+                    authorization = {}
+                if authorization.get("batchId") != imported["batchId"] or authorization.get("manifestHash") != imported["manifestHash"]:
+                    self.send_json(403, {"ok": False, "message": "Waiting for Eve to verify this import against the controller's release."})
+                    return
+                confirmation = "WB-26-%05d" % random.randint(0, 99999)
+                records.append({**imported, "confirmation": confirmation, "receivedAt": datetime.now(timezone.utc).isoformat()})
+                save_records()
+                record_event("submitted", confirmation)
+                self.send_json(200, {"ok": True, "confirmation": confirmation})
+            return
         if self.path == "/api/login":
             ok = bool(PASSWORD) and body.get("username") == USERNAME and hmac.compare_digest(
                 str(body.get("password", "")), PASSWORD
@@ -127,6 +181,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    if os.path.exists(RECORDS_PATH):
+        with open(RECORDS_PATH, encoding="utf-8") as handle:
+            records = json.load(handle)
+    if os.path.exists(IMPORTS_PATH):
+        with open(IMPORTS_PATH, encoding="utf-8") as handle:
+            imports = json.load(handle)
     save_records()
     record_event("started", "strict SSN" if CONFIG["strictSsn"] else "standard")
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

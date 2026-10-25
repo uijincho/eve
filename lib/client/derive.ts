@@ -177,7 +177,7 @@ export function projectStatusLabel(status: Person["projectStatus"] | undefined):
 }
 
 export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "personas"> & Partial<Pick<AppSnapshot, "decisions" | "org" | "people" | "claims" | "event" | "now">>): Permission {
-  if (s.org?.mode === "sponsor") return no(`${s.org.sponsorName || "The fiscal sponsor"} pays for this organization. Create a sponsor packet instead; a controller submits it.`);
+  if (s.org?.mode === "sponsor") return no(`${s.org.sponsorName || "The fiscal sponsor"} pays for this organization. Open Disburse to release a batch through the sponsor.`);
   if (s.decisions && releaseInFlight({ decisions: s.decisions }, payout)) return no("Release accepted. Eve is sending it now; this updates on its own.");
   if (payout.status === "frozen") return no("Frozen until the bank change is confirmed through the original contact channel.");
   if (payout.status === "held") return no(payout.reason || "Held until the recipient's tax form is valid.");
@@ -422,6 +422,21 @@ function holdTags(p: Payout, person?: Person): Tag[] {
 }
 
 /** Why a claim is waiting, in failed form; once decided, the reviewer's or server's reason. */
+/**
+ * A claim's state as the attendee sees it. Eve's review stages all read as
+ * "Submitted"; the checks and why a claim was escalated stay with organizers.
+ */
+export function attendeeClaimStatus(c: Pick<Claim, "category" | "status">): { status: string; label?: string } {
+  if (c.status === "submitted" || c.status === "processing" || c.status === "escalated") return { status: "submitted", label: "Submitted" };
+  return { status: c.status, label: claimStatusLabel(c) };
+}
+
+/** The only claim text an attendee sees: Eve's fare question, or a person's question or rejection reason. */
+export function attendeeClaimNote(c: Pick<Claim, "status" | "reason" | "fareReview">): string {
+  if (c.status === "needs_info") return c.fareReview?.question ?? c.reason;
+  return c.status === "rejected" ? c.reason : "";
+}
+
 export function claimReasonText(c: Pick<Claim, "checks" | "status" | "reason">): string {
   const failed = failedChecks(c).map(failedCheckText);
   return (c.status === "escalated" || c.status === "needs_info") && failed.length ? `${failed.join("; ")}.` : c.reason;
@@ -771,6 +786,7 @@ export function hasLiveWork(s: AppSnapshot | null): boolean {
   if (!s) return false;
   return (
     (s.portalRuns ?? []).some(isPortalActive) ||
+    (s.batches ?? []).some((b) => ["preparing", "filling", "submitting"].includes(b.status)) ||
     s.decisions.some((d) => d.status === "running") ||
     s.payouts.some((p) => p.status === "processing") ||
     s.claims.some((c) => c.status === "processing" || c.status === "submitted")

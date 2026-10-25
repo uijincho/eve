@@ -26,10 +26,10 @@ export function OrgIdentityForm({ snapshot: s, submitLabel = "Save organization"
   return (
     <div className="flex max-w-xl flex-col gap-4">
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_10rem]">
-        <Field label="Legal name" error={error}>
+        <Field label="Legal name" error={error} help="Tax ID stays in the vault; only its last 4 show.">
           {(p) => <Input {...p} value={name} onChange={(e) => { setName(e.target.value); setError(null); }} />}
         </Field>
-        <Field label="Country" help="Sets which payer rules apply.">
+        <Field label="Country" help="Sets the payer rules.">
           {(p) => (
             <NativeSelect {...p} value={country} onChange={(e) => setCountry(e.target.value)}>
               <option value="US">United States</option>
@@ -38,7 +38,6 @@ export function OrgIdentityForm({ snapshot: s, submitLabel = "Save organization"
           )}
         </Field>
       </div>
-      <p className="text-small text-muted-foreground">The EIN or business number is collected by the server into the vault; Eve only ever shows its last four digits.</p>
       <ActionButton
         className="self-start"
         label={submitLabel}
@@ -70,9 +69,9 @@ export function MoneyMovementForm({ snapshot: s, submitLabel = "Save money movem
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1 text-small font-medium">How money moves</legend>
         {([
-          ["direct", "Direct", "Eve pays through the connected test-mode provider after a controller releases."],
-          ["sponsor", "Sponsor packet", "A university or fiscal sponsor holds the account; Eve prepares packets they pay from."],
-          ["hybrid", "Hybrid", "Some payouts go direct, the rest through the sponsor."],
+          ["direct", "Direct", "Eve pays once a controller releases."],
+          ["sponsor", "Sponsor packet", "A fiscal sponsor pays from packets Eve prepares."],
+          ["hybrid", "Hybrid", "Some direct, the rest through the sponsor."],
         ] as const).map(([v, label, help]) => (
           <label key={v} className="flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors duration-150 hover:bg-surface has-checked:border-input has-checked:bg-surface has-focus-visible:border-ring has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
             <input type="radio" name={group} value={v} checked={mode === v} onChange={() => setMode(v)} className="mt-0.5 size-4 shrink-0 accent-foreground focus-visible:outline-none" />
@@ -132,15 +131,15 @@ export function LimitsForm({ snapshot: s, submitLabel = "Save limits", onSaved }
   return (
     <div className="flex max-w-xl flex-col gap-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={`Agent auto-approve limit (${s.org.currency})`} error={errors.agent} help="Clean, in-policy claims at or under this are approved by Eve. Payouts still need a controller.">
+        <Field label={`Agent auto-approve limit (${s.org.currency})`} error={errors.agent} help="Eve approves clean claims up to this.">
           {(p) => <Input {...p} inputMode="decimal" value={agent} onChange={(e) => setAgent(e.target.value)} />}
         </Field>
         <Field label={`Organizer approval limit (${s.org.currency})`} error={errors.organizer} help="Above this, a controller decides.">
           {(p) => <Input {...p} inputMode="decimal" value={organizer} onChange={(e) => setOrganizer(e.target.value)} />}
         </Field>
       </div>
-      <p className="text-small text-muted-foreground">
-        {controller ? `${controller.name} is the controller.` : "No controller is assigned."} Eve blocks giving one person both the requester and controller seat on the same payout.
+      <p className="text-caption text-muted-foreground">
+        {controller ? <>Controller: <span className="font-medium text-foreground">{controller.name}</span>. </> : "No controller assigned. "}No one can request and release the same payout.
       </p>
       <ActionButton
         className="self-start"
@@ -165,7 +164,7 @@ export function NotificationsForm({ snapshot: s, submitLabel = "Save notificatio
   const [channel, setChannel] = useState(s.org.notificationChannel ?? "");
   return (
     <div className="flex max-w-xl flex-col gap-4">
-      <Field label="Slack or Discord channel or webhook" help="Organizers get escalations here; attendees get email and portal notices.">
+      <Field label="Slack or Discord channel or webhook" help="Escalations post here.">
         {(p) => <Input {...p} value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="#finance" />}
       </Field>
       <ActionButton className="self-start" label={submitLabel} pendingLabel="Saving" permission={canOrganize(s.actor)} onDone={(r) => r.ok && onSaved?.()} call={payloads.orgUpdate({ notificationChannel: channel.trim() })} />
@@ -223,7 +222,7 @@ export function TravelPolicyForm({ snapshot: s }: { snapshot: AppSnapshot }) {
   return (
     <div className="flex max-w-xl flex-col gap-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={`Travel cap per person (${s.org.currency})`} error={errors.cap} help="Receipts in other currencies convert on the purchase date before the cap check.">
+        <Field label={`Travel cap per person (${s.org.currency})`} error={errors.cap} help="Foreign receipts convert at the purchase-date rate.">
           {(p) => <Input {...p} inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} />}
         </Field>
         <Field label="Booking deadline">{(p) => <Input {...p} type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} />}</Field>
@@ -255,9 +254,7 @@ export function PeriodLockForm({ snapshot: s, permission }: { snapshot: AppSnaps
   const [confirm, setConfirm] = useState(false);
   return (
     <div className="flex max-w-xl flex-col gap-3">
-      <p className="text-small text-muted-foreground">
-        Locking a month is one-way. The ledger then rejects new entries dated in it; corrections post as linked reversals in an open month.
-      </p>
+      <p className="text-small text-muted-foreground">One-way. Later corrections post as reversals in an open month.</p>
       <div className="flex flex-wrap items-end gap-3">
         <Field label="Month to lock">
           {(p) => <Input {...p} type="month" value={period} onChange={(e) => { setPeriod(e.target.value); setConfirm(false); }} className="w-44" />}

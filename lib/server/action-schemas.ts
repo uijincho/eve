@@ -59,6 +59,8 @@ export const actionSchemas = {
     /** Typed full legal name; must match the profile name. */
     signature: text(160).min(1),
     tin: z.string().regex(/^[0-9A-Za-z-]{4,20}$/).optional(),
+    /** W-8BEN line 6b: no foreign TIN because none is legally required. Not with `tin`. */
+    ftinNotRequired: z.boolean().optional(),
     treatyCountry: country.optional(), treatyArticle: text(40).optional(),
     certify: z.literal(true),
   }),
@@ -97,6 +99,9 @@ export const actionSchemas = {
     id, confirmation: z.string().regex(/^\d{6}$/), decision: z.enum(["confirm", "reject"]).optional(),
   }),
   "payout.retry": z.strictObject({ id }),
+  "sponsor.batchRelease": z.strictObject({ payouts: z.array(z.strictObject({ id, quote: z.string().min(1).max(2000) })).min(1).max(200) }),
+  "sponsor.batchRetry": z.strictObject({ id }),
+  "sponsor.batchCancel": z.strictObject({ id }),
   "sponsor.create": z.strictObject({ payoutId: id }),
   "sponsor.submit": z.strictObject({ id }),
   "sponsor.reconcile": z.strictObject({ id, paidMinor: minor.optional(), acceptShortfall: z.boolean().optional(), note: text(500).optional() }),

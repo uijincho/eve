@@ -82,6 +82,8 @@ export const payloads = {
     form: Person["taxForm"];
     signature: string;
     tin?: string;
+    /** W-8BEN line 6b; never sent with `tin`. */
+    ftinNotRequired?: boolean;
     treatyCountry?: string;
     treatyArticle?: string;
   }) => call("tax.submit", { ...stripEmpty(fields), certify: true }),
@@ -97,6 +99,9 @@ export const payloads = {
   peopleMarkSubmitted: (people: { email?: string; name?: string; projectUrl?: string }[]) =>
     call("people.markSubmitted", { people: people.map((p) => stripEmpty(p)) }),
 
+  batchRelease: (payouts: { id: string; quote: string }[]) => call("sponsor.batchRelease", { payouts }),
+  batchRetry: (id: string) => call("sponsor.batchRetry", { id }),
+  batchCancel: (id: string) => call("sponsor.batchCancel", { id }),
   sponsorCreate: (payoutId: string) => call("sponsor.create", { payoutId }),
   sponsorSubmit: (id: string) => call("sponsor.submit", { id }),
   portalStart: (packetId: string) => call("sponsor.portalStart", { id: packetId }),

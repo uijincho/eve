@@ -6,11 +6,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 
-import { PersonaSwitcher } from "@/components/app/persona-switcher";
+import { AccountMenu } from "@/components/app/account-menu";
 import { Sheet } from "@/components/app/sheet";
-import { ThemeSwitcher } from "@/components/app/theme-switcher";
 import { EveMark } from "@/components/eve/logo";
-import { TruthLabel } from "@/components/eve/truth-label";
 import { Button } from "@/components/ui/button";
 import { buildInbox } from "@/lib/client/derive";
 import { fmtDate, fmtTime } from "@/lib/client/format";
@@ -27,7 +25,7 @@ const PRIMARY: NavItem[] = [
   { href: "/payouts", label: "Payouts", count: (n) => n.payouts },
   { href: "/people", label: "People" },
   { href: "/budget", label: "Budget" },
-  { href: "/sponsor", label: "Sponsor", count: (n) => n.sponsor },
+  { href: "/sponsor", label: "Disburse", count: (n) => n.sponsor },
 ];
 const SECONDARY: NavItem[] = [
   { href: "/audit", label: "Audit trail" },
@@ -102,12 +100,11 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
       {/* Wide: the rail. */}
       <aside className="sticky top-0 hidden h-dvh p-3 pr-0 xl:flex">
         <div className="flex w-full flex-col gap-4 overflow-y-auto rounded-2xl border bg-rail px-3 pt-4 pb-3">
-        <Brand demo={snapshot?.demo} />
+        <Brand />
         {eventCard}
         {nav()}
-        <div className="mt-auto flex flex-col gap-3 border-t pt-3">
-          <PersonaSwitcher />
-          <ThemeSwitcher />
+        <div className="mt-auto border-t pt-2">
+          <AccountMenu />
         </div>
         </div>
       </aside>
@@ -117,7 +114,7 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
         <Button variant="ghost" size="icon" aria-label="Open navigation" onClick={() => setMenuOpen(true)}>
           <MenuIcon aria-hidden />
         </Button>
-        <Brand demo={snapshot?.demo} compact />
+        <Brand compact />
         <span aria-hidden className="text-border">/</span>
         <span className="truncate text-small font-medium">{current?.label ?? ""}</span>
         {counts && current?.href !== "/inbox" && counts.inbox ? (
@@ -132,9 +129,8 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
       <Sheet open={menuOpen} onOpenChange={setMenuOpen} title="Eve" side="left" description={snapshot?.event.name}>
         <div className="flex flex-col gap-4">
           {nav(() => setMenuOpen(false))}
-          <div className="flex flex-col gap-3 border-t pt-3">
-            <PersonaSwitcher />
-            <ThemeSwitcher />
+          <div className="border-t pt-2">
+            <AccountMenu />
           </div>
         </div>
       </Sheet>
@@ -154,9 +150,9 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Brand({ demo, compact }: { demo?: boolean; compact?: boolean }) {
+function Brand({ compact }: { compact?: boolean }) {
   return (
-    <div className={cn("flex items-center justify-between gap-2", !compact && "px-1")}>
+    <div className={cn("flex items-center gap-2", !compact && "px-1")}>
       <Link
         href="/overview"
         className={cn("flex items-center gap-2 rounded-md font-semibold tracking-[-0.02em]", compact ? "text-subheading" : "text-heading")}
@@ -164,7 +160,6 @@ function Brand({ demo, compact }: { demo?: boolean; compact?: boolean }) {
         <EveMark className={compact ? "size-6" : "size-7"} />
         Eve
       </Link>
-      {demo && !compact ? <TruthLabel kind="sample" /> : null}
     </div>
   );
 }

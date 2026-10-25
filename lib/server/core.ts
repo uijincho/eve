@@ -55,6 +55,9 @@ export const ACTION_ROLES: Record<C.AppAction, Who[]> = {
   "payout.verify": ["organizer", "controller", "self"],
   "payout.retry": ["controller"],
   "sponsor.create": ["organizer"],
+  "sponsor.batchRelease": ["controller"],
+  "sponsor.batchRetry": ["controller"],
+  "sponsor.batchCancel": ["controller"],
   "sponsor.submit": ["controller"],
   "sponsor.reconcile": ["organizer", "controller"],
   "sponsor.portalStart": ["organizer", "controller"],
@@ -201,6 +204,7 @@ export function toPerson(p: PersonRow, extra: {
     taxExpiresAt: iso(extra.profile?.expiresAt), taxLast4: extra.profile?.tinLast4 ?? undefined,
     // Payout tax claims a treaty only when an article is named (payouts.ts); the country defaults to residence, as on the form PDF.
     taxTreatyCountry: extra.profile?.treatyArticle ? extra.profile.treatyCountry ?? p.country : undefined,
+    ...(extra.profile?.documentId ? { taxDocumentId: extra.profile.documentId, taxDocumentForm: extra.profile.form } : {}),
     payoutCurrency: extra.method?.currency ?? p.payoutCurrency, payoutLast4: extra.method?.last4 ?? "",
     payoutChangedAt: iso(extra.method?.verifiedAt ?? extra.method?.createdAt),
     paidYtdMinor: str(extra.paidYtdMinor), outstandingMinor: str(extra.outstandingMinor), chaseCount: p.chaseCount,

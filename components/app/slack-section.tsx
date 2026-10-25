@@ -6,6 +6,7 @@ import { ActionButton } from "@/components/app/action-button";
 import { CopyLink } from "@/components/app/copy-link";
 import { Field, NativeSelect } from "@/components/app/field";
 import { LinkButton } from "@/components/app/link-button";
+import { Badge } from "@/components/ui/badge";
 import type { AppSnapshot, SlackStatus } from "@/lib/contracts";
 import { canOrganize } from "@/lib/client/derive";
 import { payloads } from "@/lib/client/payloads";
@@ -47,7 +48,7 @@ function NotConnected({ snapshot: s }: { snapshot: AppSnapshot }) {
   return (
     <>
       <p className="text-small text-muted-foreground">
-        Approvals go by direct message to the person who must act, with Release, Approve and Hold buttons that use that person&apos;s Eve permissions. Informational alerts, the daily digest and event-weekend updates go to one team channel. Slack shows names, amounts and last 4 digits only.
+        Approvals by direct message, with Release, Approve and Hold buttons. Alerts and the daily digest go to one channel.
       </p>
       {permission.allowed ? (
         <LinkButton external href="/api/slack/install" variant="default" size="sm" className="self-start">Connect Slack</LinkButton>
@@ -64,22 +65,24 @@ function Connected({ snapshot: s, slack }: { snapshot: AppSnapshot; slack: Slack
   const canLink = s.actor.role === "organizer" || s.actor.role === "controller";
   return (
     <>
-      <p className="text-small">
-        Connected to <span className="font-medium">{slack.teamName}</span>. Team channel: {slack.channelName ?? "none chosen; reconnect to pick one"}.
+      <p className="flex flex-wrap items-center gap-2 text-small">
+        <Badge variant="positive">Connected</Badge>
+        <span className="font-medium">{slack.teamName}</span>
+        <Badge variant="secondary" title="Team channel">{slack.channelName ?? "No channel"}</Badge>
       </p>
 
       <div className="flex flex-col gap-3">
         <h3 className="text-small font-medium">Your Slack account</h3>
         {slack.me.linked ? (
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-small text-muted-foreground">
-              Linked. {slack.me.muted.length ? `Muted direct messages: ${slack.me.muted.join(", ")}.` : "No categories muted."} Mute categories in Eve&apos;s Home tab in Slack or with /eve mute.
+            <span className="flex flex-wrap items-center gap-2 text-small text-muted-foreground">
+              <Badge variant="positive">Linked</Badge>
+              {slack.me.muted.length ? `Muted: ${slack.me.muted.join(", ")}` : null}
             </span>
             <ActionButton label="Unlink" variant="ghost" call={payloads.slackUnlink()} />
           </div>
         ) : canLink ? (
           <>
-            <p className="text-small text-muted-foreground">Linking proves the Slack account is yours: Eve shows a one-time code here, and you type it in Slack.</p>
             <ActionButton
               className="self-start"
               label={code ? "New code" : "Link Slack"}
@@ -101,7 +104,7 @@ function Connected({ snapshot: s, slack }: { snapshot: AppSnapshot; slack: Slack
         {slack.members.map((m) => (
           <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
             <span className="text-small"><span className="font-medium">{m.name}</span> <span className="text-muted-foreground">· {m.role}</span></span>
-            <span className="text-small text-muted-foreground">{m.linked ? "Linked" : "Not linked"}</span>
+            <Badge variant={m.linked ? "positive" : "secondary"}>{m.linked ? "Linked" : "Not linked"}</Badge>
           </li>
         ))}
       </ul>

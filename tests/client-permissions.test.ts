@@ -68,7 +68,7 @@ describe("organizer-only screens for a controller", () => {
     const { SettingsView } = await import("@/components/app/views/settings-view");
     state.snapshot = { ...fixtureSnapshot(), actor: persona("controller") };
     expect(renderToStaticMarkup(createElement(PrizesView))).not.toContain("Enter a winner");
-    expect(renderToStaticMarkup(createElement(SettingsView))).toContain("Only an organizer can do this. Fields are shown for reference");
+    expect(renderToStaticMarkup(createElement(SettingsView))).toContain("Only an organizer can do this. Saving is locked.");
   });
 });
 

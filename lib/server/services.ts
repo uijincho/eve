@@ -23,6 +23,8 @@ import { offerSigningKeyFromEnv, signOffers, verifyFlightRequest } from "@/lib/f
 import { lockPeriod, postJournal, type JournalLineInput } from "@/lib/ledger";
 import { convertMinor as convertFx } from "@/lib/engines/money";
 import { renderPayoutPacket, renderTaxFormReceipt } from "@/lib/pdf";
+import { renderW8ben } from "@/lib/pdf/w8ben";
+import { W8BEN_REVISION } from "@/lib/tax/w8ben";
 
 import { actionSchemas } from "./action-schemas";
 import { explainClaim, prepareClaim, processClaim, reviewClaim, submitClaim, type ClaimEvidence } from "./claims";
@@ -35,7 +37,7 @@ import {
 import { assertFits, ORG_BOOKED_FLIGHT, prizeBudgetRoom } from "./budget";
 import { computeTax, grossUp, recommendFulfillment, selectRule, splitAward, w8ExpiresAt } from "./engines";
 import {
-  assertNotBeneficiary, changeBankDetails, IN_KIND_PROVIDER, liveOverride, loadSource, requote, loadPayoutContext, lockOrgFinance, lockPayee, payoutCategory, postAccrual, prepareRelease,
+  assertNotInBatch, assertNotBeneficiary, changeBankDetails, IN_KIND_PROVIDER, liveOverride, loadRules, loadSource, requote, loadPayoutContext, lockOrgFinance, lockPayee, payoutCategory, postAccrual, prepareRelease,
   proposePayout, reevaluatePerson, releasePayout, requoteSiblings, retryPayout, SPONSOR_PROVIDER, taxFor, termsKey, verifyBankChange,
 } from "./payouts";
 import { computeScoreboard, saveScoreboard } from "./scoreboard";
@@ -234,8 +236,10 @@ async function personUpdate(tx: Executor, actor: ActorContext, p: { id: string }
 
 // --------------------------------------------------------------------- tax
 
-async function taxSubmit(tx: Executor, actor: ActorContext, p: { personId: string; form: "W-9" | "W-8BEN" | "W-8BEN-E" | "Residency declaration"; signature: string; tin?: string; treatyCountry?: string; treatyArticle?: string }) {
+async function taxSubmit(tx: Executor, actor: ActorContext, p: { personId: string; form: "W-9" | "W-8BEN" | "W-8BEN-E" | "Residency declaration"; signature: string; tin?: string; ftinNotRequired?: boolean; treatyCountry?: string; treatyArticle?: string }) {
   assertSelfOrStaff(actor, p.personId);
+  if (p.ftinNotRequired && p.form !== "W-8BEN") throw invalid("Only a W-8BEN records that a foreign tax ID is not legally required.");
+  if (p.ftinNotRequired && p.tin) throw invalid("Enter a foreign tax ID or say one is not legally required, not both.");
   const person = await lockPayee(tx, actor.orgId, p.personId);
   if (!person.adult) throw conflict("Eve cannot onboard anyone under 18 at the event start date.");
   const { org } = await loadOrgEvent(tx, actor.orgId);
@@ -254,11 +258,26 @@ async function taxSubmit(tx: Executor, actor: ActorContext, p: { personId: strin
   const tin = p.tin ? await vaultTin(tx, actor.orgId, person.id, p.tin) : null;
   await tx.update(s.taxProfile).set({ supersededAt: now }).where(and(eq(s.taxProfile.personId, person.id), sql`${s.taxProfile.supersededAt} IS NULL`));
   const profileId = newId("tax");
-  const pdf = await renderTaxFormReceipt({
-    documentId: profileId, formType: p.form, legalName: person.name, citizenship: person.citizenship, residenceCountry: person.country,
-    address: person.address, dateOfBirth: person.dateOfBirth, tinLast4: tin?.last4, signedName: p.signature, signedAt: now.toISOString(),
-    expiresAt: expiresAt?.toISOString(), treaty: p.treatyArticle ? { country: p.treatyCountry ?? person.country, article: p.treatyArticle, rate: "per rules table", verified: false } : undefined,
-  });
+  const treatyCountry = p.treatyCountry ?? (p.treatyArticle ? person.country : undefined);
+  // Line 10's rate comes from the rules table (exact treaty country only); the claim stays unverified unless the rule is.
+  const treatyRule = p.form === "W-8BEN" && p.treatyArticle && treatyCountry
+    ? selectRule(await loadRules(tx), { payerCountry: org.country, payeeCountry: treatyCountry, paymentType: "cash_prize:treaty", year: now.getUTCFullYear() })
+    : undefined;
+  const rule = treatyRule?.payeeCountry === treatyCountry ? treatyRule : undefined;
+  const signedVia = actor.personId === person.id ? `Eve portal, signed in as ${actor.name} (${actor.role})` : `Eve, submitted by ${actor.name} (${actor.role}) for ${person.name}`;
+  // Only the vault's last 4 ever reach a renderer; the full TIN is never printed.
+  const pdf = p.form === "W-8BEN"
+    ? await renderW8ben({
+      referenceNumber: profileId, legalName: person.name, citizenship: person.citizenship, residenceCountry: person.country, address: person.address,
+      dateOfBirth: person.dateOfBirth, ftinLast4: tin?.last4, ftinNotRequired: p.ftinNotRequired, treatyCountry,
+      treatyClaim: p.treatyArticle ? { article: p.treatyArticle, rateBps: rule?.rateBps, verified: rule?.verified ?? false } : undefined,
+      signedName: p.signature, signedAt: now.toISOString(), signedVia, expiresAt: expiresAt?.toISOString(),
+    })
+    : await renderTaxFormReceipt({
+      documentId: profileId, formType: p.form, legalName: person.name, citizenship: person.citizenship, residenceCountry: person.country,
+      address: person.address, dateOfBirth: person.dateOfBirth, tinLast4: tin?.last4, signedName: p.signature, signedAt: now.toISOString(), signedVia,
+      expiresAt: expiresAt?.toISOString(), treaty: p.treatyArticle ? { country: treatyCountry ?? person.country, article: p.treatyArticle, rate: "per rules table", verified: false } : undefined,
+    });
   const doc = await storeDocument(tx, { orgId: actor.orgId, personId: person.id, uploadedBy: actor.memberId, kind: "tax_form", name: `${p.form}-${person.name}.pdf`, mimeType: "application/pdf", bytes: pdf });
   await tx.insert(s.taxProfile).values({
     id: profileId, orgId: actor.orgId, personId: person.id, form: p.form, status, statusReason: problems.join(" "), signatureName: p.signature,
@@ -270,7 +289,10 @@ async function taxSubmit(tx: Executor, actor: ActorContext, p: { personId: strin
     orgId: actor.orgId, objectType: "person", objectId: person.id, personId: person.id, personName: person.name, action: "tax.submit",
     summary: status === "valid" ? `${p.form} signed and valid${expiresAt ? ` until ${expiresAt.toISOString().slice(0, 10)}` : ""}. ${re.requoted} unpaid payout(s) re-quoted.` : `${p.form} needs review: ${blocking.join(" ")}`,
     actor, status: status === "valid" ? "done" : "escalated", tool: "validateTaxForm", documentId: doc.id,
-    facts: { form: p.form, expected: expectedForm(person, org.country), tinLast4: tin?.last4 ?? null, problems },
+    facts: {
+      form: p.form, expected: expectedForm(person, org.country), tinLast4: tin?.last4 ?? null, problems,
+      ...(p.form === "W-8BEN" ? { document: `IRS Form W-8BEN (${W8BEN_REVISION}), filled, with signature record`, ftinNotRequired: Boolean(p.ftinNotRequired), treatyRule: rule ? `${rule.id} v${rule.version}` : null } : {}),
+    },
   });
   return ok(status === "valid" ? `${p.form} saved.` : `${p.form} saved for review: ${blocking.join(" ")}`, { status, documentId: doc.id });
 }
@@ -457,7 +479,7 @@ async function awardFulfill(tx: Executor, actor: ActorContext, p: { id: string }
     actor, status: "done", tool: "fulfillPrize", ruleId: tax.ruleId, ruleVersion: tax.ruleVersion,
     facts: { truth: "Simulated", fmvMinor: fmv.toString(), grossMinor: grossMinor.toString(), withholdingMinor: withholdingMinor.toString(), ytdMinor, reportingForm: reported.reportingForm, reportable: reported.reportable, payoutId: id, method },
   });
-  await recordNotice(tx, { orgId: actor.orgId, personId: a.personId, channel: "portal", title: `${a.title}: fulfillment recorded`, body: `Your prize was marked ${method}. This demo does not ship or buy anything. Its fair market value (${usd(fmv)}) is reportable prize income.` });
+  await recordNotice(tx, { orgId: actor.orgId, personId: a.personId, channel: "portal", title: `${a.title}: fulfillment recorded`, body: `Your prize was marked ${method}. Its fair market value (${usd(fmv)}) is reportable prize income.` });
   await requoteSiblings(tx, actor.orgId, a.personId, `in-kind prize ${a.title} became final`, id, actor);
   return ok(`${a.title} marked ${method}.`, { awardId: a.id, payoutId: row.id, fmvMinor: fmv.toString(), grossMinor: grossMinor.toString(), withholdingMinor: withholdingMinor.toString(), reportingForm: reported.reportingForm, reportable: reported.reportable, truth: "Simulated" });
 }
@@ -578,7 +600,7 @@ function sponsorFxNote(payout: Pick<typeof s.payout.$inferSelect, "currency" | "
   return ` About ${money(sponsorDestination(payout, usdMinor), payout.destinationCurrency)} at the payout's quoted rate, 1 ${payout.currency} = ${payout.fxRate} ${payout.destinationCurrency} (estimate; the sponsor's rate may differ).`;
 }
 
-export async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payoutId: string }) {
+export async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payoutId: string }, batchId?: string) {
   await lockOrgFinance(tx, actor.orgId);
   const { org } = await loadOrgEvent(tx, actor.orgId);
   if (org.mode === "direct") throw conflict("This organization pays directly. Switch to sponsor or hybrid mode in Settings to use sponsor packets.");
@@ -587,6 +609,7 @@ export async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payo
   const person = await loadPerson(tx, actor.orgId, peek.personId, true);
   assertNotBeneficiary(actor, person, "request");
   const [payout] = await tx.select().from(s.payout).where(eq(s.payout.id, p.payoutId)).for("update");
+  await assertNotInBatch(tx, payout.id, batchId);
   if (payout.status !== "proposed" && payout.status !== "approved") throw conflict(`Payout is ${payout.status}; only a proposed payout can go to the sponsor.`);
   if (payout.provider === IN_KIND_PROVIDER) throw conflict("In-kind prizes are not paid in cash.");
   const [existing] = await tx.select({ id: s.sponsorPacket.id, status: s.sponsorPacket.status }).from(s.sponsorPacket).where(eq(s.sponsorPacket.payoutId, payout.id));
@@ -625,7 +648,7 @@ async function loadPacket(tx: Executor, actor: ActorContext, id: string) {
 }
 
 /** sponsor.submit: the controller's release for a sponsor-paid payout. */
-export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: string }) {
+export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: string }, batchId?: string) {
   if (actor.role !== "controller") throw forbidden("Submitting a packet releases money through the sponsor, so only a controller can do it.");
   const { pk, payout: pk0 } = await loadPacket(tx, actor, p.id);
   if (pk.status !== "draft" && pk.status !== "questioned") throw conflict(`Packet is ${pk.status}.`);
@@ -639,7 +662,7 @@ export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: 
     await recordDecision(tx, { orgId: actor.orgId, objectType: "packet", objectId: pk.id, personId: pk0.personId, action: "sponsor.withdraw", summary: `Packet withdrawn: fee policy changed from ${pk.feesPaidBy ?? "org"} to ${orgNow.feesPaidBy} after it was drafted. Draft a new packet.`, actor, status: "escalated", tool: "sponsorPacket" });
     return { ok: false, message: `Not submitted: the fee policy changed after this packet was drafted, so it was withdrawn. Draft a new packet with the current terms.`, data: { withdrawn: pk.id } };
   }
-  const check = await prepareRelease(tx, actor, pk.payoutId, "sponsor");
+  const check = await prepareRelease(tx, actor, pk.payoutId, "sponsor", { batchId });
   if (check.kind === "requoted") {
     return { ok: false, message: `Not submitted: the payout was re-quoted (${check.payout.reason}). Draft a new packet for the new terms.`, data: { payoutId: check.payout.id } };
   }
@@ -907,6 +930,9 @@ const handlers: Record<AppAction, Handler> = {
   "sponsor.submit": sponsorSubmit as Handler,
   "sponsor.reconcile": reconcilePacket as Handler,
   // Started, resumed and stopped by the actions route (lib/computer-use/portal-run.ts), never inside a transaction.
+  "sponsor.batchRelease": portalRouteOnly,
+  "sponsor.batchRetry": portalRouteOnly,
+  "sponsor.batchCancel": portalRouteOnly,
   "sponsor.portalStart": portalRouteOnly,
   "sponsor.portalDecide": portalRouteOnly,
   "sponsor.portalStop": portalRouteOnly,
