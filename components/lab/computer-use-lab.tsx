@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { LiveDesktop } from "@/components/app/live-desktop";
 import { PageHeader } from "@/components/app/page-header";
 import { Money } from "@/components/eve/money";
 import { TruthLabel } from "@/components/eve/truth-label";
@@ -206,15 +207,18 @@ function PageTrail({ state }: { state: LabState | null }) {
 function LiveView({ state }: { state: LabState | null }) {
   if (state?.streamUrl) {
     return (
-      <div className="flex flex-col gap-2">
-        <div className="overflow-hidden rounded-xl border bg-background">
-          <iframe src={state.streamUrl} title="Live view of the E2B desktop, view only" className="block aspect-[4/3] w-full" />
-        </div>
-        <p className="text-caption text-muted-foreground">
-          Live view only. Sandbox {state.sandboxId}
-          {state.offline ? " has no internet access; Chrome can open the portal and nothing else." : " has internet access."}
-        </p>
-      </div>
+      <LiveDesktop
+        src={state.streamUrl}
+        title="Live view of the E2B desktop, view only"
+        className="gap-2"
+        frameClassName="rounded-xl bg-background"
+        caption={
+          <>
+            Live view only. Sandbox {state.sandboxId}
+            {state.offline ? " has no internet access; Chrome can open the portal and nothing else." : " has internet access."}
+          </>
+        }
+      />
     );
   }
   return (
