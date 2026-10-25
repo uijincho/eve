@@ -29,6 +29,7 @@ export function ClaimForm({
   defaultType = "travel",
   submitLabel = "Submit claim",
   submitVariant = "default",
+  successMessage,
   onSubmitted,
 }: {
   /** Organizers submit for someone; attendees omit this and claim for themselves. */
@@ -37,6 +38,8 @@ export function ClaimForm({
   submitLabel?: string;
   /** Secondary where the page already has its one primary. */
   submitVariant?: "default" | "secondary";
+  /** Shown instead of the server's outcome, for attendees who never see Eve's checks. */
+  successMessage?: string;
   onSubmitted?: (claimId: string | null) => void;
 }) {
   const { act } = useEve();
@@ -103,7 +106,7 @@ export function ClaimForm({
       }),
     );
     setPhase("idle");
-    setResult(r);
+    setResult(r.ok && successMessage ? { ...r, message: successMessage } : r);
     if (r.ok) {
       idempotencyKey.current = null;
       const id = typeof r.data?.id === "string" ? r.data.id : typeof r.data?.claimId === "string" ? r.data.claimId : null;

@@ -422,6 +422,21 @@ function holdTags(p: Payout, person?: Person): Tag[] {
 }
 
 /** Why a claim is waiting, in failed form; once decided, the reviewer's or server's reason. */
+/**
+ * A claim's state as the attendee sees it. Eve's review stages all read as
+ * "Submitted"; the checks and why a claim was escalated stay with organizers.
+ */
+export function attendeeClaimStatus(c: Pick<Claim, "category" | "status">): { status: string; label?: string } {
+  if (c.status === "submitted" || c.status === "processing" || c.status === "escalated") return { status: "submitted", label: "Submitted" };
+  return { status: c.status, label: claimStatusLabel(c) };
+}
+
+/** The only claim text an attendee sees: Eve's fare question, or a person's question or rejection reason. */
+export function attendeeClaimNote(c: Pick<Claim, "status" | "reason" | "fareReview">): string {
+  if (c.status === "needs_info") return c.fareReview?.question ?? c.reason;
+  return c.status === "rejected" ? c.reason : "";
+}
+
 export function claimReasonText(c: Pick<Claim, "checks" | "status" | "reason">): string {
   const failed = failedChecks(c).map(failedCheckText);
   return (c.status === "escalated" || c.status === "needs_info") && failed.length ? `${failed.join("; ")}.` : c.reason;

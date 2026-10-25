@@ -13,7 +13,7 @@ import { TruthLabel } from "@/components/eve/truth-label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResult, AppSnapshot, Person } from "@/lib/contracts";
-import { big, claimStatusLabel, claimReasonText } from "@/lib/client/derive";
+import { attendeeClaimNote, attendeeClaimStatus, big } from "@/lib/client/derive";
 import { fmtDate, fmtDateTime, humanize } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
 import { useEve } from "@/lib/client/use-eve";
@@ -200,11 +200,11 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
               <li key={c.id} className="flex items-center justify-between gap-3 px-4 py-3">
                 <span className="flex flex-col">
                   <span className="font-medium">{c.merchant}{c.origin ? ` · from ${c.origin}` : ""}</span>
-                  <span className="text-small text-muted-foreground">{claimReasonText(c) || c.description}</span>
+                  <span className="text-small text-muted-foreground">{attendeeClaimNote(c) || c.description}</span>
                 </span>
                 <span className="flex flex-col items-end gap-1">
                   <Money amountMinor={big(c.usdMinor)} className="font-semibold" />
-                  <StatusBadge status={c.status} label={claimStatusLabel(c)} />
+                  <StatusBadge {...attendeeClaimStatus(c)} />
                 </span>
               </li>
             ))}

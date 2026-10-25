@@ -457,7 +457,7 @@ async function awardFulfill(tx: Executor, actor: ActorContext, p: { id: string }
     actor, status: "done", tool: "fulfillPrize", ruleId: tax.ruleId, ruleVersion: tax.ruleVersion,
     facts: { truth: "Simulated", fmvMinor: fmv.toString(), grossMinor: grossMinor.toString(), withholdingMinor: withholdingMinor.toString(), ytdMinor, reportingForm: reported.reportingForm, reportable: reported.reportable, payoutId: id, method },
   });
-  await recordNotice(tx, { orgId: actor.orgId, personId: a.personId, channel: "portal", title: `${a.title}: fulfillment recorded`, body: `Your prize was marked ${method}. This demo does not ship or buy anything. Its fair market value (${usd(fmv)}) is reportable prize income.` });
+  await recordNotice(tx, { orgId: actor.orgId, personId: a.personId, channel: "portal", title: `${a.title}: fulfillment recorded`, body: `Your prize was marked ${method}. Its fair market value (${usd(fmv)}) is reportable prize income.` });
   await requoteSiblings(tx, actor.orgId, a.personId, `in-kind prize ${a.title} became final`, id, actor);
   return ok(`${a.title} marked ${method}.`, { awardId: a.id, payoutId: row.id, fmvMinor: fmv.toString(), grossMinor: grossMinor.toString(), withholdingMinor: withholdingMinor.toString(), reportingForm: reported.reportingForm, reportable: reported.reportable, truth: "Simulated" });
 }

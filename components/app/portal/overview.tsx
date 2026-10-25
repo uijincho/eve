@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { DueChip } from "@/components/eve/due-chip";
 import { Money } from "@/components/eve/money";
 import type { AppSnapshot, Award, Person } from "@/lib/contracts";
-import { awardName, big, prizeOptions, payoutSource, providerLabel, isInKind, payoutValue, claimReasonText, FULFILLMENT_LABEL, fmtPlain } from "@/lib/client/derive";
+import { awardName, big, prizeOptions, payoutSource, providerLabel, isInKind, payoutValue, attendeeClaimNote, FULFILLMENT_LABEL, fmtPlain } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 
 import { PortalFrame } from "./portal-frame";
@@ -27,7 +27,7 @@ function todos(s: AppSnapshot, me: Person): Todo[] {
     if (a.teamId && !a.splitConfirmed) list.push({ id: `s-${a.id}`, title: "Confirm your team's split", detail: `${a.track}: every member confirms before payment.`, href: "/portal/prizes", dueAt: a.dueAt });
   }
   for (const c of s.claims.filter((x) => x.personId === me.id && x.status === "needs_info"))
-    list.push({ id: `c-${c.id}`, title: `Answer a question about claim ${c.id}`, detail: claimReasonText(c), href: "/portal/claims", dueAt: c.dueAt });
+    list.push({ id: `c-${c.id}`, title: `Answer a question about claim ${c.id}`, detail: attendeeClaimNote(c), href: "/portal/claims", dueAt: c.dueAt });
   return list;
 }
 
