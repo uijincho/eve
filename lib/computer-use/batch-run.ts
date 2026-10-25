@@ -9,17 +9,20 @@ import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
 import { batchQuoteKey } from "@/lib/disbursement";
 import { ActionError, agentActor, conflict, forbidden, loadOrgEvent, recordDecision, storeDocument } from "@/lib/server/core";
-import { assertNotBeneficiary, lockOrgFinance, prepareRelease, termsKey } from "@/lib/server/payouts";
+import { assertNotBeneficiary, loadReleaseRules, lockOrgFinance, prepareRelease, termsKey } from "@/lib/server/payouts";
 import { sponsorCreate, sponsorSubmit } from "@/lib/server/services";
 import { BATCH_FILE, batchBrief, buildBatchBundle, canonical, matchesBatchImport } from "./batch-packet";
 import { authorizePortalBatch, bootComputer, capture, portalImports, portalRecords } from "./computer";
-import { loadPortalPacket, portalConfigured, portalPassword } from "./portal-run";
+import { loadPortalPacket, portalPassword } from "./portal-run";
 import { newAgentState, runAgentTurn, type AgentState } from "./turn";
+import { randomUUID } from "node:crypto";
+import { cloudConfigured } from "@/lib/browser-use/client";
+import { cloudState } from "@/lib/browser-use/state";
 
 type Batch = typeof s.disbursementBatch.$inferSelect;
 type Result = ActionResult & { status: number };
 export interface BatchTarget { orgId: string; batchId: string }
-interface State { agent: AgentState; submissionAuthorized?: boolean }
+interface State { agent: AgentState; submissionAuthorized?: boolean; validating?: boolean }
 const table = s.disbursementBatch;
 const message = (error: unknown) => error instanceof Error ? error.message : "The portal service is unavailable.";
 
@@ -36,28 +39,35 @@ async function log(t: BatchTarget, summary: string, status: "running" | "done" |
     action: `batch.${status}`, actor: agentActor(t.orgId), tool: "bulkPortal", summary, status, documentId,
     facts: { batchId: t.batchId } });
 }
-async function controller(db: Executor, b: Batch): Promise<ActorContext> {
+export async function controller(db: Executor, b: Batch): Promise<ActorContext> {
   const [m] = await db.select().from(s.orgMember).where(and(eq(s.orgMember.id, b.approvedBy), eq(s.orgMember.orgId, b.orgId)));
   const { org } = await loadOrgEvent(db, b.orgId);
   if (!m || m.role !== "controller" || (m.demoPersona && (!org.isDemo || !demoModeEnabled()))) throw forbidden("The approving controller no longer has access. Cancel and obtain a new release.");
   return { memberId: m.id, orgId: m.orgId, role: m.role, name: m.name, email: m.email, personId: m.personId, userId: m.userId, demo: m.demoPersona && org.isDemo };
 }
 
-/** Run the full existing settlement gate in a savepoint, then roll it back. No money/status is posted during validation. */
-async function checkBatch(tx: Tx, actor: ActorContext, b: Pick<Batch, "id" | "orgId" | "feesPaidBy" | "evidence">) {
+/** Compare immutable release evidence. sponsorSubmit performs the full policy gate under the same lock. */
+async function checkBatchEvidence(tx: Tx, b: Pick<Batch, "id" | "orgId" | "feesPaidBy" | "evidence">) {
+  // If the server is killed, release its uncommitted finance locks promptly.
+  // These transactions contain database work only, never model/browser waits.
+  await tx.execute(sql`set local idle_in_transaction_session_timeout = '30s'`);
   const { org } = await loadOrgEvent(tx, b.orgId);
   if (org.mode === "direct" || org.feesPaidBy !== b.feesPaidBy) throw conflict("The sponsor payment policy changed. Cancel this batch and release a new one.");
   for (const item of b.evidence) {
-    const check = await prepareRelease(tx, actor, item.payoutId, "sponsor", { expectTerms: item.terms, batchId: b.id });
-    if (check.kind !== "ready") throw conflict("A payment was re-quoted. Cancel this batch and review the current amounts.");
-    const { packet } = await loadPortalPacket(b.orgId, item.packetId, tx);
+    const { packet } = await loadPortalPacket(b.orgId, item.packetId, tx, false);
     if (canonical(packet) !== canonical(item.packet)) throw conflict("A recipient or packet changed. Cancel this batch and release a new one.");
   }
+}
+
+/** Simulate settlement once, including interactions between payments, then roll it back. */
+export async function checkBatch(tx: Tx, actor: ActorContext, b: Pick<Batch, "id" | "orgId" | "feesPaidBy" | "evidence">) {
+  await checkBatchEvidence(tx, b);
+  const releaseRules = await loadReleaseRules(tx);
   const rollback = new Error("batch-preflight-complete");
   try {
     await tx.transaction(async (sp) => {
       for (const item of b.evidence) {
-        const result = await sponsorSubmit(sp, actor, { id: item.packetId }, b.id);
+        const result = await sponsorSubmit(sp, actor, { id: item.packetId }, b.id, { expectTerms: item.terms, releaseRules });
         if (!result.ok) throw conflict(result.message);
       }
       throw rollback;
@@ -68,7 +78,7 @@ async function checkBatch(tx: Tx, actor: ActorContext, b: Pick<Batch, "id" | "or
 /** Fast release: bind the visible quotes and reserve every payout, then prepare in durable code steps. */
 export async function releaseBatch(actor: ActorContext, input: { payouts: { id: string; quote: string }[] }): Promise<Result> {
   if (actor.role !== "controller") return { ok: false, status: 403, message: "Only a controller can release a batch." };
-  const missing = portalConfigured();
+  const missing = cloudConfigured();
   if (missing) return { ok: false, status: 503, message: missing };
   if (!input.payouts.length || input.payouts.length > 200 || new Set(input.payouts.map((p) => p.id)).size !== input.payouts.length) return { ok: false, status: 400, message: "Choose 1–200 different payouts." };
   const target = { orgId: actor.orgId, batchId: newId("batch") };
@@ -93,7 +103,7 @@ export async function releaseBatch(actor: ActorContext, input: { payouts: { id: 
       }
       if (!Object.values(totals).every(Number.isSafeInteger)) throw conflict("Batch total exceeds the portal limit.");
       await tx.insert(table).values({ id: target.batchId, orgId: actor.orgId, approvedBy: actor.memberId, approvedByName: actor.name,
-        requestedPayouts: [...input.payouts].sort((a, b) => a.id.localeCompare(b.id)),
+        requestedPayouts: [...input.payouts].sort((a, b) => a.id.localeCompare(b.id)), state: { provider: "browser-use", attempt: randomUUID() },
         manifest: { version: 1, batchId: target.batchId, currency: "USD", payments: [], documents: [], totals }, manifestHash: "", evidence: [], feesPaidBy: org.feesPaidBy });
       await tx.insert(s.disbursementBatchItem).values(ids.map((payoutId) => ({ payoutId, batchId: target.batchId })));
       await tx.insert(s.approval).values(rows.map(({ payout: p }) => ({ id: newId("apr"), orgId: actor.orgId, objectType: "batch", objectId: target.batchId,
@@ -177,15 +187,20 @@ async function launch(target: BatchTarget): Promise<Result> {
 
 export async function retryBatch(actor: ActorContext, id: string): Promise<Result> {
   if (actor.role !== "controller") return { ok: false, status: 403, message: "Only a controller can retry a batch." };
+  const missing = cloudConfigured();
+  if (missing) return { ok: false, status: 503, message: missing };
   const target = { orgId: actor.orgId, batchId: id };
   try {
+    const previous = await load(target);
+    if (previous.status === "failed" && previous.approvedBy === actor.memberId && cloudState(previous.state)) await (await import("@/lib/browser-use/batch")).closeCloudBatch(target);
     await getDb().transaction(async (tx) => {
       await lockOrgFinance(tx, actor.orgId);
       const b = await load(target, tx);
       if (b.status !== "failed" || (b.state as unknown as State | null)?.submissionAuthorized || b.confirmation) throw conflict("This batch may have reached the sponsor. Check its confirmation before any new submission.");
       if (actor.memberId !== b.approvedBy) throw forbidden("The controller who released this batch must retry it.");
-      if (b.evidence.length === b.requestedPayouts.length) await checkBatch(tx, await controller(tx, b), b);
-      await tx.update(table).set({ status: "preparing", workflowRunId: null, error: null, state: null }).where(eq(table.id, id));
+      await controller(tx, b);
+      // Full checks run durably before the cloud agent starts, not in this HTTP request.
+      await tx.update(table).set({ status: "preparing", workflowRunId: null, error: null, state: { provider: "browser-use", attempt: randomUUID() } }).where(eq(table.id, id));
     });
     return await launch(target);
   } catch (error) { return { ok: false, status: error instanceof ActionError ? error.status : 409, message: message(error) }; }
@@ -203,6 +218,7 @@ export async function cancelBatch(actor: ActorContext, id: string): Promise<Resu
       await tx.delete(s.disbursementBatchItem).where(eq(s.disbursementBatchItem.batchId, id));
       await log(target, `${actor.name} cancelled this batch before submission. Its payouts can be released again.`, "done", undefined, tx);
     });
+    if (cloudState((await load(target)).state)) await (await import("@/lib/browser-use/batch")).closeCloudBatch(target);
     return { ok: true, status: 200, message: "Batch cancelled. Its payouts are ready for a new release." };
   } catch (error) { return { ok: false, status: error instanceof ActionError ? error.status : 409, message: message(error) }; }
 }
@@ -262,13 +278,20 @@ export async function authorizeBatch(t: BatchTarget): Promise<boolean> {
   const desktop = await Sandbox.connect(b.sandboxId!);
   const imported = (await portalImports(desktop))[t.batchId];
   if (!imported || !matchesBatchImport(imported, b.manifestHash, b.manifest)) throw new Error("The portal import differs from the approved batch. Nothing was submitted.");
+  // Persist the phase before the long transaction so polling can explain the pause.
+  await getDb().update(table).set({ state: sql`jsonb_set(${table.state}, '{validating}', 'true'::jsonb)`, updatedAt: new Date() })
+    .where(and(eq(table.id, t.batchId), eq(table.orgId, t.orgId), eq(table.status, "filling")));
   await getDb().transaction(async (tx) => {
     await lockOrgFinance(tx, t.orgId);
     const current = await load(t, tx);
+    // Another delivery may have completed authorization while this one waited
+    // for the finance lock. Reuse that exact authorization instead of failing
+    // and closing a healthy desktop.
+    if (current.status === "submitting" && (current.state as unknown as State)?.submissionAuthorized) return;
     if (current.status !== "filling") throw conflict("This batch is no longer awaiting submission.");
     await checkBatch(tx, await controller(tx, current), current);
     const saved = current.state as unknown as State;
-    saved.submissionAuthorized = true; saved.agent.approved = true;
+    saved.submissionAuthorized = true; saved.agent.approved = true; saved.validating = false;
     saved.agent.operatorNote = `The controller ${current.approvedByName} already released this exact batch. Eve compared every imported row and document fingerprint with that release and rechecked all payment policies. Click "Submit batch" once and report the confirmation.`;
     await tx.update(table).set({ status: "submitting", state: saved as unknown as Record<string, unknown>, updatedAt: new Date() }).where(eq(table.id, t.batchId));
   });
@@ -282,7 +305,14 @@ export async function finishBatch(t: BatchTarget): Promise<void> {
   if (b.status === "submitted") return;
   const records = await portalRecords(await Sandbox.connect(b.sandboxId!));
   const receipt = records.find((r) => matchesBatchImport(r, b.manifestHash, b.manifest));
-  if (!receipt || typeof receipt.confirmation !== "string" || !(b.state as unknown as State)?.submissionAuthorized) throw new Error("The portal did not confirm this authorized batch. Check the sponsor before retrying.");
+  if (!receipt) throw new Error("The portal did not confirm this batch.");
+  await settleConfirmedBatch(t, receipt);
+}
+
+export async function settleConfirmedBatch(t: BatchTarget, receipt: Record<string, unknown>): Promise<void> {
+  const b = await load(t);
+  if (b.status === "submitted") return;
+  if (!matchesBatchImport(receipt, b.manifestHash, b.manifest) || typeof receipt.confirmation !== "string" || !(b.state as unknown as State)?.submissionAuthorized) throw new Error("The portal did not confirm this authorized batch. Check the sponsor before retrying.");
   // Preserve the external receipt even if local settlement checks fail.
   await save(t, { confirmation: receipt.confirmation });
   await getDb().transaction(async (tx) => {
@@ -290,9 +320,12 @@ export async function finishBatch(t: BatchTarget): Promise<void> {
     const current = await load(t, tx);
     if (current.status === "submitted") return;
     const actor = await controller(tx, current);
-    await checkBatch(tx, actor, current);
+    // The actual transaction is already atomic. A second rolled-back settlement
+    // here doubled the slowest phase and could exceed the server's time limit.
+    await checkBatchEvidence(tx, current);
+    const releaseRules = await loadReleaseRules(tx);
     for (const item of current.evidence) {
-      const result = await sponsorSubmit(tx, actor, { id: item.packetId }, current.id);
+      const result = await sponsorSubmit(tx, actor, { id: item.packetId }, current.id, { expectTerms: item.terms, releaseRules });
       if (!result.ok) throw conflict(result.message);
       await tx.update(s.sponsorPacket).set({ reason: `Batch ${current.id} submitted by Eve. Controller: ${actor.name}. Portal confirmation ${receipt.confirmation}. Awaiting payment.` }).where(eq(s.sponsorPacket.id, item.packetId));
     }
@@ -328,11 +361,13 @@ export async function batchesFor(orgId: string, db: Executor = getDb()): Promise
     manifest: table.manifest, documentId: table.documentId, approvedByName: table.approvedByName, approvedBy: table.approvedBy,
     streamUrl: table.streamUrl, confirmation: table.confirmation, error: table.error, turns: table.turns, createdAt: table.createdAt,
     submissionAuthorized: sql<boolean>`coalesce((${table.state}->>'submissionAuthorized')::boolean, false)`,
+    validating: sql<boolean>`coalesce((${table.state}->>'validating')::boolean, false)`,
+    provider: sql<string>`${table.state}->>'provider'`,
   }).from(table).where(eq(table.orgId, orgId)).orderBy(desc(table.createdAt));
   return rows.map((b) => ({ id: b.id, status: b.status, payoutIds: b.requestedPayouts.map((e) => e.id), packetIds: b.evidence.map((e) => e.packetId),
     count: b.manifest.totals.count, grossMinor: String(b.manifest.totals.grossCents), withholdingMinor: String(b.manifest.totals.withheldCents), netMinor: String(b.manifest.totals.netCents),
     documentId: b.documentId ?? undefined, approvedByName: b.approvedByName, approvedBy: b.approvedBy, streamUrl: b.streamUrl ?? undefined, confirmation: b.confirmation ?? undefined,
-    error: b.error ?? undefined, canRetry: b.status === "failed" && !b.submissionAuthorized && !b.confirmation,
+    error: b.error ?? undefined, provider: b.provider === "browser-use" ? "browser-use" : "computer-use", validating: ["preparing", "filling"].includes(b.status) && b.validating, canRetry: b.status === "failed" && !b.submissionAuthorized && !b.confirmation,
     canCancel: ["preparing", "filling", "failed"].includes(b.status) && !b.submissionAuthorized && !b.confirmation,
     turns: b.turns, createdAt: b.createdAt.toISOString() }));
 }

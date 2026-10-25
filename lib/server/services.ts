@@ -14,7 +14,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { ActorContext } from "@/lib/auth/session";
 import { demoModeEnabled } from "@/lib/auth/session";
-import type { ActionResult, AppAction } from "@/lib/contracts";
+import type { ActionResult, AppAction, TaxRule } from "@/lib/contracts";
 import { getDb, type Executor } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
@@ -626,7 +626,7 @@ async function loadPacket(tx: Executor, actor: ActorContext, id: string) {
 }
 
 /** sponsor.submit: the controller's release for a sponsor-paid payout. */
-export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: string }, batchId?: string) {
+export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: string }, batchId?: string, checks?: { expectTerms: string; releaseRules: TaxRule[] }) {
   if (actor.role !== "controller") throw forbidden("Submitting a packet releases money through the sponsor, so only a controller can do it.");
   const { pk, payout: pk0 } = await loadPacket(tx, actor, p.id);
   if (pk.status !== "draft" && pk.status !== "questioned") throw conflict(`Packet is ${pk.status}.`);
@@ -640,7 +640,7 @@ export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: 
     await recordDecision(tx, { orgId: actor.orgId, objectType: "packet", objectId: pk.id, personId: pk0.personId, action: "sponsor.withdraw", summary: `Packet withdrawn: fee policy changed from ${pk.feesPaidBy ?? "org"} to ${orgNow.feesPaidBy} after it was drafted. Draft a new packet.`, actor, status: "escalated", tool: "sponsorPacket" });
     return { ok: false, message: `Not submitted: the fee policy changed after this packet was drafted, so it was withdrawn. Draft a new packet with the current terms.`, data: { withdrawn: pk.id } };
   }
-  const check = await prepareRelease(tx, actor, pk.payoutId, "sponsor", { batchId });
+  const check = await prepareRelease(tx, actor, pk.payoutId, "sponsor", { batchId, ...checks });
   if (check.kind === "requoted") {
     return { ok: false, message: `Not submitted: the payout was re-quoted (${check.payout.reason}). Draft a new packet for the new terms.`, data: { payoutId: check.payout.id } };
   }

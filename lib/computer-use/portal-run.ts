@@ -80,7 +80,7 @@ async function saveRun(id: string, patch: Partial<typeof s.portalRun.$inferInser
 // ----------------------------------------------------------------- packet
 
 /** Reads a drafted packet and everything the portal needs, including the files to upload. */
-export async function loadPortalPacket(orgId: string, packetId: string, db: Executor = getDb()): Promise<{ packet: PortalPacket; documents: { path: string; bytes: Uint8Array }[]; person: typeof s.person.$inferSelect }> {
+export async function loadPortalPacket(orgId: string, packetId: string, db: Executor = getDb(), includeDocuments = true): Promise<{ packet: PortalPacket; documents: { path: string; bytes: Uint8Array }[]; person: typeof s.person.$inferSelect }> {
   const [row] = await db.select({ pk: s.sponsorPacket, payout: s.payout, person: s.person }).from(s.sponsorPacket)
     .innerJoin(s.payout, eq(s.payout.id, s.sponsorPacket.payoutId))
     .innerJoin(s.person, eq(s.person.id, s.payout.personId))
@@ -102,6 +102,8 @@ export async function loadPortalPacket(orgId: string, packetId: string, db: Exec
     source: award ? { kind: "award", track: award.track, title: award.title } : { kind: "claim", type: claim?.type ?? "expense", category: claim?.category ?? "", description: claim?.description ?? "" },
   });
 
+  // Policy rechecks need the packet fields, not another read/render of every PDF.
+  if (!includeDocuments) return { packet, documents: [], person: row.person };
   const stored = async (id: string | null | undefined) => {
     if (!id) return null;
     const [doc] = await db.select({ bytes: s.document.bytes, mimeType: s.document.mimeType }).from(s.document).where(and(eq(s.document.id, id), eq(s.document.orgId, orgId)));
