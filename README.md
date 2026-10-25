@@ -1,8 +1,78 @@
 # Eve
 
-Event finance for travel claims, prizes, controller approvals, sponsor handoffs and filing drafts. Built from [PRD.md](PRD.md), with the Blue Hour interface in [DESIGN.md](DESIGN.md).
+![Eve: Event finances, handled.](docs/images/banner.png)
 
-The application uses real Postgres persistence, deterministic financial rules, an immutable balanced ledger, Better Auth accounts and Vercel Workflow jobs. Money movement is **simulated**. Tax documents are **drafts, not for filing**. Integration and validation details are tracked in [IMPLEMENTATION.md](IMPLEMENTATION.md).
+Eve is an event finance agent that runs the money side of a hackathon: travel reimbursements, expenses, cash and physical prizes, and the cross-border tax work behind them. Organizers set budgets and rules, attendees submit receipts and claim prizes in a portal, and Eve prepares every payout with its evidence. Nothing is released without a human controller.
+
+Money movement is **simulated**. Tax documents are **drafts, not for filing**. Product scope is in [PRD.md](PRD.md), the Daylight interface in [DESIGN.md](DESIGN.md), and integration and validation details in [IMPLEMENTATION.md](IMPLEMENTATION.md).
+
+## Inspiration
+
+Evan won a prize at TreeHacks. The organizers first tried to ship the physical prize, then found they couldn't for tax reasons, because he's a Canadian citizen. They switched to a wire. Getting the right tax form, the right withholding and a working international transfer took about nine months.
+
+Nobody did anything wrong. The organization simply had no system that knew, at the moment he won, that a Canadian winner needs a W-8BEN, a withholding decision and a cross-border payout rail. The same failure repeats at every event: receipts in other currencies, caps nobody checks until after the flight is booked, tax forms collected late, and a university or fiscal sponsor that holds the bank account.
+
+We asked: what if one permissioned agent did the travel coordinator's, accounts payable clerk's and tax preparer's jobs, while a human still decides when money moves?
+
+## What it does
+
+- **Overview for organizers.** Budget left, payouts awaiting release, what is blocked and why, and the prize pipeline before the closing ceremony.
+
+  ![Organizer overview during the event](docs/images/overview.png)
+
+- **Travel and expenses.** Policy-aware flight suggestions, receipt reading, caps, currency conversion, duplicate and fare-anomaly checks.
+- **Cash and physical prizes.** For each item prize, Eve compares shipping, buying locally and a cash equivalent. Team splits need member confirmation.
+- **Tax profiles and withholding.** Adult-only onboarding collects residency and W-9 or W-8BEN details; withholding, fees and FX are computed before approval.
+- **Controller release.** Every proposal discloses gross, withholding, fees and expected net. Only the controller can release it; the organizer and the agent cannot.
+- **Fraud guards.** Claimed fares are compared with peers and stored market prices, travel claims from hackers with no project on record are escalated, and a bank change near payout freezes the payment until it is confirmed through the original contact channel.
+- **Slack approvals.** Controllers approve by DM; organizers get channel alerts and digests.
+- **Fiscal sponsor handoff.** Sponsor packets, remittance reconciliation, and computer use that fills a sponsor portal and stops before Submit.
+- **Audit and filings.** An immutable double-entry ledger, decision evidence behind every number, accounting exports and filing drafts.
+
+## How we built it
+
+**Frontend:** Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4, shadcn/ui, Base UI, TanStack Table, lucide icons.
+
+**Backend:** server actions and route handlers, Postgres (PlanetScale) with Drizzle ORM, Better Auth, Zod, Vercel Workflow for durable jobs and cron, pdf-lib for documents.
+
+**AI:**
+
+- Claude through the Vercel AI SDK and Anthropic SDK for receipt reading with structured extraction and for the event review agent
+- Claude computer use on an E2B desktop to enter sponsor packets
+- Deterministic policy, tax and money engines; the model never decides an amount
+
+**Dev tools:** pnpm, Vitest, ESLint, Drizzle Kit, Vercel.
+
+## Challenges we ran into
+
+- **Autonomy without a superuser.** The agent is a role with permissions enforced in code, not in the prompt. It can propose and hold, never release.
+- **Sources that disagree.** Receipts, card charges, policy, the sponsor's ledger and the payee's bank each say something slightly different, and Eve has to say which to trust and why.
+- **Cross-border tax.** Cumulative per-payee thresholds, default 30% withholding without a valid treaty claim, and Canadian rules we kept explicitly unverified instead of guessing.
+
+## Accomplishments we're proud of
+
+- A seeded 300-person event where the measured scoreboard caught 40 of 40 planted problems, with no false positives and no wrongful payouts ([benchmark](docs/demo-benchmark.json))
+- A balanced, immutable ledger where every number can be traced to its decision record
+- Computer use that fills a real-looking sponsor portal end to end and leaves the final Submit to a person
+
+## What we learned
+
+The hard part of a finance agent isn't the model; it's deciding what the model is allowed to do. Keeping calculations deterministic, rules versioned and release with a human let us automate the routine work without trusting generation with money.
+
+## What's next
+
+- Live payment rails beyond test mode, and verified Duffel flight booking
+- Verified Canadian rules and treaty handling
+- Official IRS and CRA forms and e-filing
+- Email verification and invitation delivery for real organizations
+
+## Individual contributions
+
+- **Evan**: Product and architecture, the ledger, tax, payout and policy engines, receipt reading, the agent and workflows, sponsor packets and disbursement batches, the attendee portal, browser QA and deployment
+- **Bernice**: The Eve Slack app (approvals by DM, channel alerts and digests), computer use on the sponsor portal, the Lamplight dark theme and Overview layout
+- **Uijin**: Airfare fraud detection (peer fare anomalies, market price snapshots, nightly cheapest-fare tracking), attendee verification against project submissions, the Daylight theme and Overview home
+
+## Live demo
 
 Open the [Vercel preview](https://eve-calhacks-bnzqx9gf8-badbird5907s-projects.vercel.app) with your Vercel account. The [overnight handover](docs/overnight-handover.md) contains the walkthrough and remaining limitations; the [browser QA index](docs/browser-qa-summary.md) links the tested journeys, fixes and evidence.
 
