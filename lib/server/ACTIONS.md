@@ -16,6 +16,9 @@ Money in payloads is integer minor units, as a string (`"129900"`) or a safe int
 | GET | `/api/documents/:id` | Authorized download (attendees only their own documents). |
 | GET | `/api/export?type=ledger\|claims\|payouts\|filings` | CSV (formula-injection safe). `type=packet&id=<packetId>` or `type=filing&id=<filingId>` returns the stored PDF. Organizer, controller, auditor only. |
 | GET/POST | `/api/auth/*` | Better Auth (email + password) for real users. Real users need an `org_member` row; demo personas never apply. |
+| GET | `/api/slack/install` | Organizer only. Redirects to Slack's consent page with a signed state bound to the organizer and org. |
+| GET | `/api/slack/oauth` | Slack's redirect. Must arrive in the same organizer's session; stores the workspace and its sealed bot token, then redirects to `/settings?slack=connected`. |
+| POST | `/api/webhooks/slack` | Slack interactivity, the `/eve` command and the Events API. Slack's v0 signature is verified over the raw body first. See [docs/slack.md](../../docs/slack.md). |
 
 ## Personas (demo org `blue-hour-demo`)
 
@@ -59,6 +62,17 @@ Who may call each action is enforced on the server (`ACTION_ROLES` in `lib/serve
 | `agent.run` | `{ kind?: "claims"\|"chase"\|"all" }` | organizer, controller | Processes submitted claims; chases missing forms (notices). Logged as an agent run. |
 | `flight.search` | `{ origin: "YYZ", date?, personId? }` | any non-auditor | Returns `data.offers` (fixtures; labeled). Each offer carries an `offerToken` to send back with `flight.request`. |
 | `flight.request` | `{ offerId, origin, offerToken?, personId?, carrier?, departAt?, amountMinor?, currency?, cabin? }` | self, organizer | Price, carrier, times and cabin come **only** from the server offer: the fixture table (`fx_<ORIGIN>_<n>`) or the HMAC `offerToken` that `flight.search` returned with each offer (30 min TTL). Optional client copies are compared and returned as `data.mismatches`, never used. Unknown or forged offers -> 400; expired -> 409. Stored as a travel claim with category `org_booked_flight` that the agent never approves. Organizer `claim.review` approval records a **Simulated** booking (Dr 5000 / Cr 1000, claim -> `paid`) and never creates an attendee payout. One live request per person; the same offer replays. |
+
+### Slack
+
+Actions taken from Slack run through this same dispatcher as the linked member (`ActorContext.via = "slack"`), and every decision row they write records `facts.via: "slack"`.
+
+| Action | Payload | Who | Effect |
+| --- | --- | --- | --- |
+| `slack.settings` | `{ onDutyMemberId?: id \| null, backupMemberId?: id \| null }` | organizer | Organizer on duty (must be an organizer) and backup approver (organizer or controller). `null` means every eligible linked person. |
+| `slack.linkCode` | `{}` | organizer, controller | Returns `data.code` (`ABCD-EFGH`, 10 minutes, one use) to type as `/eve link CODE`. Only its hash is stored. |
+| `slack.unlink` | `{}` | organizer, controller | Unlinks the caller's own Slack account. |
+| `slack.disconnect` | `{}` | organizer | Forgets the workspace, its posted cards, queued alerts and every link, and revokes the bot token. |
 
 ## Service entrypoints (for workflows)
 

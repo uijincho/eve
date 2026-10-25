@@ -13,8 +13,8 @@ import type * as C from "@/lib/contracts";
 import { getDb, type Executor } from "@/lib/db";
 import * as s from "@/lib/db/schema";
 
-import { BOOKS_CURRENCY, iso, loadOrgEvent, str, toAward, toClaim, toEvent, toOrg, toPayout, toPerson, toUsd, type MethodRow, type ProfileRow } from "./core";
-import { capInBooks } from "./budget";
+import { iso, loadOrgEvent, str, toAward, toClaim, toEvent, toOrg, toPayout, toPerson, type MethodRow, type ProfileRow } from "./core";
+import { budgetLinesView } from "./budget";
 import { filingCurrency } from "./filing-currency";
 import { loadRules } from "./payouts";
 import { loadScoreboardView } from "./scoreboard-view";
@@ -62,29 +62,7 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
     if (["held", "proposed", "approved", "processing", "frozen"].includes(p.status)) outstanding.set(p.personId, (outstanding.get(p.personId) ?? 0n) + p.netMinor);
   }
 
-  // Budget attribution: claims by category, prizes to "prizes".
-  const budgetOut: C.BudgetLine[] = await Promise.all(budgets.map(async (b) => {
-    const cap = await capInBooks(db, b.capMinor, org.currency, now);
-    let spent = 0n, committed = 0n;
-    const payoutByClaim = new Map(payouts.filter((p) => p.claimId).map((p) => [p.claimId!, p]));
-    if (b.category === "prizes") {
-      for (const p of payouts) {
-        if (!p.awardId) continue;
-        if (p.status === "paid") spent += p.grossMinor;
-        else if (["held", "proposed", "approved", "processing", "frozen"].includes(p.status)) committed += p.grossMinor;
-      }
-      for (const a of awards) if (!payouts.some((p) => p.awardId === a.id && !["failed", "returned"].includes(p.status)) && a.status !== "paid") committed += (await toUsd(db, a.amountMinor, a.currency, now)).usdMinor;
-    } else {
-      for (const c of claims) {
-        const matches = c.budgetLineId === b.id || (!c.budgetLineId && (c.category === b.category || (b.category === "travel" && c.type === "travel")));
-        if (!matches) continue;
-        const p = payoutByClaim.get(c.id);
-        if (c.status === "paid" || p?.status === "paid") spent += c.usdMinor;
-        else if (c.status === "approved") committed += c.usdMinor;
-      }
-    }
-    return { id: b.id, name: b.name, capMinor: str(cap.capMinor), spentMinor: str(spent), committedMinor: str(committed), fundingSource: b.fundingSource, currency: BOOKS_CURRENCY, enteredCapMinor: str(b.capMinor), enteredCurrency: org.currency, fxSource: cap.note };
-  }));
+  const budgetOut = await budgetLinesView(db, org.currency, budgets, { claims, awards, payouts }, now);
 
   const payoutPerson = new Map(payouts.map((p) => [p.id, p.personId]));
   const noticesOut: C.Notice[] = [];
@@ -108,6 +86,7 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
   const scoreboard: C.Scoreboard = self || !org.isDemo
     ? { total: 0, evaluated: 0, caught: 0, missed: 0, falsePositives: 0, wrongfulPayouts: 0, results: [] }
     : await loadScoreboardView(db, orgId);
+  const slack = self ? undefined : await (await import("@/lib/slack/status")).slackStatus(actor, db);
 
   return {
     actor: { id: actor.memberId, name: actor.name, email: actor.email, role: actor.role, personId: actor.personId ?? undefined },
@@ -135,10 +114,12 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
     scoreboard,
     demo: actor.demo,
     now: now.toISOString(),
+    ...(slack ? { slack } : {}),
     integrationStatus: [
       { name: "Payouts", mode: "Simulated", detail: "Simulated provider (mock wire fee schedule). No real money moves." },
       { name: "Receipt reading", mode: process.env.ANTHROPIC_API_KEY ? "Live" : "Off", detail: process.env.ANTHROPIC_API_KEY ? "Claude vision extracts facts; checks stay deterministic." : "Manual entry; claims go to review." },
       { name: "Notifications", mode: "Simulated", detail: "Notices are recorded in Eve; no external delivery in demo." },
+      { name: "Slack app", mode: slack?.installed ? "Live" : slack?.configured ? "Not connected" : "Off", detail: slack?.installed ? `Connected to ${slack.teamName}. Approvals by direct message; alerts and digests in ${slack.channelName ?? "the team channel"}.` : slack?.configured ? "An organizer can connect a Slack workspace below." : "Set SLACK_CLIENT_ID, SLACK_CLIENT_SECRET and SLACK_SIGNING_SECRET to enable it." },
       { name: "Flights", mode: "Fixture", detail: "Fixture offers; no booking." },
       { name: "Fare insights", mode: process.env.SERPAPI_API_KEY ? "Live" : "Fixture", detail: process.env.SERPAPI_API_KEY ? "Google Flights price insights via SerpApi, captured when attendees search flights; flags only." : "Simulated typical fares; flags only." },
       { name: "Filings", mode: "Draft", detail: "Draft PDFs only. A controller signs; nothing is e-filed." },

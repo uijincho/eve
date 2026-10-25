@@ -8,7 +8,7 @@ import * as s from "@/lib/db/schema";
 
 type PayoutRow = typeof s.payout.$inferSelect;
 export interface ApprovalTarget { orgId: string; payoutId: string; quoteFingerprint: string }
-export interface ControllerApproval { memberId: string; quoteFingerprint: string }
+export interface ControllerApproval { memberId: string; quoteFingerprint: string; via?: "slack" }
 export class ApprovalConflictError extends Error {}
 
 /** Approval is bound to these exact terms. A bank change or re-quote needs a new release. */
@@ -95,6 +95,7 @@ export async function executeControllerApproval(target: ApprovalTarget, approval
     const actor: ActorContext = {
       memberId: member.id, orgId: member.orgId, role: member.role, name: member.name, email: member.email,
       personId: member.personId, userId: member.userId, demo: member.demoPersona && org.isDemo,
+      ...(approval.via ? { via: approval.via } : {}),
     };
     assertControllerApproval(actor, payout, person.email);
     const released = await releasePayout(tx, actor, payout.id);
@@ -110,7 +111,7 @@ export async function executeControllerApproval(target: ApprovalTarget, approval
           ? "The controller authorized this payment. The provider has not confirmed bank settlement, so it is still processing."
           : "Tax, year-to-date income or eligibility changed during the final checks. The updated proposal is saved and no money was released. A controller must review it again.",
       actor: actor.name, actorRole: actor.role, status: settled ? "done" : processing ? "waiting" : "escalated", tool: "executePayout",
-      facts: { approverId: member.id, quoteFingerprint: target.quoteFingerprint, currentFingerprint: payoutQuoteFingerprint(released), providerRef: released.providerRef, truth: released.truth },
+      facts: { approverId: member.id, quoteFingerprint: target.quoteFingerprint, currentFingerprint: payoutQuoteFingerprint(released), providerRef: released.providerRef, truth: released.truth, ...(approval.via ? { via: approval.via } : {}) },
     }).onConflictDoNothing();
     return { payoutId: released.id, status: released.status, replayed: false };
   });

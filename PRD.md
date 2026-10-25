@@ -57,7 +57,7 @@ A guided wizard at `/setup`. The agent prefills what it can and explains each ch
 2. **How money moves:** direct (connect Stripe), sponsor packet (enter the sponsor's name, contact, packet format, turnaround, and rules like "no gift cards"), or hybrid with a dollar split.
 3. **People and limits:** invite teammates as organizer, controller, or auditor. Set the agent's auto-approve limit (default $300), the organizer approval limit, and a backup approver for each. The UI blocks giving one person both requester and controller on the same flow.
 4. **Accounting:** pick the starter chart of accounts or connect the QuickBooks sandbox and map accounts.
-5. **Notifications:** paste a Slack or Discord webhook, choose digest time.
+5. **Notifications:** connect the Eve Slack app (Add to Slack, which also picks the team channel such as `#eve-finance`), choose the organizer on duty and a backup approver, and have each organizer and controller link their own Slack account. A Discord webhook remains an option for digests.
 
 ### Event setup (per event)
 
@@ -274,7 +274,7 @@ In-policy claims under the limit skip organizer review, but every payout still w
 | Winners entered by judges | Build payout plans, check tax forms, recommend ship/local/cash for items |
 | Tax form missing or expiring | Chase on a schedule (day 0, 2, 5, 10), then escalate |
 | Prize list created or edited | Pre-event tax and shipping warnings to organizers |
-| Approval sits unanswered | Remind, then route to the backup approver |
+| Approval sits unanswered | Remind, then route to the backup approver (in Slack, a DM with the same buttons) |
 | Payout failed or returned | Diagnose (bad bank details, unsupported rail), re-quote, ask the payee to fix |
 | Bank details changed close to a payout | Freeze that payout, verify through the original contact channel, log it |
 | Calendar: Jan 1 | Assemble the year-end filing packet |
@@ -293,7 +293,52 @@ Every decision writes a record: input documents, extracted facts, rules applied 
 
 ### Notifications
 
-Slack or Discord webhooks for organizers (escalations, daily digest, batch ready to release). Email and portal notices for attendees. Webhooks are cheap, so both are in scope for the weekend.
+Email and portal notices for attendees. For staff, the **Eve Slack app** (below); a Discord or Slack incoming webhook still works for a plain daily digest.
+
+### Slack app
+
+What a Slack app adds over a webhook is interactivity: approve buttons, DMs to the right person, and a thread per item. Alerts are grouped by who has to act and how fast.
+
+**Real-time, interactive (DM to the person who must act)**
+
+| Alert | Who gets it | Buttons |
+| --- | --- | --- |
+| Payout batch ready for release | Every linked controller | Release, Hold, Open in Eve |
+| Payout frozen: bank details changed | Controllers and organizers (never the recipient) | Keep frozen, Mark verified, View evidence |
+| Escalated claim (over limit, out of policy, fare anomaly) | Organizer on duty (or every organizer); controllers when the claim is over the organizer limit. Never the requester or the claimant | Approve, Reject, Ask for info |
+| Prize decision needed (ship, buy local, or cash) | Organizer on duty | Accept recommendation, Compare options |
+| Approval sitting too long | Backup approver: a release batch waiting 48 hours, or a claim or prize past its due date | Same buttons as the original |
+
+**Real-time, informational (team channel, batched every 15 minutes)**
+
+- A payout failed or was returned, with the reason and the next step Eve takes.
+- A sponsor reconciliation exception, like the $970 paid on a $1,000 request.
+- A budget line crossed 80% or 100% (spent plus committed).
+- A computer use run finished or got stuck, with screenshots in the thread.
+- A tax rule marked unverified was used in a live decision (paid or submitted), or a controller accepted one.
+
+**Digest (one message per day, plus one at the end of event weekend)**
+
+- Auto-approved claims and totals.
+- Payouts sent and amounts withheld.
+- Tax forms still missing, and who is being chased (reminder n of 4).
+- Inbox count by age (under a day, 1 to 3 days, older).
+- Budget spent vs. committed vs. remaining per line.
+
+**Event-weekend specials (team channel, time-sensitive, not batched)**
+
+- Winners entered, with how many need tax forms (W-8BEN called out) before the closing ceremony. One message, edited as winners and forms change; each new winner is a thread reply.
+- A countdown to the closing-ceremony payout release while anything still blocks it (missing forms, held or frozen prize payouts, payouts waiting for release, undecided item prizes, unconfirmed team splits). It starts 6 hours out and refreshes at 3h, 2h, 1h, 30m, 10m and at closing.
+
+**Rules the Slack app follows**
+
+- **Same permissions as the web app.** Each Slack user maps to one Eve member through a link they make themselves: Eve shows a one-time code in Settings, and the member types `/eve link CODE` in Slack. The role is re-read from the database on every Slack request; nothing about authority is stored on the link. Every button calls the same server functions as the web (`runAuthorizedAction`, `queueControllerRelease`). The Release button checks segregation of duties server-side, so a controller who requested a payout in the batch is told so and refused. Release is bound to the exact batch the controller saw; if any payout or its terms changed, nothing is released and the card refreshes.
+- **No sensitive data in Slack.** Names, amounts and the last 4 digits only; never full TINs, bank numbers or tax forms. Free text is scrubbed, and the API client refuses any message whose visible text looks like a taxpayer ID or an account number. Evidence lives behind "Open in Eve".
+- **Threads per item.** Each escalation is one message per recipient. Status updates go in its thread, and the original is edited into its outcome ("Approved by Dana Whitfield via Slack") when resolved, so the channel never fills with stale buttons. A claim sent back for information reopens the same card when the attendee answers.
+- **Logged like everything else.** An approval from Slack writes the same `decision_log` row as one from the web, with `via: "slack"` recorded in its facts and shown as "via Slack" in the audit trail. Slack-only decisions (Hold, Keep frozen) are logged too and never change payout state.
+- **Noise control.** Informational alerts batch every 15 minutes. Each person can mute direct-message categories in the app's Home tab or with `/eve mute`. If everyone who can act mutes a category, the card goes to the team channel instead of being lost.
+
+**Build:** a reconciler (`syncSlack`) compares what Slack should show with what was posted and posts, edits, threads or resolves; every post is claimed by a unique row first, so concurrent runs never double-post. It runs after every action (web or Slack), at the end of agent runs, approval reminders and computer use runs, from the countdown timer, and in the daily cron. Batching and the countdown are Workflow `sleep` timers. Slack's 3-second limit is met by acknowledging immediately and doing the work after the response.
 
 ## Working inside a university or fiscal sponsor
 
@@ -343,7 +388,7 @@ The rule for judging: say exactly what's real and what's simulated. Hyphenate as
 | Receipt OCR | LLM vision extracting merchant, date, amount, currency, lines | Real | None needed |
 | FX rates | Free daily reference-rate API (e.g. Frankfurter, ECB data) | Real | Cached rate table |
 | Accounting export | QuickBooks Online sandbox company (free with an Intuit developer account): push bills and journal entries | Real API, sandbox books | CSV/IIF export |
-| Notifications | Slack and Discord incoming webhooks; email via any transactional provider | Real | Console log in the UI |
+| Notifications | Eve Slack app (OAuth install, Web API, interactivity, Events API, slash command); Discord incoming webhook; email via any transactional provider | Real | Portal notices and the in-app inbox |
 | Tax form e-sign | In-app typed signature with timestamp and IP, stored as PDF | Real (demo grade) | None needed |
 | Tax filing | Generated 1099/1042-S/T4A/NR4 PDFs and export files | Real output, not filed | None needed |
 | Shipping and duty | Rules table of carrier availability and duty estimates for 5 to 10 countries | Mocked data | None needed |
@@ -374,6 +419,8 @@ One Postgres database with a real double-entry ledger underneath; every screen i
 | `decision_log` | object, inputs, facts, rules used, reasoning summary, action, actor |
 | `journal_entry` / `journal_line` | date, memo, source object; lines with account, debit, credit, currency |
 | `filing` | person, tax year, form type, amounts, generated file, status |
+| `slack_installation` / `slack_user_link` | org's workspace, sealed bot token, team channel, organizer on duty, backup approver; member ↔ Slack user, muted categories |
+| `slack_message` / `slack_alert` | one posted card per item and recipient (thread, state, fingerprint); queued channel alerts and their 15-minute batch |
 
 ### Ledger rules
 
@@ -416,7 +463,7 @@ Pick **Next.js (App Router)** for this weekend. TanStack Start is a good framewo
 | Payouts | Stripe Node SDK (test mode) behind `PayoutProvider` | Mock provider for wires |
 | Flights | Duffel SDK (test mode), SerpApi for price insights | Search, sandbox booking, stretch fare check |
 | Accounting | QuickBooks Online REST (sandbox) via `intuit-oauth` | Push bills and journal entries |
-| Notifications | Slack and Discord webhooks, Resend for email | Cheap and real |
+| Notifications | Eve Slack app over the Web API (no SDK), Discord webhook, Resend for email | Interactive approvals where staff already are |
 | Tests | Vitest | Tax engine and ledger run against the answer key |
 | Deploy | Vercel (app + Workflow) + PlanetScale + E2B | Deploy Saturday morning, not Sunday |
 
@@ -444,7 +491,8 @@ Pick **Next.js (App Router)** for this weekend. TanStack Start is a good framewo
 app/
   (attendee)/       portal: onboarding, claims, prizes, payout method
   (organizer)/      dashboard: queue, approvals, budgets, audit trail, scoreboard
-  api/webhooks/     stripe, slack, hook resume
+  api/webhooks/     stripe, slack (interactivity, /eve, events), hook resume
+  api/slack/        Slack install and OAuth callback
 lib/
   db/               drizzle schema, migrations (incl. raw SQL ledger trigger)
   ledger/           postJournal, reverse, period lock
@@ -453,7 +501,9 @@ lib/
   flights/          duffel.ts, price-insights.ts
   agent/            tools, prompts, per-job agent functions
   pdf/              form fillers
-workflows/          durable workflows (claims, payouts, chasing, computer use) + cron routes
+  slack/            Slack app: model (who gets what), blocks, sync, interactions, linking
+slack/manifest.yml  Slack app manifest
+workflows/          durable workflows (claims, payouts, chasing, computer use, Slack batches and countdown) + cron routes
 scripts/seed.ts     300-person event + planted errors + answer key
 tests/              vitest suites against the answer key
 ```

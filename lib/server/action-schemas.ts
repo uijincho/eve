@@ -115,6 +115,12 @@ export const actionSchemas = {
     personId: id.optional(), offerId: text(80).min(1), origin: z.string().regex(/^[A-Z]{3}$/), offerToken: z.string().min(10).max(4000).optional(),
     carrier: text(80).optional(), departAt: isoDateTime.optional(), amountMinor: positiveMinor.optional(), currency: currency.optional(), cabin: text(40).optional(),
   }),
+  /** Slack routing: who gets escalated claims and prize decisions, and who backs up approvals that wait too long. Null clears. */
+  "slack.settings": z.strictObject({ onDutyMemberId: id.nullable().optional(), backupMemberId: id.nullable().optional() }),
+  /** A one-time code to type as `/eve link CODE` in Slack; only its hash is stored. */
+  "slack.linkCode": z.strictObject({}),
+  "slack.unlink": z.strictObject({}),
+  "slack.disconnect": z.strictObject({}),
 } satisfies Record<AppAction, z.ZodType>;
 
 export type ActionPayload<A extends AppAction> = z.output<(typeof actionSchemas)[A]>;

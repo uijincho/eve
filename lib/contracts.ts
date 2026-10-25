@@ -105,6 +105,17 @@ export interface AppSnapshot {
   budgets: BudgetLine[]; packets: SponsorPacket[]; portalRuns: PortalRun[]; decisions: Decision[];
   filings: Filing[]; rules: TaxRule[]; notices: Notice[]; scoreboard: Scoreboard;
   demo: boolean; now: string; integrationStatus: { name: string; mode: string; detail: string }[];
+  /** Staff only. Absent for attendees. */
+  slack?: SlackStatus;
+}
+/** The org's Slack app connection as Settings shows it. Never a token or a Slack user id. */
+export interface SlackStatus {
+  /** The server has Slack app credentials. */
+  configured: boolean;
+  installed: boolean; teamName?: string; channelName?: string;
+  onDutyMemberId?: string; backupMemberId?: string;
+  me: { linked: boolean; muted: string[] };
+  members: { id: string; name: string; role: Role; linked: boolean }[];
 }
 export type AppAction =
   | "org.update" | "event.update" | "budget.update" | "people.import" | "person.update" | "person.setProject" | "people.markSubmitted"
@@ -113,7 +124,8 @@ export type AppAction =
   | "payout.bankChange" | "payout.verify" | "payout.retry" | "sponsor.create"
   | "sponsor.submit" | "sponsor.reconcile" | "sponsor.portalStart" | "sponsor.portalDecide" | "sponsor.portalStop"
   | "period.lock" | "filings.generate"
-  | "demo.reset" | "demo.run" | "agent.run" | "flight.search" | "flight.request";
+  | "demo.reset" | "demo.run" | "agent.run" | "flight.search" | "flight.request"
+  | "slack.settings" | "slack.linkCode" | "slack.unlink" | "slack.disconnect";
 export interface ActionRequest { action: AppAction; payload: Record<string, unknown> }
 export interface ActionResult { ok: boolean; message: string; data?: Record<string, unknown> }
 
