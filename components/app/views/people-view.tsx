@@ -14,7 +14,7 @@ import { Sheet } from "@/components/app/sheet";
 import { EmptyState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { Money } from "@/components/eve/money";
-import { TruthLabel } from "@/components/eve/truth-label";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Person } from "@/lib/contracts";
@@ -35,7 +35,7 @@ export function PeopleView() {
   return (
     <PageFrame
       title="People"
-      lede={(s) => `${s.people.length} attendees, judges, and mentors. Tax identifiers and bank numbers stay in the vault; Eve sees only the last four digits.`}
+      lede={(s) => `${s.people.length} attendees, judges, and mentors.`}
       actions={(s) =>
         canOrganize(s.actor).allowed ? (
           <LinkButton href="/events/new?tab=import" variant="outline">
@@ -53,8 +53,35 @@ export function PeopleView() {
         const selected = s.people.find((p) => p.id === openId);
         const columns: Column<Person>[] = [
           { key: "name", header: "Person", stack: "title", sort: (p) => p.name, cell: (p) => p.name },
-          { key: "role", header: "Role", stack: "meta", sort: (p) => p.role, cell: (p) => `${p.role} · ${p.country}${p.citizenship !== p.country ? ` (citizen ${p.citizenship})` : ""}` },
-          { key: "project", header: "Project", stack: "meta", sort: (p) => p.projectStatus ?? "unknown", cell: (p) => <span className={p.projectStatus === "none" ? "text-critical" : undefined}>{projectStatusLabel(p.projectStatus)}</span> },
+          {
+            key: "role",
+            header: "Role",
+            stack: "meta",
+            sort: (p) => p.role,
+            cell: (p) => (
+              <span className="flex flex-col">
+                {p.role.charAt(0).toUpperCase() + p.role.slice(1)}
+                <span className="text-caption text-muted-foreground">
+                  {p.country}
+                  {p.citizenship !== p.country ? ` · citizen ${p.citizenship}` : ""}
+                </span>
+              </span>
+            ),
+          },
+          {
+            key: "project",
+            header: "Project",
+            stack: "meta",
+            sort: (p) => p.projectStatus ?? "unknown",
+            cell: (p) =>
+              p.projectStatus === "submitted" ? (
+                <Badge variant="positive">Submitted</Badge>
+              ) : p.projectStatus === "none" ? (
+                <Badge variant="critical">No project</Badge>
+              ) : (
+                <span className="text-muted-foreground">—</span>
+              ),
+          },
           { key: "form", header: "Tax form", stack: "end", sort: (p) => p.taxStatus, cell: (p) => <span className="inline-flex items-center gap-2">{p.taxForm} <StatusBadge status={p.taxStatus} /></span> },
           { key: "chase", header: "Chases", align: "end", stack: "hide", sort: (p) => p.chaseCount, cell: (p) => <span className="tabular-nums">{p.chaseCount}</span> },
           { key: "ytd", header: "Paid YTD", align: "end", stack: "hide", sort: (p) => big(p.paidYtdMinor), cell: (p) => <Money amountMinor={big(p.paidYtdMinor)} /> },
@@ -173,12 +200,9 @@ function PersonDetail({ person: p, snapshot: s }: { person: Person; snapshot: Ap
       </section>
 
       <section className="flex flex-col gap-3 border-t pt-4">
-        <div className="flex items-center gap-2">
-          <h3 className="font-semibold">Replay a bank-detail change</h3>
-          <TruthLabel kind="simulated" />
-        </div>
+        <h3 className="font-semibold">Replay a bank-detail change</h3>
         <p className="text-small text-muted-foreground">
-          Simulates {p.name.split(" ")[0]} sending new bank details. Eve should freeze any pending payout and confirm through the original channel.
+          As if {p.name.split(" ")[0]} sent new bank details. Eve freezes pending payouts and confirms through the original channel.
         </p>
         <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
           <Field label="New account, last 4">
@@ -193,7 +217,7 @@ function PersonDetail({ person: p, snapshot: s }: { person: Person; snapshot: Ap
           </Field>
         </div>
         <ActionButton
-          label="Send simulated change"
+          label="Send change"
           pendingLabel="Sending"
           permission={canOrganize(s.actor)}
           call={() => (last4.length === 4 ? payloads.payoutBankChange(p.id, last4, currency) : null)}

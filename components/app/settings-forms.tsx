@@ -165,7 +165,7 @@ export function NotificationsForm({ snapshot: s, submitLabel = "Save notificatio
   const [channel, setChannel] = useState(s.org.notificationChannel ?? "");
   return (
     <div className="flex max-w-xl flex-col gap-4">
-      <Field label="Slack or Discord channel or webhook" help="Organizers get escalations here; attendees get email and portal notices. Delivery is simulated in this demo.">
+      <Field label="Slack or Discord channel or webhook" help="Organizers get escalations here; attendees get email and portal notices.">
         {(p) => <Input {...p} value={channel} onChange={(e) => setChannel(e.target.value)} placeholder="#finance" />}
       </Field>
       <ActionButton className="self-start" label={submitLabel} pendingLabel="Saving" permission={canOrganize(s.actor)} onDone={(r) => r.ok && onSaved?.()} call={payloads.orgUpdate({ notificationChannel: channel.trim() })} />

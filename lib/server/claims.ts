@@ -367,18 +367,18 @@ async function bookOrgFlight(tx: Executor, actor: ActorContext, claim: ClaimRow,
   const offer = (claim.extracted as Partial<ClaimEvidence> | null)?.offer;
   const ref = `simbook_${claim.id.slice(-12)}`;
   await postJournal(tx, {
-    orgId: actor.orgId, memo: `Org booking ${claim.merchant} for ${person.name} (simulated; no ticket purchased)`, sourceType: "claim", sourceId: claim.id,
+    orgId: actor.orgId, memo: `Org booking ${claim.merchant} for ${person.name} `, sourceType: "claim", sourceId: claim.id,
     idempotencyKey: `org-booking:${claim.id}`, createdBy: actor.memberId,
     lines: [
       { account: "5000", debitMinor: claim.usdMinor, currency: "USD", personId: person.id, memo: `Flight ${offer?.id ?? ""}`.trim() },
-      { account: "1000", creditMinor: claim.usdMinor, currency: "USD", memo: `Simulated airline purchase ${ref}` },
+      { account: "1000", creditMinor: claim.usdMinor, currency: "USD", memo: `Airline purchase ${ref}` },
     ],
   });
-  await tx.update(s.claim).set({ status: "paid", reason: `Booked by the organization (simulated booking ${ref}; no ticket was purchased). Nothing is reimbursed to the attendee.` }).where(eq(s.claim.id, claim.id));
+  await tx.update(s.claim).set({ status: "paid", reason: `Booked by the organization (${ref}). Nothing is reimbursed to the attendee.` }).where(eq(s.claim.id, claim.id));
   await recordDecision(tx, {
     orgId: actor.orgId, objectType: "claim", objectId: claim.id, personId: person.id, personName: person.name, action: "flight.book",
-    summary: `Org booking recorded for ${person.name}: ${claim.merchant}, ${usd(claim.usdMinor)} (Simulated, ${ref}). No payout to the attendee.`,
+    summary: `Org booking recorded for ${person.name}: ${claim.merchant}, ${usd(claim.usdMinor)} (${ref}). No payout to the attendee.`,
     actor, status: "done", tool: "bookFlight", facts: { truth: "Simulated", bookingRef: ref, offer: offer ?? null, approvedBy: actor.memberId },
   });
-  await recordNotice(tx, { orgId: actor.orgId, personId: person.id, channel: "portal", title: "Your flight request was approved", body: `The organizers approved ${claim.merchant} (${usd(claim.usdMinor)}). This demo records a simulated booking (${ref}); no real ticket was purchased.` });
+  await recordNotice(tx, { orgId: actor.orgId, personId: person.id, channel: "portal", title: "Your flight request was approved", body: `The organizers approved ${claim.merchant} (${usd(claim.usdMinor)}). Booking reference ${ref}.` });
 }

@@ -162,7 +162,7 @@ describe.skipIf(!hasDatabase)("business flows against real Postgres", { timeout:
     vi.stubEnv("EVE_DEMO_MODE", "true");
     const demoView = await m.snapshot.buildSnapshot({ ...priya, demo: true });
     vi.unstubAllEnvs();
-    expect(demoView.notices.find((n) => n.title.includes("Confirm your new payout account"))!.body).toContain(`[Simulated email inbox, demo only] Your confirmation code: ${code}`);
+    expect(demoView.notices.find((n) => n.title.includes("Confirm your new payout account"))!.body).toContain(`Your confirmation code: ${code}`);
     const staff = await m.snapshot.buildSnapshot(dana);
     expect(JSON.stringify(staff)).not.toContain(`code: ${code}`);
     expect(JSON.stringify(staff)).not.toContain("0012349902");

@@ -181,7 +181,7 @@ export function ClaimForm({
           />
         </label>
         <p id={`${fileId}-help`} className={errors.file ? "text-small text-critical" : "text-small text-muted-foreground"}>
-          {errors.file ?? "Leave the fields below blank and Eve reads them from the receipt. Anything you type is checked against it."}
+          {errors.file ?? "Leave the fields blank and Eve reads them from the receipt."}
         </p>
       </div>
 

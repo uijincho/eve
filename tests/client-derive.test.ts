@@ -33,7 +33,7 @@ describe("buildInbox", () => {
   it("surfaces the frozen payout as a critical exception", () => {
     const frozen = inbox.find((i) => i.id === "payout:PO-7");
     expect(frozen?.category).toBe("exceptions");
-    expect(frozen?.critical).toBe("Frozen");
+    expect(frozen?.tags[0]).toEqual({ label: "Frozen", tone: "critical" });
   });
 
   it("collects proposed payouts into one release item", () => {
@@ -192,7 +192,7 @@ describe("readable names", () => {
     const { awardName, providerLabel, objectLabel } = await import("@/lib/client/derive");
     expect(awardName({ track: "Judge stipend", title: "Judge stipend" })).toBe("Judge stipend");
     expect(awardName({ track: "First Overall", title: "MacBook Air" })).toBe("First Overall: MacBook Air");
-    expect(providerLabel("mock_wire")).toBe("Simulated wire");
+    expect(providerLabel("mock_wire")).toBe("Wire");
     expect(objectLabel({ objectType: "payout", personName: "Priya Raman", objectId: "pay_x" })).toBe("Priya Raman · Payout");
   });
 });
@@ -268,15 +268,18 @@ describe("failed checks", () => {
     expect(failedCheckText({ code: "cap", label: "Under the travel cap", detail: "$565.25 against a $500.00 cap after conversion to USD." })).toBe("Over the $500.00 travel cap: $565.25 after conversion");
     expect(failedCheckText({ code: "booking_deadline", label: "Booked before the deadline", detail: "Booked 2026-10-14 after the 2026-10-10 deadline." })).toBe("Booked 2026-10-14 after the 2026-10-10 deadline");
   });
-  it("titles inbox claims by their decisive failure", async () => {
+  it("leads inbox claims with their decisive failure as a chip", async () => {
     const { buildInbox } = await import("@/lib/client/derive");
     const claim = { ...s.claims[0], status: "escalated" as const, checks: [
       { code: "agent_limit", label: "Within the agent's auto-approve limit", passed: false, detail: "$423.81 against a $300.00 limit." },
       { code: "adult", label: "18 or older at event start", passed: false, detail: "Age 17 on 2026-10-24." },
     ] };
     const item = buildInbox({ ...s, claims: [claim] }).find((i) => i.id === `claim:${claim.id}`)!;
-    expect(item.title).toBe("Under 18 at event start: age 17");
-    expect(item.detail).toBe("Also: Over the $300.00 auto-approve limit: $423.81.");
+    expect(item.title).toBe(claim.personName);
+    expect(item.tags).toEqual([
+      { label: "Under 18", tone: "critical", title: "Under 18 at event start: age 17" },
+      { label: "Over limit", tone: "neutral", title: "Over the $300.00 auto-approve limit: $423.81" },
+    ]);
   });
 });
 
@@ -292,7 +295,7 @@ describe("agent rail lines", () => {
     ]);
     expect(runSubject(run, { payouts: [payout], packets: [] })).toBe("Quinn Davis · $600.00");
     expect(runLine(run, { payouts: [payout] })).toBe("Awaiting controller");
-    const [paid] = groupRuns([d({ runId: "r2", personName: "Quinn Davis", tool: "executePayout", status: "done", summary: "Released $600.00 to ••9625 via simulated provider (sim_x)." })]);
+    const [paid] = groupRuns([d({ runId: "r2", personName: "Quinn Davis", tool: "executePayout", status: "done", summary: "Released $600.00 to ••9625 by wire (sim_x)." })]);
     expect(runLine(paid, { payouts: [payout] })).toBe("Paid $600.00 · ••9625");
     const [filings] = groupRuns([d({ runId: "f", objectType: "filings", objectId: "2026", tool: "draftFilings", summary: "Drafted 0 filing(s) for 2026.", facts: { year: 2026, count: 0 } })]);
     expect(runSubject(filings, { payouts: [], packets: [] })).toBe("Filing drafts 2026");

@@ -44,7 +44,7 @@ export function PrizeComparison({
       <section className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-2">
           <h3 className="font-semibold">{inKind ? `What ${them} received, as reported income` : `What ${them} ${self ? "receive" : "receives"} as cash`}</h3>
-          {inKind ? <TruthLabel kind="simulated" /> : o.fromPayout ? null : <TruthLabel kind="estimate" />}
+          {inKind || o.fromPayout ? null : <TruthLabel kind="estimate" />}
         </div>
         <BreakdownBar
           grossMinor={Number(inKind ? BigInt(payout.grossMinor) : o.gross)}

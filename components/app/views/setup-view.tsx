@@ -7,7 +7,6 @@ import { useState } from "react";
 import { LinkButton } from "@/components/app/link-button";
 import { PageFrame } from "@/components/app/page-frame";
 import { LimitsForm, MoneyMovementForm, NotificationsForm, OrgIdentityForm } from "@/components/app/settings-forms";
-import { TruthLabel } from "@/components/eve/truth-label";
 import { Button } from "@/components/ui/button";
 
 const STEPS = [
@@ -28,7 +27,7 @@ export function SetupView() {
   const current = STEPS[step];
 
   return (
-    <PageFrame title="Organization setup" lede={() => "About ten minutes, once per organization. Each step saves as you go."}>
+    <PageFrame title="Organization setup" lede={() => "Each step saves as you go."}>
       {(s) => (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[13rem_minmax(0,1fr)]">
           <nav aria-label="Setup steps" className="min-w-0">
@@ -65,8 +64,8 @@ export function SetupView() {
             {current.id === "accounting" ? (
               <div className="flex max-w-xl flex-col gap-4">
                 <div className="flex flex-col gap-1 rounded-lg border px-4 py-3">
-                  <span className="flex items-center gap-2 font-medium">Starter chart of accounts <TruthLabel kind="simulated" /></span>
-                  <span className="text-small text-muted-foreground">QuickBooks sandbox sync is not connected in this demo. The ledger exports as CSV from the audit trail.</span>
+                  <span className="font-medium">Starter chart of accounts</span>
+                  <span className="text-small text-muted-foreground">The ledger exports as CSV from the audit trail.</span>
                 </div>
                 <Button className="self-start" variant="secondary" onClick={next}>Continue</Button>
               </div>

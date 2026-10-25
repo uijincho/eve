@@ -53,7 +53,7 @@ export async function deliverBankVerification(orgId: string, methodId: string, d
   const body = delivery.status === "sent"
     ? `${request} The confirmation code was emailed to ${masked}. If this was you, enter it in Eve. If not, do nothing and tell the organizers.`
     : org.isDemo
-      ? `${request} Demo: the recipient sees the code in a simulated inbox; no email was sent.`
+      ? `${request} The recipient sees the code in their Eve inbox.`
       : `${request} The confirmation code has not been delivered: ${reason}. Payouts stay frozen until the change is confirmed with that code.`;
   if (notice) await db.update(s.notice).set({ status: delivery.status, body }).where(eq(s.notice.id, notice.id));
   if (delivery.status !== "sent" && !org.isDemo) {

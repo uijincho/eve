@@ -23,7 +23,7 @@ export function AgentView() {
   return (
     <PageFrame
       title="Agent"
-      lede={(s) => `Every workflow run Eve is doing or has done, one entry per receipt, winner, or payout. Eve works inside ${s.org.name}'s policy limits and cannot release money.`}
+      lede={() => "Every run Eve is doing or has done. Eve cannot release money."}
       actions={(s) =>
         s.demo ? (
           <ActionButton
@@ -69,7 +69,7 @@ function Scoreboard({ snapshot: s }: { snapshot: AppSnapshot }) {
   return (
     <Section title="Scoreboard" aside={b.lastRunAt ? `Last evaluated run ${fmtDateTime(b.lastRunAt)}` : "No evaluated run yet"}>
       <p className="max-w-[64ch] text-small text-muted-foreground">
-        Compares Eve&rsquo;s saved decisions on the sample event with its answer key of planted errors. The numbers are measured from those decisions, not a target; running the answer key re-evaluates them.
+        Eve&rsquo;s saved decisions, scored against the event&rsquo;s planted errors.
       </p>
       <dl className="grid max-w-2xl grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
         <Stat label="Caught" value={b.evaluated ? `${b.caught} of ${b.total}` : `— of ${b.total}`} />
@@ -116,7 +116,7 @@ function TryReceipt({ snapshot: s }: { snapshot: AppSnapshot }) {
   return (
     <Section title={s.demo ? "Try your own receipt" : "Run Eve on a receipt"}>
       <p className="text-small text-muted-foreground">
-        Upload a receipt photo or PDF. Eve reads it, runs the policy checks, and records the result as a claim{s.demo ? " in the sample event" : ""}.
+        Eve reads it, runs the policy checks, and files a claim.
       </p>
       {canOrganize(s.actor).allowed || s.actor.role === "attendee" ? (
         <>
@@ -152,7 +152,7 @@ function TryWinner({ snapshot: s }: { snapshot: AppSnapshot }) {
   return (
     <Section title="Try your own winner">
       <p className="text-small text-muted-foreground">
-        Describe a winner and prize. Eve adds a synthetic winner to the sample event, picks the tax form, applies the versioned rule, and compares shipping, buying locally, and cash.
+        Eve picks the tax form, applies the rule, and compares shipping, buying locally, and cash.
       </p>
       <form
         noValidate

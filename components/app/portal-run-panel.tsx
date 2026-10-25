@@ -4,7 +4,6 @@ import { cn } from "cn";
 import { CheckIcon, ChevronRightIcon, XIcon } from "lucide-react";
 
 import { ActionButton } from "@/components/app/action-button";
-import { TruthLabel } from "@/components/eve/truth-label";
 import { Badge } from "@/components/ui/badge";
 import type { AppSnapshot, PortalRun, SponsorPacket } from "@/lib/contracts";
 import { canControl, canManage, isPortalActive, PORTAL_STATUS, portalStatusLine } from "@/lib/client/derive";
@@ -37,7 +36,6 @@ export function PortalRunPanel({ run, packet, snapshot, live = true, actions = t
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-subheading">Eve on the sponsor portal</h3>
         <span className="flex flex-wrap items-center gap-2">
-          <TruthLabel kind="simulated" />
           <Badge variant={status.variant}>{status.label}</Badge>
         </span>
       </div>

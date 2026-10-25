@@ -28,6 +28,7 @@ export function ActionButton({
   onDone,
   className,
   wide,
+  grow,
   quietSuccess,
 }: {
   /** The action, or a function that validates input first and returns null to stop. */
@@ -40,6 +41,8 @@ export function ActionButton({
   onDone?: (result: ActionResult) => void;
   className?: string;
   wide?: boolean;
+  /** Fill the rest of a row of actions instead of taking a line of its own. */
+  grow?: boolean;
   quietSuccess?: boolean;
 }) {
   const { state, run, pending } = useAction();
@@ -47,14 +50,14 @@ export function ActionButton({
 
   if (permission && !permission.allowed) {
     return (
-      <span className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5", wide && "w-full", className)}>
+      <span className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5", wide && "w-full", grow && "min-w-0 flex-1", className)}>
         <Button
           variant="secondary"
           size={size}
           disabled
           focusableWhenDisabled
           aria-describedby={statusId}
-          className={cn(wide && "w-full")}
+          className={cn((wide || grow) && "w-full")}
         >
           <LockIcon aria-hidden />
           {label}
@@ -68,13 +71,13 @@ export function ActionButton({
 
   const result = state.status === "done" ? state.result : null;
   return (
-    <span className={cn("inline-flex flex-wrap items-center gap-x-3 gap-y-1.5", wide && "flex w-full", className)}>
+    <span className={cn("inline-flex flex-wrap items-center gap-x-3 gap-y-1.5", wide && "flex w-full", grow && "flex min-w-0 flex-1", className)}>
       <Button
         variant={variant}
         size={size}
         aria-busy={pending || undefined}
         aria-describedby={result ? statusId : undefined}
-        className={cn("enabled:active:scale-[0.96] transition-[background-color,scale] duration-150", wide && "w-full")}
+        className={cn("enabled:active:scale-[0.96] transition-[background-color,scale] duration-150", (wide || grow) && "w-full")}
         onClick={async () => {
           // aria-busy keeps the fill, so guard repeat clicks here instead of disabling.
           if (pending) return;

@@ -33,7 +33,7 @@ function todos(s: AppSnapshot, me: Person): Todo[] {
 
 export function PortalOverview() {
   return (
-    <PortalFrame title="Your event money" lede="Everything Eve needs from you, and what you will receive. Amounts marked est. can change with exchange rates.">
+    <PortalFrame title="Your event money" lede="What Eve needs from you, and what you will receive.">
       {(s, me) => {
         const list = todos(s, me);
         const mine = s.payouts.filter((p) => p.personId === me.id);
@@ -105,7 +105,7 @@ export function PortalOverview() {
                     <li key={n.id} className="flex flex-col gap-0.5 border-b pb-3 text-small last:border-b-0">
                       <span className="font-medium">{n.title}</span>
                       <span className="whitespace-pre-line text-muted-foreground">{n.body}</span>
-                      <span className="text-caption text-faint">{fmtDateTime(n.createdAt)} · {n.channel}{n.status === "simulated" ? " · simulated delivery" : ""}</span>
+                      <span className="text-caption text-faint">{fmtDateTime(n.createdAt)} · {n.channel}</span>
                     </li>
                   ))}
                 </ol>

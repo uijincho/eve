@@ -1,27 +1,29 @@
 "use client";
 
-import { DownloadIcon, PlusIcon, SearchIcon } from "lucide-react";
+import { CircleCheckIcon, DownloadIcon, FileTextIcon, PlusIcon, ScrollTextIcon, SearchIcon } from "lucide-react";
 import { useState } from "react";
 
 import { ActionButton } from "@/components/app/action-button";
+import { ClaimDecision } from "@/components/app/claim-decision";
 import { ClaimForm, ClaimOutcome } from "@/components/app/claim-form";
 import { DataTable, FilterChips, type Column } from "@/components/app/data-table";
 import { CheckList, EvidenceSheet } from "@/components/app/evidence-sheet";
 import { LinkButton } from "@/components/app/link-button";
 import { PageFrame } from "@/components/app/page-frame";
-import { ReasonAction } from "@/components/app/reason-action";
 import { Sheet } from "@/components/app/sheet";
 import { EmptyState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
+import { Airline, Airport } from "@/components/eve/airline";
 import { DueChip } from "@/components/eve/due-chip";
 import { Evidence } from "@/components/eve/evidence";
 import { Money } from "@/components/eve/money";
-import { TruthLabel } from "@/components/eve/truth-label";
+import { TagList } from "@/components/eve/tag-list";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Claim } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
-import { big, canOrganize, canReview, isOrgBookedFlight, claimStatusLabel, claimReasonText, projectStatusLabel } from "@/lib/client/derive";
+import { big, canOrganize, checkTag, claimReasonText, claimStatusLabel, failedChecks, isOrgBookedFlight, projectStatusLabel } from "@/lib/client/derive";
 import { fmtDate, fmtDay, humanize } from "@/lib/client/format";
 import { initialParam } from "@/lib/client/url-param";
 import { payloads } from "@/lib/client/payloads";
@@ -43,7 +45,7 @@ export function ClaimsView() {
       title="Claims"
       lede={(s) => {
         const open = s.claims.filter((c) => c.status === "escalated" || c.status === "needs_info").length;
-        return `${s.claims.length} travel and expense claims. ${open} need a person; the rest Eve handled within policy.`;
+        return `${open} of ${s.claims.length} need a person.`;
       }}
       actions={(s) => (
         <>
@@ -80,8 +82,19 @@ export function ClaimsView() {
         const selected = s.claims.find((c) => c.id === openId);
 
         const columns: Column<Claim>[] = [
-          { key: "id", header: "Claim", cell: (c) => `${c.id} · ${c.personName}`, stack: "title", sort: (c) => c.personName },
-          { key: "what", header: "Details", cell: (c) => [c.type === "travel" ? `${c.origin ?? ""} ${c.cabin ?? ""}`.trim() || "Travel" : humanize(c.category), c.merchant].filter(Boolean).join(" · "), stack: "meta" },
+          {
+            key: "id",
+            header: "Claim",
+            stack: "title",
+            sort: (c) => c.personName,
+            cell: (c) => (
+              <span className="flex flex-col">
+                {c.personName}
+                <span className="text-caption font-normal text-muted-foreground tabular-nums">{c.id}</span>
+              </span>
+            ),
+          },
+          { key: "what", header: "Details", cell: (c) => <ClaimDetails claim={c} />, stack: "meta" },
           { key: "flags", header: "Checks", cell: (c) => <ChecksSummary claim={c} />, stack: "meta" },
           { key: "status", header: "Status", cell: (c) => <StatusBadge status={c.status} label={claimStatusLabel(c)} />, stack: "end", sort: (c) => c.status },
           {
@@ -151,7 +164,7 @@ export function ClaimsView() {
               empty={<EmptyState title="No claims match">Change the filters or search. New claims appear here as attendees submit receipts.</EmptyState>}
             />
 
-            <Sheet open={selected !== undefined} onOpenChange={(o) => !o && setOpenId(null)} title={selected ? `Claim ${selected.id}` : "Claim"} description={selected?.personName}>
+            <Sheet open={selected !== undefined} onOpenChange={(o) => !o && setOpenId(null)} title={selected?.personName ?? "Claim"} description={selected ? `Claim ${selected.id}` : undefined}>
               {selected ? <ClaimDetail claim={selected} snapshot={s} onEvidence={() => setEvidence(selected)} /> : null}
             </Sheet>
             <Sheet open={submitOpen} onOpenChange={setSubmitOpen} title="Submit a claim" description="Eve reads the receipt and runs the policy checks">
@@ -175,11 +188,38 @@ export function ClaimsView() {
   );
 }
 
+/** Origin and carrier as chips, the carrier as its logo; expenses show their category. */
+function ClaimDetails({ claim: c }: { claim: Claim }) {
+  if (c.type !== "travel") {
+    return (
+      <span className="flex flex-wrap items-center gap-1.5">
+        <Badge variant="outline">{humanize(c.category)}</Badge>
+        {c.merchant ? <span className="text-small text-muted-foreground">{c.merchant}</span> : null}
+      </span>
+    );
+  }
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      {c.origin ? <Airport code={c.origin} /> : null}
+      {c.merchant ? <Airline name={c.merchant} /> : null}
+      {c.cabin && c.cabin !== "economy" ? <Badge variant="pending">{humanize(c.cabin)}</Badge> : null}
+      {!c.origin && !c.merchant ? <span className="text-small text-muted-foreground">Travel</span> : null}
+    </span>
+  );
+}
+
 function ChecksSummary({ claim }: { claim: Claim }) {
-  const failed = claim.checks.filter((k) => !k.passed);
-  if (!claim.checks.length) return <span className="text-muted-foreground">Not checked yet</span>;
-  if (!failed.length) return <span className="text-muted-foreground">All {claim.checks.length} passed</span>;
-  return <span className="text-critical">Flagged: {failed.map((k) => k.label.toLowerCase()).join(", ")}</span>;
+  const failed = failedChecks(claim);
+  if (!claim.checks.length) return <span className="text-small text-muted-foreground">Not checked</span>;
+  if (!failed.length) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-small text-muted-foreground">
+        <CircleCheckIcon aria-hidden className="size-4 text-positive" />
+        All passed
+      </span>
+    );
+  }
+  return <TagList tags={failed.map(checkTag)} max={2} />;
 }
 
 /** Why the fare was flagged, what Eve asked, and the attendee's answer. */
@@ -204,7 +244,7 @@ function FareReviewPanel({ claim: c }: { claim: Claim }) {
           <>
             <dt className="text-muted-foreground">{r.market.basis === "typical_high" ? "Market typical high" : "Cheapest tracked fare"} ({r.market.capturedOn})</dt>
             <dd className="text-right">
-              <Evidence source={`${r.market.source === "serpapi" ? "Google Flights via SerpApi" : r.market.source === "duffel_test" ? "Duffel test mode" : "Simulated fare table"} · ${r.market.truth}`}>
+              <Evidence source={`${r.market.source === "serpapi" ? "Google Flights via SerpApi" : r.market.source === "duffel_test" ? "Duffel test mode" : "Fare table"} · ${r.market.truth}`}>
                 <Money amountMinor={big(r.market.referenceMinor)} />
               </Evidence>
             </dd>
@@ -228,84 +268,91 @@ function FareReviewPanel({ claim: c }: { claim: Claim }) {
 }
 
 export function ClaimDetail({ claim: c, snapshot, onEvidence }: { claim: Claim; snapshot: AppSnapshot; onEvidence: () => void }) {
-  const perm = canReview(snapshot.actor, c, snapshot);
   const person = snapshot.people.find((p) => p.id === c.personId);
   const open = c.status === "escalated" || c.status === "needs_info" || c.status === "submitted";
+  const first = c.personName.split(" ")[0];
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge status={c.status} label={claimStatusLabel(c)} />
-        <DueChip due={c.dueAt} now={snapshot.now} context="review" />
-      </div>
-      {c.reason ? <p className="text-small">{claimReasonText(c)}</p> : null}
-      <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-small">
-        <dt className="text-muted-foreground">Receipt amount</dt>
-        <dd className="text-right"><Money amountMinor={big(c.amountMinor)} currency={c.currency} /></dd>
-        <dt className="text-muted-foreground">In USD</dt>
-        <dd className="text-right font-semibold">
+    <div className="flex flex-col gap-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <Money amountMinor={big(c.usdMinor)} className="text-title" />
           {c.currency !== "USD" ? (
-            <Evidence source={`FX ${c.fxRate} · ${c.fxSource}`}>
-              <Money amountMinor={big(c.usdMinor)} />
-            </Evidence>
-          ) : (
-            <Money amountMinor={big(c.usdMinor)} />
-          )}
-        </dd>
-        <dt className="text-muted-foreground">Merchant</dt>
-        <dd className="text-right">{c.merchant}</dd>
+            <span className="text-small text-muted-foreground">
+              <Evidence source={`FX ${c.fxRate} · ${c.fxSource}`}>
+                <Money amountMinor={big(c.amountMinor)} currency={c.currency} />
+              </Evidence>{" "}
+              on the receipt
+            </span>
+          ) : null}
+        </div>
+        <div className="flex flex-col items-end gap-1.5 pt-1">
+          <StatusBadge status={c.status} label={claimStatusLabel(c)} />
+          <DueChip due={c.dueAt} now={snapshot.now} context="review" inline />
+        </div>
+      </div>
+
+      {!open && c.reason ? <p className="text-small">{claimReasonText(c)}</p> : null}
+
+      <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 text-small">
+        <dt className="text-muted-foreground">{c.type === "travel" ? "Airline" : "Merchant"}</dt>
+        <dd className="flex justify-end">{c.type === "travel" ? <Airline name={c.merchant} withName /> : c.merchant}</dd>
+        {c.type === "travel" ? (
+          <>
+            <dt className="text-muted-foreground">Flight</dt>
+            <dd className="flex items-center justify-end gap-1.5">
+              {c.origin ? <Airport code={c.origin} /> : null}
+              {c.cabin && c.cabin !== "economy" ? <Badge variant="pending">{humanize(c.cabin)}</Badge> : null}
+              {c.travelDate ? <span>{fmtDate(c.travelDate)}</span> : null}
+            </dd>
+          </>
+        ) : (
+          <>
+            <dt className="text-muted-foreground">Category</dt>
+            <dd className="text-right">{humanize(c.category)}</dd>
+          </>
+        )}
         <dt className="text-muted-foreground">Purchased</dt>
         <dd className="text-right">{fmtDay(c.purchasedAt, true)}</dd>
-        {c.travelDate ? (
-          <>
-            <dt className="text-muted-foreground">Travel</dt>
-            <dd className="text-right">{[c.origin, c.cabin, fmtDate(c.travelDate)].filter(Boolean).join(" · ")}</dd>
-          </>
-        ) : null}
-        <dt className="text-muted-foreground">Category</dt>
-        <dd className="text-right">{humanize(c.category)}</dd>
         {c.type === "travel" && person ? (
           <>
             <dt className="text-muted-foreground">Project</dt>
             <dd className={person.projectStatus === "none" ? "text-right text-critical" : "text-right"}>
-              {projectStatusLabel(person.projectStatus)}{person.projectUrl ? ` · ${person.projectUrl}` : ""}
+              {person.projectUrl ? (
+                <a href={person.projectUrl} target="_blank" rel="noreferrer" className="underline decoration-faint decoration-dotted underline-offset-4 hover:decoration-foreground">
+                  {projectStatusLabel(person.projectStatus)}
+                </a>
+              ) : (
+                projectStatusLabel(person.projectStatus)
+              )}
             </dd>
           </>
         ) : null}
       </dl>
+
       {c.fareReview ? <FareReviewPanel claim={c} /> : null}
-      <CheckList checks={c.checks} />
-      <div className="flex flex-wrap gap-2">
-        {c.documentId ? (
-          <LinkButton href={documentUrl(c.documentId)} external size="sm" variant="outline" target="_blank">
-            Open receipt
-          </LinkButton>
-        ) : null}
-        <Button size="sm" variant="ghost" onClick={onEvidence}>
-          View evidence
-        </Button>
-      </div>
-      {open ? (
-        <div className="flex flex-col gap-2 border-t pt-4">
-          <ActionButton
-            wide
-            size="default"
-            variant="default"
-            label="Approve"
-            pendingLabel="Approving"
-            permission={perm}
-            call={payloads.claimReview(c.id, "approve", "Approved after review")}
-          />
-          {perm.allowed ? (
-            <div className="flex flex-wrap gap-2">
-              <ReasonAction label="Reject" pendingLabel="Rejecting" prompt="Why is this claim rejected? The attendee sees this." build={(r) => payloads.claimReview(c.id, "reject", r)} />
-              <ReasonAction label="Ask for info" submitLabel="Send question" pendingLabel="Sending" prompt={`What should Eve ask ${c.personName.split(" ")[0]}?`} build={(r) => payloads.claimReview(c.id, "needs_info", r)} />
-            </div>
+
+      <div className="flex flex-col gap-3">
+        <CheckList checks={c.checks} />
+        <div className="-ml-2.5 flex flex-wrap gap-1">
+          {c.documentId ? (
+            <LinkButton href={documentUrl(c.documentId)} external size="sm" variant="ghost" target="_blank">
+              <FileTextIcon aria-hidden />
+              Receipt
+            </LinkButton>
           ) : null}
+          <Button size="sm" variant="ghost" onClick={onEvidence}>
+            <ScrollTextIcon aria-hidden />
+            Evidence
+          </Button>
+        </div>
+      </div>
+
+      {open ? (
+        <div className="border-t pt-4">
+          <ClaimDecision claim={c} snapshot={snapshot} />
         </div>
       ) : c.status === "approved" && isOrgBookedFlight(c) ? (
-        <p className="flex flex-wrap items-center gap-2 text-small text-muted-foreground">
-          <TruthLabel kind="simulated" /> Booked by the organization. {c.personName.split(" ")[0]} pays nothing, so there is no payout.
-        </p>
+        <p className="text-small text-muted-foreground">Booked by the organization. {first} pays nothing, so there is no payout.</p>
       ) : c.status === "approved" && canOrganize(snapshot.actor).allowed && !snapshot.payouts.some((p) => p.sourceId === c.id) ? (
         <ActionButton wide size="default" variant="default" label="Propose payout" pendingLabel="Proposing" call={payloads.payoutPropose(c.id, "claim")} />
       ) : null}

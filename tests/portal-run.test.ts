@@ -85,8 +85,9 @@ describe("portal runs in the inbox and feed", () => {
   it("asks a controller to approve a run waiting on Review, and says what differs", () => {
     const s = withRun({});
     const item = buildInbox(s).find((i) => i.ref.kind === "portal");
-    expect(item).toMatchObject({ category: "approvals", critical: "1 value differs" });
-    expect(item!.title).toMatch(/^Approve the sponsor portal submission/);
+    expect(item).toMatchObject({ category: "approvals" });
+    expect(item!.tags).toEqual([{ label: "Ready to submit", tone: "positive" }, { label: "1 value differs", tone: "critical" }]);
+    expect(item!.meta).toMatch(/^Sponsor portal submission/);
     expect(item!.detail).toMatch(/1 of 2 values match the packet; 1 differ/);
   });
 
@@ -94,14 +95,14 @@ describe("portal runs in the inbox and feed", () => {
     const escalated = withRun({ status: "escalated", escalation: { field: "Social Security Number", reason: "The payee is a US person; the SSN is vaulted." } });
     const item = buildInbox(escalated).find((i) => i.ref.kind === "portal");
     expect(item).toMatchObject({ category: "exceptions" });
-    expect(item!.title).toContain("Social Security Number");
+    expect(item!.meta).toContain("Social Security Number");
     const submitted = { ...escalated, packets: escalated.packets.map((k) => ({ ...k, status: "submitted" as const })) };
     expect(buildInbox(submitted).some((i) => i.ref.kind === "portal")).toBe(false);
   });
 
   it("flags a portal confirmation that Eve could not record", () => {
     const s = withRun({ status: "failed", confirmation: "WB-26-01234", error: "The portal accepted request WB-26-01234, but Eve did not mark the packet submitted." });
-    expect(buildInbox(s).find((i) => i.ref.kind === "portal")!.title).toMatch(/Portal accepted WB-26-01234/);
+    expect(buildInbox(s).find((i) => i.ref.kind === "portal")!.meta).toMatch(/Portal accepted WB-26-01234/);
   });
 
   it("keeps finished runs out of the inbox", () => {

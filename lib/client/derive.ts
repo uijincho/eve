@@ -48,10 +48,10 @@ export function awardName(a: Pick<Award, "track" | "title">, sep = ": "): string
 }
 
 const PROVIDER_LABEL: Record<string, string> = {
-  mock_wire: "Simulated wire", in_kind: "In-kind delivery", mock: "Simulated", simulated: "Simulated", stripe_test: "Stripe test mode", stripe: "Stripe test mode",
+  mock_wire: "Wire", in_kind: "In-kind delivery", mock: "Bank transfer", simulated: "Bank transfer", stripe_test: "Stripe", stripe: "Stripe",
 };
 
-/** "mock_wire" -> "Simulated wire". */
+/** "mock_wire" -> "Wire". */
 export function providerLabel(provider: string): string {
   return PROVIDER_LABEL[provider] ?? provider.replace(/[_-]+/g, " ").replace(/^./, (c) => c.toUpperCase());
 }
@@ -258,19 +258,25 @@ export function canControl(actor: Actor, s: Pick<AppSnapshot, "personas">): Perm
 
 export type InboxCategory = "approvals" | "holds" | "exceptions";
 
+export type Tone = "critical" | "pending" | "positive" | "neutral";
+
+/** A short state chip. `title` carries the full sentence for hover and screen readers. */
+export type Tag = { label: string; tone: Tone; title?: string };
+
 export type InboxItem = {
   id: string;
   category: InboxCategory;
+  /** Who or what: a person's name, or the batch or packet. */
   title: string;
   mark: string;
   meta: string;
+  /** The longer explanation, shown only in the detail pane. */
   detail: string;
+  tags: Tag[];
   amountMinor: bigint;
   currency: string;
-  amountNote: string;
   dueAt: string;
   dueContext: string;
-  critical?: string;
   ref:
     | { kind: "payouts"; payouts: Payout[] }
     | { kind: "payout"; payout: Payout }
@@ -379,6 +385,42 @@ export function failedChecks(c: Pick<Claim, "checks">): Check[] {
   return c.checks.filter((k) => !k.passed).sort((a, b) => rank(a) - rank(b));
 }
 
+/** Two-word names for failed checks. Hard policy failures are critical; soft flags only ask for a look. */
+const CHECK_TAG: Record<string, Omit<Tag, "title">> = {
+  project_submission: { label: "No project", tone: "critical" },
+  adult: { label: "Under 18", tone: "critical" },
+  duplicate: { label: "Duplicate", tone: "critical" },
+  name_match: { label: "Name mismatch", tone: "critical" },
+  evidence: { label: "Unverified receipt", tone: "critical" },
+  cap: { label: "Over cap", tone: "critical" },
+  cabin: { label: "Premium cabin", tone: "critical" },
+  budget: { label: "Over budget", tone: "critical" },
+  receipt: { label: "No receipt", tone: "critical" },
+  purchase_date: { label: "Bad date", tone: "critical" },
+  amount_valid: { label: "Bad amount", tone: "critical" },
+  fx_converted: { label: "No FX rate", tone: "critical" },
+  booking_deadline: { label: "Late booking", tone: "pending" },
+  travel_dates: { label: "Off dates", tone: "pending" },
+  fare_peer: { label: "High fare", tone: "pending" },
+  fare_market: { label: "Above market", tone: "pending" },
+  cap_hugging: { label: "Near cap", tone: "pending" },
+  agent_limit: { label: "Over limit", tone: "neutral" },
+};
+
+/** A failed check as a chip: "Over limit", with "Over the $300.00 auto-approve limit: $316.58" as its title. */
+export function checkTag(c: Pick<Check, "code" | "label" | "detail">): Tag {
+  return { ...(CHECK_TAG[c.code] ?? { label: c.label, tone: "critical" }), title: failedCheckText(c) };
+}
+
+/** Why a payout is held, as chips: the tax form first, then an unverified rule. */
+function holdTags(p: Payout, person?: Person): Tag[] {
+  const tags: Tag[] = [];
+  if (person?.taxStatus === "missing" || person?.taxStatus === "expired") tags.push({ label: `${person.taxForm} ${person.taxStatus}`, tone: "critical" });
+  else if (person?.taxStatus === "review") tags.push({ label: `${person.taxForm} review`, tone: "pending" });
+  if (!p.ruleVerified) tags.push({ label: "Unverified rule", tone: "pending" });
+  return tags;
+}
+
 /** Why a claim is waiting, in failed form; once decided, the reviewer's or server's reason. */
 export function claimReasonText(c: Pick<Claim, "checks" | "status" | "reason">): string {
   const failed = failedChecks(c).map(failedCheckText);
@@ -392,6 +434,7 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
     s.payouts.filter((p) => p.sourceType === "award").map((p) => [p.sourceId, p]),
   );
   const heldPeople = new Set<string>();
+  const source = (p: Payout) => (p.sourceType === "award" ? "Prize payout" : "Claim payout");
 
   const ready = s.payouts.filter((p) => p.status === "proposed" || p.status === "approved");
   if (ready.length) {
@@ -401,13 +444,13 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
     items.push({
       id: "batch",
       category: "approvals",
-      title: ready.length === 1 ? `Payout ready for release: ${ready[0].personName}` : `Payout batch ready for release`,
+      title: ready.length === 1 ? ready[0].personName : "Payout batch",
       mark: "Release",
-      meta: `${ready.length} ${ready.length === 1 ? "payout" : "payouts"}${s.personas.some((p) => p.role === "controller") ? ` · controller ${controllerName(s)}` : " · for a controller"}`,
-      detail: `${fmtPlain(withheld, "USD")} withheld · fees ${fmtPlain(sumMinor(ready.map((p) => p.feeMinor)), "USD")} · Eve cannot release money.`,
+      meta: `${ready.length} ${ready.length === 1 ? "payout" : "payouts"}${s.personas.some((p) => p.role === "controller") ? ` · controller ${controllerName(s)}` : ""}`,
+      detail: `${fmtPlain(withheld, "USD")} withheld, ${fmtPlain(sumMinor(ready.map((p) => p.feeMinor)), "USD")} in fees.`,
+      tags: [{ label: "Ready to release", tone: "positive" }],
       amountMinor: gross,
       currency: ready[0].currency,
-      amountNote: "gross",
       dueAt: due,
       dueContext: "release",
       ref: { kind: "payouts", payouts: ready },
@@ -419,16 +462,15 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
       items.push({
         id: `payout:${p.id}`,
         category: "exceptions",
-        title: p.status === "frozen" ? "Payout frozen: bank details changed" : `Payout ${p.status}`,
+        title: p.personName,
         mark: p.personName.split(" ")[0],
-        meta: `${p.personName} · ${p.sourceType === "award" ? "prize" : "claim"} payout · ${providerLabel(p.provider)}`,
+        meta: p.status === "frozen" ? `Bank details changed · ${source(p)}` : source(p),
         detail: p.reason,
+        tags: [{ label: p.status === "frozen" ? "Frozen" : p.status === "failed" ? "Failed" : "Returned", tone: "critical" }],
         amountMinor: big(p.grossMinor),
         currency: p.currency,
-        amountNote: "payout",
         dueAt: p.dueAt,
         dueContext: "release",
-        critical: p.status === "frozen" ? "Frozen" : p.status === "failed" ? "Failed" : "Returned",
         ref: { kind: "payout", payout: p },
       });
     } else if (p.status === "held") {
@@ -436,13 +478,13 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
       items.push({
         id: `payout:${p.id}`,
         category: "holds",
-        title: `Payout on hold: ${p.personName}`,
+        title: p.personName,
         mark: p.personName.split(" ")[0],
-        meta: `${p.sourceType === "award" ? "Prize" : "Claim"} payout · ${people.get(p.personId)?.taxForm ?? "tax form"} ${people.get(p.personId)?.taxStatus ?? ""}`.trim(),
+        meta: `${source(p)} on hold`,
         detail: p.reason,
+        tags: holdTags(p, people.get(p.personId)),
         amountMinor: big(p.grossMinor),
         currency: p.currency,
-        amountNote: "held",
         dueAt: p.dueAt,
         dueContext: "payout",
         ref: { kind: "payout", payout: p },
@@ -452,28 +494,24 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
 
   for (const c of s.claims) {
     if (c.status !== "escalated" && c.status !== "needs_info") continue;
-    const failed = failedChecks(c).map(failedCheckText);
+    const failed = failedChecks(c);
+    const kind = c.type === "travel" ? "Travel claim" : "Expense";
     items.push({
       id: `claim:${c.id}`,
       category: c.status === "escalated" ? "approvals" : "holds",
-      title:
-        c.status === "escalated"
-          ? failed[0] ?? `${c.type === "travel" ? "Travel claim" : "Expense"} needs a decision`
-          : `Waiting on ${c.personName.split(" ")[0]} for more information`,
+      title: c.personName,
       mark: c.personName.split(" ")[0],
-      meta: [c.personName, c.origin ? `Flight from ${c.origin}` : c.merchant, c.cabin].filter(Boolean).join(" · "),
-      // Failures in failed form; the server's reason pairs pass-phrased labels with failing facts.
-      detail:
-        c.status === "escalated"
-          ? failed.length > 1
-            ? `Also: ${failed.slice(1).join("; ")}.`
-            : `${c.type === "travel" ? "Travel claim" : "Expense"} awaiting a decision.`
+      meta: [kind, c.origin ? `from ${c.origin}` : "", c.merchant].filter(Boolean).join(" · "),
+      // The pane lists every check, so only a reviewer's question needs words here.
+      detail: c.status === "needs_info" ? c.reason || "Waiting for more information." : "",
+      tags:
+        c.status === "needs_info"
+          ? [{ label: "Needs info", tone: "neutral" }]
           : failed.length
-            ? `${failed.join("; ")}.`
-            : c.reason || "Waiting for more information.",
+            ? failed.map(checkTag)
+            : [{ label: "Needs review", tone: "pending" }],
       amountMinor: big(c.usdMinor),
       currency: "USD",
-      amountNote: c.currency !== "USD" ? `${fmtPlain(big(c.amountMinor), c.currency)}` : c.type,
       dueAt: c.dueAt,
       dueContext: "review",
       ref: { kind: "claim", claim: c },
@@ -484,18 +522,18 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
     const person = people.get(a.personId);
     const payout = awardPayout.get(a.id);
     if (a.status === "paid" || a.status === "proposed" || payout) continue;
-    const where = person ? person.country : "";
+    const meta = [awardName(a), person?.country].filter(Boolean).join(" · ");
     if (a.status === "needs_form") {
       items.push({
         id: `award:${a.id}`,
         category: "holds",
-        title: `Prize held: ${person?.taxForm ?? "tax form"} not signed`,
+        title: a.personName,
         mark: a.personName.split(" ")[0],
-        meta: `${a.personName}${where ? `, ${where}` : ""} · ${a.track}`,
+        meta,
         detail: a.recommendation || "Eve is chasing the winner for their tax form.",
+        tags: [{ label: `${person?.taxForm ?? "Tax form"} not signed`, tone: "pending" }],
         amountMinor: big(a.amountMinor),
         currency: a.currency,
-        amountNote: a.kind === "item" ? "item FMV" : "prize",
         dueAt: a.dueAt,
         dueContext: "ceremony",
         ref: { kind: "award", award: a, person, payout },
@@ -506,17 +544,19 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
       items.push({
         id: `award:${a.id}`,
         category: splitPending ? "holds" : "approvals",
-        title: undecided
-          ? `Prize to a winner${where ? ` in ${where}` : ""}: ${a.title}`
-          : splitPending
-            ? `Team split awaiting confirmation: ${a.title}`
-            : `Prize ready for a payout proposal: ${a.title}`,
+        title: a.personName,
         mark: a.personName.split(" ")[0],
-        meta: `${a.personName}${where ? `, ${where}` : ""} · ${a.track}`,
+        meta,
         detail: a.recommendation,
+        tags: [
+          undecided
+            ? { label: "Choose delivery", tone: "pending" }
+            : splitPending
+              ? { label: "Split unconfirmed", tone: "pending" }
+              : { label: "Ready to propose", tone: "positive" },
+        ],
         amountMinor: big(a.amountMinor),
         currency: a.currency,
-        amountNote: a.kind === "item" ? "item FMV" : "prize",
         dueAt: a.dueAt,
         dueContext: "ceremony",
         ref: { kind: "award", award: a, person, payout },
@@ -529,16 +569,17 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
     items.push({
       id: `packet:${k.id}`,
       category: "exceptions",
-      title:
-        k.status === "exception"
-          ? `Sponsor paid ${fmtPlain(big(k.paidMinor), "USD")} on a ${fmtPlain(big(k.requestedMinor), "USD")} request`
-          : `Sponsor questioned packet ${k.id}`,
+      title: `Sponsor packet ${k.id}`,
       mark: "Sponsor",
-      meta: `Packet ${k.id} · ${k.personName} · ${s.org.sponsorName}`,
+      meta: `${k.personName} · ${s.org.sponsorName}`,
       detail: k.reason,
+      tags: [
+        k.status === "exception"
+          ? { label: `Short ${fmtPlain(big(k.requestedMinor) - big(k.paidMinor), "USD")}`, tone: "critical" }
+          : { label: "Questioned", tone: "pending" },
+      ],
       amountMinor: big(k.paidMinor),
       currency: "USD",
-      amountNote: `of ${fmtPlain(big(k.requestedMinor), "USD")}`,
       dueAt: k.dueAt,
       dueContext: "reconcile",
       ref: { kind: "packet", packet: k },
@@ -556,21 +597,28 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
     items.push({
       id: `portal:${run.id}`,
       category: run.status === "awaiting_approval" ? "approvals" : "exceptions",
-      title: run.status === "awaiting_approval" ? `Approve the sponsor portal submission for ${k.personName}`
-        : unreconciled ? `Portal accepted ${run.confirmation}, but the packet is not submitted in Eve`
-          : `Sponsor portal needs a person: ${run.escalation?.field ?? "Eve stopped"}`,
+      title: k.personName,
       mark: "Portal",
-      meta: `Packet ${k.id} · ${k.personName} · sponsor portal (fictional demo)`,
+      meta: run.status === "awaiting_approval"
+        ? `Sponsor portal submission · packet ${k.id}`
+        : unreconciled ? `Portal accepted ${run.confirmation} · packet ${k.id}`
+          : `Sponsor portal: ${run.escalation?.field ?? "Eve stopped"}`,
       detail: run.status === "awaiting_approval"
         ? checks.length ? `Eve stopped on Review before Submit. ${checks.length - differ} of ${checks.length} values match the packet${differ ? `; ${differ} differ` : ""}.` : "Eve stopped on Review before Submit. Check the screenshot before approving."
-        : unreconciled ? run.error ?? ""
+        : unreconciled ? `The portal accepted it, but the packet is not submitted in Eve. ${run.error ?? ""}`.trim()
           : run.escalation?.reason ?? portalStatusLine(run),
+      tags: [
+        run.status === "awaiting_approval"
+          ? { label: "Ready to submit", tone: "positive" }
+          : unreconciled
+            ? { label: "Not reconciled", tone: "critical" }
+            : { label: "Needs a person", tone: "pending" },
+        ...(differ ? [{ label: `${differ} ${differ === 1 ? "value differs" : "values differ"}`, tone: "critical" as const }] : []),
+      ],
       amountMinor: big(k.requestedMinor),
       currency: "USD",
-      amountNote: "net to payee",
       dueAt: run.status === "awaiting_approval" ? new Date(Date.parse(run.updatedAt) + 25 * 60_000).toISOString() : k.dueAt,
       dueContext: run.status === "awaiting_approval" ? "desktop closes" : "packet",
-      critical: differ ? `${differ} ${differ === 1 ? "value differs" : "values differ"}` : undefined,
       ref: { kind: "portal", run, packet: k },
     });
   }
@@ -581,13 +629,13 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
       items.push({
         id: `person:${p.id}`,
         category: "holds",
-        title: `${p.taxForm} ${p.taxStatus === "expired" ? "expired" : "needs review"}; payment on hold`,
+        title: p.name,
         mark: p.name.split(" ")[0],
-        meta: `${p.name}, ${p.country} · ${p.role}`,
-        detail: `Eve has chased ${p.chaseCount} ${p.chaseCount === 1 ? "time" : "times"}.`,
+        meta: `${p.role.charAt(0).toUpperCase()}${p.role.slice(1)} · ${p.country} · chased ${p.chaseCount}×`,
+        detail: "",
+        tags: [p.taxStatus === "expired" ? { label: `${p.taxForm} expired`, tone: "critical" } : { label: `${p.taxForm} review`, tone: "pending" }],
         amountMinor: big(p.outstandingMinor),
         currency: "USD",
-        amountNote: "outstanding",
         dueAt: p.taxExpiresAt ?? s.event.closingAt,
         dueContext: "form",
         ref: { kind: "person", person: p },
@@ -673,7 +721,7 @@ export function runLine(run: Run, s: Pick<AppSnapshot, "payouts">): string {
       return `Release queued${amount}`;
     case "executePayout": {
       if (last.status !== "done") return firstSentence(last.summary);
-      // "Released $600.00 to ••9625 via simulated provider (sim_…)." -> "Paid $600.00 · ••9625"
+      // "Released $600.00 to ••9625 by wire (sim_…)." -> "Paid $600.00 · ••9625"
       const paid = /^Released (\S+) to (\S+)/.exec(last.summary);
       return paid ? `Paid ${paid[1]} · ${paid[2]}` : `Approved${amount}`;
     }

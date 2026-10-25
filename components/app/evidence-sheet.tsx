@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleCheckIcon, CircleXIcon, FileTextIcon } from "lucide-react";
+import { ChevronDownIcon, CircleCheckIcon, CircleXIcon, FileTextIcon } from "lucide-react";
 
 import { Sheet } from "@/components/app/sheet";
 import { StatusBadge } from "@/components/app/status-badge";
@@ -121,23 +121,40 @@ function FactRow({ k, v }: { k: string; v: unknown }) {
   );
 }
 
+/** Flagged checks in full; passed ones fold into one line that opens on demand. */
 export function CheckList({ checks }: { checks: Check[] }) {
+  const failed = checks.filter((c) => !c.passed);
+  const passed = checks.filter((c) => c.passed);
   return (
-    <ul aria-label="Checks" className="flex flex-col gap-2">
-      {checks.map((c) => (
-        <li key={c.code} className="flex items-start gap-2 text-small">
-          {c.passed ? (
-            <CircleCheckIcon aria-label="Passed" className="mt-px size-4 shrink-0 text-positive" />
-          ) : (
-            <CircleXIcon aria-label="Flagged" className="mt-px size-4 shrink-0 text-critical" />
-          )}
-          <span className="flex flex-col">
-            <span className="font-medium">{c.passed ? c.label : failedCheckText(c)}</span>
-            {c.passed ? <span className="text-muted-foreground">{c.detail}</span> : null}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-2">
+      {failed.length ? (
+        <ul aria-label="Flagged checks" className="flex flex-col gap-2">
+          {failed.map((c) => (
+            <li key={c.code} className="flex items-start gap-2 text-small">
+              <CircleXIcon aria-label="Flagged" className="mt-px size-4 shrink-0 text-critical" />
+              <span className="font-medium">{failedCheckText(c)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {passed.length ? (
+        <details className="group text-small">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-sm text-muted-foreground transition-colors duration-150 hover:text-foreground [&::-webkit-details-marker]:hidden">
+            <CircleCheckIcon aria-hidden className="size-4 shrink-0 text-positive" />
+            {failed.length ? `${passed.length} other ${passed.length === 1 ? "check" : "checks"} passed` : `All ${passed.length} checks passed`}
+            <ChevronDownIcon aria-hidden className="size-3.5 transition-transform duration-150 group-open:rotate-180" />
+          </summary>
+          <ul aria-label="Passed checks" className="mt-2 flex flex-col gap-1.5 pl-6">
+            {passed.map((c) => (
+              <li key={c.code} className="flex flex-col">
+                <span>{c.label}</span>
+                <span className="text-caption text-muted-foreground">{c.detail}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
   );
 }
 

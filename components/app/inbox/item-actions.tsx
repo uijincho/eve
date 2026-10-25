@@ -1,8 +1,9 @@
 "use client";
 
-import { cn } from "cn";
+import { ScrollTextIcon } from "lucide-react";
 
 import { ActionButton } from "@/components/app/action-button";
+import { ClaimDecision } from "@/components/app/claim-decision";
 import { FulfillAction } from "@/components/app/fulfill-action";
 import { LinkButton } from "@/components/app/link-button";
 import { ReasonAction } from "@/components/app/reason-action";
@@ -48,10 +49,12 @@ export function ItemActions({
   const { actor } = snapshot;
   const pane = layout === "pane";
   const first = pane ? ("default" as const) : ("secondary" as const);
-  const wrap = cn("flex flex-wrap items-center gap-2", pane && "flex-col items-start");
+  // In the pane the primary spans its own line and the rest sit in a row beneath.
+  const wrap = "flex flex-wrap items-center gap-2";
   const evidence = showEvidence ? (
     <Button size="sm" variant="ghost" onClick={onEvidence}>
-      View evidence
+      <ScrollTextIcon aria-hidden />
+      Evidence
     </Button>
   ) : null;
   const ref = item.ref;
@@ -74,7 +77,7 @@ export function ItemActions({
             call={payloads.payoutRelease(allowed.map((p) => p.id))}
           />
           {allowed.length && allowed.length < ref.payouts.length ? (
-            <p className="text-small text-muted-foreground">
+            <p className="w-full text-small text-muted-foreground">
               {ref.payouts.length - allowed.length} not included: {blocked?.reason}
             </p>
           ) : null}
@@ -91,8 +94,18 @@ export function ItemActions({
       if (p.status === "frozen") {
         return (
           <div className={wrap}>
-            <VerifyCode personId={p.personId} personName={p.personName} permission={manage} primary={pane} trailing={trailing} />
-            {evidence}
+            <VerifyCode
+              personId={p.personId}
+              personName={p.personName}
+              permission={manage}
+              primary={pane}
+              trailing={
+                <>
+                  {evidence}
+                  {trailing}
+                </>
+              }
+            />
           </div>
         );
       }
@@ -124,7 +137,7 @@ export function ItemActions({
       }
       return (
         <div className={wrap}>
-          <LinkButton href={`/people?person=${encodeURIComponent(p.personId)}`} size="sm" variant={pane ? "secondary" : "secondary"}>
+          <LinkButton href={`/people?person=${encodeURIComponent(p.personId)}`} size="sm" variant="secondary">
             Open {p.personName.split(" ")[0]}&rsquo;s profile
           </LinkButton>
           {evidence}
@@ -134,13 +147,20 @@ export function ItemActions({
     }
     case "claim": {
       const c = ref.claim;
+      if (pane) {
+        return (
+          <div className="flex flex-col gap-3">
+            <ClaimDecision claim={c} snapshot={snapshot} />
+            {evidence ? <div className={wrap}>{evidence}</div> : null}
+          </div>
+        );
+      }
       const perm = canReview(actor, c, snapshot);
       return (
         <div className={wrap}>
           <ActionButton
             variant={first}
-            size={pane ? "default" : "sm"}
-            wide={pane}
+            size="sm"
             label="Approve"
             pendingLabel="Approving"
             permission={perm}

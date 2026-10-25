@@ -87,7 +87,7 @@ export async function advanceTaxChase(target: ChaseTarget, day: number, runId: s
       personId: person.id, personName: person.name, action: day === 10 ? "Tax form chase escalated" : "Tax form reminder scheduled",
       summary: `${demo ? "Accelerated demo · " : ""}Day ${day}: ${day === 10 ? "fourth reminder recorded; organizer follow-up required" : "portal and email reminders recorded"}. ${body}`,
       actor: "Eve (agent)", actorRole: "agent", status: day === 10 ? "escalated" : "waiting", tool: "chaseTaxForm",
-      facts: { day, reason: attention, acceleratedDemo: demo, delivery: org?.isDemo ? "Simulated" : "Configured provider", scheduleDays: [0, 2, 5, 10] }, nextActionAt: nextAt,
+      facts: { day, reason: attention, acceleratedDemo: demo, delivery: org?.isDemo ? "Portal notice" : "Configured provider", scheduleDays: [0, 2, 5, 10] }, nextActionAt: nextAt,
     }).onConflictDoNothing();
     return { complete: day === 10, noticeIds: noticeRows.map((row) => row.id), reason: attention };
   });

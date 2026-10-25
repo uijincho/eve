@@ -20,6 +20,7 @@ const badgeVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         critical: "bg-[color-mix(in_srgb,var(--critical)_12%,var(--background))] text-critical",
         positive: "bg-positive/12 text-positive",
+        pending: "bg-pending/25 text-dusk-5",
       },
     },
     defaultVariants: {

@@ -8,7 +8,6 @@ import { useMemo, useState } from "react";
 import { LinkButton } from "@/components/app/link-button";
 import { ErrorState, ListSkeleton } from "@/components/app/states";
 import { Money } from "@/components/eve/money";
-import { TruthLabel } from "@/components/eve/truth-label";
 import { Button } from "@/components/ui/button";
 import type { AppSnapshot, Award, Decision, Payout } from "@/lib/contracts";
 import { awardName, big, booksCurrency, budgetTotals, buildInbox, controllerName, sumMinor } from "@/lib/client/derive";
@@ -132,11 +131,9 @@ function Overview({ s }: { s: AppSnapshot }) {
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-title">Overview</h1>
-            {s.demo ? <TruthLabel kind="sample" /> : null}
-            <TruthLabel kind="simulated" />
           </div>
           <p className="max-w-[72ch] text-small text-muted-foreground">
-            {s.event.name} · {s.event.venue} · {PHASES.find((p) => p.id === phase)?.focus}
+            {s.event.name} · {s.event.venue}
           </p>
         </div>
         <div role="group" aria-label="Event phase" className="flex gap-0.5 rounded-xl bg-surface-hover p-1">
@@ -145,6 +142,7 @@ function Overview({ s }: { s: AppSnapshot }) {
               key={p.id}
               type="button"
               aria-pressed={phase === p.id}
+              title={p.focus}
               onClick={() => setPhase(p.id)}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-small transition-colors duration-150",
@@ -467,7 +465,6 @@ function Overview({ s }: { s: AppSnapshot }) {
                 <h2 className="text-subheading">Release console</h2>
                 <p className="text-caption text-muted-foreground">Controller: {controllerName(s)}</p>
               </div>
-              <TruthLabel kind="test" />
             </div>
             <div className="flex flex-col gap-3 rounded-2xl bg-money p-4 text-foreground">
               <div className="flex justify-between gap-2 text-caption font-semibold">

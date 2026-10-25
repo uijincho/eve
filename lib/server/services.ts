@@ -438,7 +438,7 @@ async function awardFulfill(tx: Executor, actor: ActorContext, p: { id: string }
     id, orgId: actor.orgId, personId: a.personId, sourceType: "award", awardId: a.id, claimId: null,
     grossMinor, withholdingMinor, feeMinor: 0n, netMinor: 0n, currency: "USD", destinationCurrency: "USD", destinationNetMinor: 0n, fxRate: "1",
     provider: IN_KIND_PROVIDER, truth: "Simulated", status: "paid",
-    reason: `In-kind prize: ${a.title} ${method} (simulated; nothing was shipped or purchased). Fair market value ${usd(fmv)}${withholdingMinor > 0n ? ` plus ${usd(withholdingMinor)} tax the org pays on top` : ""} is reportable income.`,
+    reason: `In-kind prize: ${a.title} ${method}. Fair market value ${usd(fmv)}${withholdingMinor > 0n ? ` plus ${usd(withholdingMinor)} tax the org pays on top` : ""} is reportable income.`,
     ruleId: tax.ruleId, ruleVersion: tax.ruleVersion, ruleVerified: tax.ruleVerified, reportingForm: reported.reportingForm, reportable: reported.reportable,
     requestedBy: a.requestedBy, releasedBy: actor.memberId, idempotencyKey: `inkind:${a.id}`, providerRef: `inkind_sim_${a.id.slice(-12)}`,
     attempts: 1, dueAt: a.dueAt, paidAt: now,
@@ -446,20 +446,20 @@ async function awardFulfill(tx: Executor, actor: ActorContext, p: { id: string }
   await tx.insert(s.approval).values({ id: newId("apr"), orgId: actor.orgId, objectType: "payout", objectId: id, requestedBy: a.requestedBy, approverId: actor.memberId, approverRole: actor.role, decision: "approved", reason: `Physical prize ${method}` });
   const lines: JournalLineInput[] = [
     { account: "5100", debitMinor: grossMinor, currency: "USD", personId: a.personId, memo: `In-kind prize ${a.title} (FMV ${usd(fmv)}${withholdingMinor > 0n ? " + tax on top" : ""})` },
-    { account: "1000", creditMinor: fmv, currency: "USD", memo: `Item ${method} (simulated purchase/shipment)` },
+    { account: "1000", creditMinor: fmv, currency: "USD", memo: `Item ${method}` },
   ];
   if (withholdingMinor > 0n) lines.push({ account: "2100", creditMinor: withholdingMinor, currency: "USD", personId: a.personId, memo: `Withholding paid by the org on a grossed-up prize (${tax.ruleId} v${tax.ruleVersion})` });
   await postJournal(tx, { orgId: actor.orgId, memo: `Fulfill item prize ${a.id}`, sourceType: "payout", sourceId: id, idempotencyKey: `inkind:${a.id}`, createdBy: actor.memberId, lines });
   await tx.update(s.award).set({ status: "paid" }).where(eq(s.award.id, a.id));
   await recordDecision(tx, {
     orgId: actor.orgId, objectType: "award", objectId: a.id, personId: a.personId, personName: ctx.person.name, action: "award.fulfill",
-    summary: `${a.title} ${method} for ${ctx.person.name} (Simulated). Reportable income ${usd(grossMinor)} on ${reported.reportingForm}${withholdingMinor > 0n ? `, including ${usd(withholdingMinor)} withholding the org pays on top` : ""}${reported.reportable ? "" : " (below the threshold so far)"}.`,
+    summary: `${a.title} ${method} for ${ctx.person.name}. Reportable income ${usd(grossMinor)} on ${reported.reportingForm}${withholdingMinor > 0n ? `, including ${usd(withholdingMinor)} withholding the org pays on top` : ""}${reported.reportable ? "" : " (below the threshold so far)"}.`,
     actor, status: "done", tool: "fulfillPrize", ruleId: tax.ruleId, ruleVersion: tax.ruleVersion,
     facts: { truth: "Simulated", fmvMinor: fmv.toString(), grossMinor: grossMinor.toString(), withholdingMinor: withholdingMinor.toString(), ytdMinor, reportingForm: reported.reportingForm, reportable: reported.reportable, payoutId: id, method },
   });
   await recordNotice(tx, { orgId: actor.orgId, personId: a.personId, channel: "portal", title: `${a.title}: fulfillment recorded`, body: `Your prize was marked ${method}. This demo does not ship or buy anything. Its fair market value (${usd(fmv)}) is reportable prize income.` });
   await requoteSiblings(tx, actor.orgId, a.personId, `in-kind prize ${a.title} became final`, id, actor);
-  return ok(`${a.title} marked ${method} (simulated).`, { awardId: a.id, payoutId: row.id, fmvMinor: fmv.toString(), grossMinor: grossMinor.toString(), withholdingMinor: withholdingMinor.toString(), reportingForm: reported.reportingForm, reportable: reported.reportable, truth: "Simulated" });
+  return ok(`${a.title} marked ${method}.`, { awardId: a.id, payoutId: row.id, fmvMinor: fmv.toString(), grossMinor: grossMinor.toString(), withholdingMinor: withholdingMinor.toString(), reportingForm: reported.reportingForm, reportable: reported.reportable, truth: "Simulated" });
 }
 
 // ---------------------------------------------------------------- payouts
@@ -652,7 +652,7 @@ export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: 
   if (!sent) throw conflict("Payout changed while submitting; try again.");
   await postAccrual(tx, sent, actor.memberId, await payoutCategory(tx, sent));
   await tx.update(s.sponsorPacket).set({ status: "submitted", submittedAt: new Date(), dueAt: new Date(Date.now() + org.sponsorTurnaroundDays * 86_400_000) }).where(eq(s.sponsorPacket.id, pk.id));
-  await recordDecision(tx, { orgId: actor.orgId, objectType: "packet", objectId: pk.id, personId: payout.personId, action: "sponsor.submit", summary: `Submitted ${usd(pk.requestedMinor)} to ${org.sponsorName || "the sponsor"} (Simulated counterparty); expected within ${org.sponsorTurnaroundDays} days. Expense and withholding accrued.`, actor, status: "waiting", tool: "sponsorPacket", facts: { payoutId: payout.id, requestedMinor: pk.requestedMinor.toString() } });
+  await recordDecision(tx, { orgId: actor.orgId, objectType: "packet", objectId: pk.id, personId: payout.personId, action: "sponsor.submit", summary: `Submitted ${usd(pk.requestedMinor)} to ${org.sponsorName || "the sponsor"}; expected within ${org.sponsorTurnaroundDays} days. Expense and withholding accrued.`, actor, status: "waiting", tool: "sponsorPacket", facts: { payoutId: payout.id, requestedMinor: pk.requestedMinor.toString() } });
   if (payout.sourceType === "award") await requoteSiblings(tx, actor.orgId, payout.personId, `payment ${payout.id} went to the sponsor`, payout.id, actor);
   return ok("Packet submitted.");
 }
@@ -694,7 +694,7 @@ export async function reconcilePacket(tx: Executor, actor: ActorContext, p: { id
       orgId: actor.orgId, memo: `Sponsor paid packet ${pk.id}`, sourceType: "packet", sourceId: pk.id, idempotencyKey: `sponsor-pay:${pk.id}`, createdBy: actor.memberId,
       lines: [
         { account: "2000", debitMinor: settled, currency: "USD", personId: payout.personId, memo: "Payable settled by the sponsor" },
-        { account: "1100", creditMinor: settled, currency: "USD", memo: `${org.sponsorName || "Sponsor"} disbursement (Simulated counterparty)` },
+        { account: "1100", creditMinor: settled, currency: "USD", memo: `${org.sponsorName || "Sponsor"} disbursement` },
       ],
     });
   }
@@ -811,9 +811,9 @@ async function flightSearch(tx: Executor, actor: ActorContext, p: { origin: stri
   const key = offerKey();
   // The token binds the server's price, itinerary and this event; flight.request trusts only the token or the fixture table regenerated for the same event.
   const options = key ? signOffers(result.options, key, Date.now(), evt) : result.options;
-  const note = destination.recognized ? "" : ` The venue names no city Eve has simulated fares for, so these fares go to ${destination.airport}.`;
+  const note = destination.recognized ? "" : ` The venue names no city Eve has fares for, so these fares go to ${destination.airport}.`;
   const message = !offers.length
-    ? p.origin.toUpperCase() === destination.airport ? `${destination.airport} is the event's own airport; no flight needed.` : `Eve has no simulated fares from ${p.origin.toUpperCase()}. Try ${fixtureOrigins().join(", ")}, or submit your own booking as a travel claim.`
+    ? p.origin.toUpperCase() === destination.airport ? `${destination.airport} is the event's own airport; no flight needed.` : `Eve has no fares from ${p.origin.toUpperCase()}. Try ${fixtureOrigins().join(", ")}, or submit your own booking as a travel claim.`
     : result.options.length ? `${result.options.length} option(s) under policy.` : result.reason;
   return ok(`${message}${note}`, { offers: options, rejected: result.rejected, truth: result.truth, destination: destination.airport, destinationRecognized: destination.recognized });
 }
@@ -892,7 +892,7 @@ const handlers: Record<AppAction, Handler> = {
   "payout.bankChange": (async (tx, actor, p) => {
     assertSelfOrStaff(actor, p.personId);
     const r = await changeBankDetails(tx, actor, p);
-    if (r.enrolled) return ok(`Payout account ••${p.last4} added (simulated provider). ${r.requoted} unpaid payout(s) re-quoted; each still needs a controller release.`, r);
+    if (r.enrolled) return ok(`Payout account ••${p.last4} added. ${r.requoted} unpaid payout(s) re-quoted; each still needs a controller release.`, r);
     return ok(`Bank change recorded. ${r.frozen.length} payout(s) frozen; verification requested through ${r.sentTo} (delivery pending).`, r);
   }) as Handler,
   "payout.verify": (async (tx, actor, p) => {

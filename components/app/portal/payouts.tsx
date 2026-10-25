@@ -17,7 +17,7 @@ import { PortalFrame } from "./portal-frame";
 
 export function PortalPayouts() {
   return (
-    <PortalFrame title="Payouts" lede="Where your money goes and what arrives. Fees and exchange rates are shown before anything is sent. Payouts here are test-mode or simulated money.">
+    <PortalFrame title="Payouts" lede="Where your money goes. Fees and exchange rates show before anything is sent.">
       {(s, me) => {
         const mine = s.payouts.filter((p) => p.personId === me.id);
         const frozen = mine.some((p) => p.status === "frozen");

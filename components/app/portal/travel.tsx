@@ -72,7 +72,7 @@ function readOffers(data: Record<string, unknown> | undefined, origin: string): 
 
 export function PortalTravel() {
   return (
-    <PortalFrame title="Travel" lede="Tell Eve where you are flying from. It suggests three fares under the cap that land before check-in; the organizers book the one you pick, so there is nothing to reimburse.">
+    <PortalFrame title="Travel" lede="Pick a fare under the cap. The organizers book it, so there is nothing to reimburse.">
       {(s, me) => <Travel snapshot={s} me={me} />}
     </PortalFrame>
   );
@@ -168,7 +168,7 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
                   {o.returnDepartAt ? <span className="text-small text-muted-foreground">Returns {fmtDateTime(o.returnDepartAt)}</span> : null}
                 </span>
                 <span className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
-                  <TruthLabel kind={o.source === "duffel_test" ? "test" : "simulated"} />
+                  {o.source === "duffel_test" ? <TruthLabel kind="test" /> : null}
                   <span className="flex flex-col items-end">
                     <Money amountMinor={big(o.totalMinor)} currency={o.currency} className="font-semibold" />
                     {o.usdMinor && o.currency !== "USD" ? <Money amountMinor={big(o.usdMinor)} currency="USD" estimate className="text-caption text-muted-foreground" /> : null}
@@ -214,7 +214,7 @@ function Travel({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
         )}
         {requests.some((c) => c.category === "org_booked_flight") ? (
           <p className="text-small text-muted-foreground">
-            Flights you request are booked by the organizers once approved, so you pay nothing and there is nothing to reimburse. Bookings in this demo are simulated.
+            Flights you request are booked by the organizers once approved, so you pay nothing and there is nothing to reimburse.
           </p>
         ) : null}
       </Section>

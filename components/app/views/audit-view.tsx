@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/app/status-badge";
 import { Input } from "@/components/ui/input";
 import type { Decision } from "@/lib/contracts";
 import { exportUrl } from "@/lib/client/api";
+import { objectLabel } from "@/lib/client/derive";
 import { fmtDateTime } from "@/lib/client/format";
 
 export function AuditView() {
@@ -21,7 +22,7 @@ export function AuditView() {
   return (
     <PageFrame
       title="Audit trail"
-      lede={(s) => `${s.decisions.length} decisions logged with their facts, rules, documents, and who acted. Posted ledger entries are immutable; corrections are linked reversals.`}
+      lede={(s) => `${s.decisions.length} decisions logged. Ledger entries are immutable.`}
       actions={() => (
         <>
           <LinkButton href={exportUrl("ledger")} external variant="outline">
@@ -38,9 +39,20 @@ export function AuditView() {
           .filter((d) => type === "all" || d.objectType === type)
           .filter((d) => !q || `${d.objectId} ${d.personName} ${d.summary} ${d.actor} ${d.tool} ${d.ruleId ?? ""}`.toLowerCase().includes(q));
         const columns: Column<Decision>[] = [
-          { key: "obj", header: "Object", stack: "title", sort: (d) => d.objectId, cell: (d) => `${d.objectId} · ${d.personName}` },
-          { key: "sum", header: "Decision", stack: "meta", cell: (d) => d.summary, className: "max-w-[36ch]" },
-          { key: "who", header: "Actor", stack: "meta", sort: (d) => d.actor, cell: (d) => <span>{d.actor} · <span className="font-mono text-caption">{d.tool}{d.ruleId ? ` · ${d.ruleId} v${d.ruleVersion}` : ""}</span></span> },
+          {
+            key: "obj",
+            header: "Object",
+            stack: "title",
+            sort: (d) => d.personName || d.objectId,
+            cell: (d) => (
+              <span className="flex flex-col">
+                {d.personName || objectLabel(d)}
+                <span className="text-caption font-normal text-muted-foreground">{d.personName ? objectLabel({ ...d, personName: "" }) : d.objectId}</span>
+              </span>
+            ),
+          },
+          { key: "sum", header: "Decision", stack: "meta", cell: (d) => <span className="line-clamp-2" title={d.summary}>{d.summary}</span>, className: "max-w-[44ch]" },
+          { key: "who", header: "Actor", stack: "meta", sort: (d) => d.actor, cell: (d) => <span className="whitespace-nowrap">{d.actor}</span> },
           { key: "status", header: "Result", stack: "end", sort: (d) => d.status, cell: (d) => <StatusBadge status={d.status} /> },
           { key: "at", header: "When", align: "end", stack: "end", sort: (d) => d.createdAt, cell: (d) => <span className="text-small whitespace-nowrap text-muted-foreground">{fmtDateTime(d.createdAt)}</span> },
         ];
@@ -55,7 +67,7 @@ export function AuditView() {
               </label>
             </div>
             <DataTable label="Decision log" rows={rows} columns={columns} rowKey={(d) => d.id} onRowClick={setOpen} selectedKey={open?.id} initialSort={{ key: "at", dir: "desc" }} empty={<EmptyState title="No decisions match">Try a person&rsquo;s name, an object id like C-2241, or a rule id.</EmptyState>} />
-            <EvidenceSheet open={open !== null} onOpenChange={(o) => !o && setOpen(null)} title={open ? `${open.objectId} · ${open.personName}` : "Evidence"} objectIds={open ? [open.objectId] : []} decisionId={open?.id} />
+            <EvidenceSheet open={open !== null} onOpenChange={(o) => !o && setOpen(null)} title={open ? objectLabel(open) : "Evidence"} objectIds={open ? [open.objectId] : []} decisionId={open?.id} />
           </>
         );
       }}

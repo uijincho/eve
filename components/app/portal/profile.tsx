@@ -22,7 +22,7 @@ export const COUNTRIES: [string, string][] = [
 
 export function PortalProfile() {
   return (
-    <PortalFrame title="Profile and tax form" lede="Eve needs to know who you are for tax before any money is promised. Your tax ID goes straight to an encrypted vault; Eve only sees its last four digits.">
+    <PortalFrame title="Profile and tax form" lede="Needed for tax before any money is promised. Your tax ID goes straight to an encrypted vault.">
       {(s, me) => (
         <div className="flex max-w-2xl flex-col gap-12">
           <Identity snapshot={s} me={me} key={`id-${me.id}`} />

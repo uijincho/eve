@@ -14,6 +14,7 @@ export function DueChip({
   now,
   context,
   align = "start",
+  inline = false,
   className,
 }: {
   due: Date | string;
@@ -21,6 +22,8 @@ export function DueChip({
   /** What the deadline is, e.g. "2:00 PM release". */
   context?: string;
   align?: "start" | "end";
+  /** Context on the same line as the time, for chips that sit beside a badge. */
+  inline?: boolean;
   className?: string;
 }) {
   const dueDate = new Date(due);
@@ -30,8 +33,8 @@ export function DueChip({
   return (
     <span
       className={cn(
-        "inline-flex flex-col gap-0.5",
-        align === "end" ? "items-end text-right" : "items-start",
+        inline ? "inline-flex items-baseline gap-1.5" : "inline-flex flex-col gap-0.5",
+        !inline && (align === "end" ? "items-end text-right" : "items-start"),
         className,
       )}
     >

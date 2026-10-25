@@ -304,7 +304,7 @@ export function agentActor(orgId: string): ActorContext {
 
 // ---------------------------------------------------------------------- FX
 
-export const FX_FALLBACK_SOURCE = "Seeded reference table (simulated)";
+export const FX_FALLBACK_SOURCE = "Seeded reference table";
 
 /** Converts minor units to USD minor units at the latest stored rate on or before the date. */
 export async function toUsd(db: Executor, amountMinor: bigint, currency: string, on: Date): Promise<{ usdMinor: bigint; fxRate: string; fxSource: string }> {

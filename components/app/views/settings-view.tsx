@@ -25,7 +25,7 @@ export function SettingsView() {
   return (
     <PageFrame
       title="Settings"
-      lede={(s) => `Policy for ${s.org.name}. Eve works inside these limits and cannot change them; every change is logged.`}
+      lede={() => "Eve works inside these limits. Every change is logged."}
     >
       {(s) => (
         <div className="flex max-w-3xl flex-col gap-12">
@@ -99,7 +99,6 @@ function ReadOnlyNote({ permission }: { permission: Permission }) {
 function ModeLabel({ mode }: { mode: string }) {
   const m = mode.toLowerCase();
   if (m.includes("test")) return <TruthLabel kind="test" />;
-  if (m.includes("simul") || m.includes("mock") || m.includes("fixture")) return <TruthLabel kind="simulated" />;
   if (m.includes("estimate")) return <TruthLabel kind="estimate" />;
   return <span className="text-small text-muted-foreground">{mode}</span>;
 }

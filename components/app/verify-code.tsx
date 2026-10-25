@@ -47,38 +47,47 @@ export function VerifyCode({
       </>
     );
   }
+  const confirm = (
+    <ActionButton
+      grow={primary}
+      size={primary ? "default" : "sm"}
+      variant={primary ? "default" : "secondary"}
+      label={primary ? "Confirm new account" : "Confirm account"}
+      pendingLabel="Confirming"
+      call={() => (check() ? payloads.payoutVerify(personId, code, "confirm") : null)}
+    />
+  );
   return (
     <div className="flex w-full flex-col gap-2">
       <label htmlFor={id} className="text-small font-medium">
         {self ? "Code from your original email" : `Code ${first} received at their original email`}
       </label>
-      <Input
-        id={id}
-        inputMode="numeric"
-        autoComplete="one-time-code"
-        maxLength={6}
-        value={code}
-        onChange={(e) => {
-          setCode(e.target.value.replace(/\D/g, ""));
-          setError(null);
-        }}
-        placeholder="123456"
-        aria-invalid={error ? true : undefined}
-        aria-describedby={`${id}-help`}
-        className="max-w-40 tabular-nums tracking-[0.2em]"
-      />
-      <p id={`${id}-help`} className={error ? "text-small text-critical" : "text-small text-muted-foreground"}>
-        {error ?? (self ? "Confirming moves your payout to the new account. A controller then releases it again." : "Confirming re-quotes the payout on the new account; a controller must release it again.")}
-      </p>
       <div className="flex flex-wrap items-center gap-2">
-        <ActionButton
-          wide={primary}
-          size={primary ? "default" : "sm"}
-          variant={primary ? "default" : "secondary"}
-          label={primary ? "Confirm new account" : "Confirm account"}
-          pendingLabel="Confirming"
-          call={() => (check() ? payloads.payoutVerify(personId, code, "confirm") : null)}
+        <Input
+          id={id}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          value={code}
+          onChange={(e) => {
+            setCode(e.target.value.replace(/\D/g, ""));
+            setError(null);
+          }}
+          placeholder="123456"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error || primary || self ? `${id}-help` : undefined}
+          className="w-32 shrink-0 tabular-nums tracking-[0.2em]"
         />
+        {primary ? confirm : null}
+      </div>
+      {/* Rows keep only errors; the pane and the portal explain what confirming does. */}
+      {error || primary || self ? (
+        <p id={`${id}-help`} className={error ? "text-small text-critical" : "text-small text-muted-foreground"}>
+          {error ?? (self ? "A controller releases your payout again after you confirm." : "Confirming re-quotes the payout; a controller releases it again.")}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {primary ? null : confirm}
         <ActionButton
           variant="ghost"
           label={primary ? "Reject change" : "Reject"}

@@ -120,7 +120,7 @@ describe.skipIf(!hasDatabase)("independent financial review fixes (real Postgres
     expect(approved.ok, approved.message).toBe(true);
     const [after] = await db.select().from(s.claim).where(eq(s.claim.id, claim.id));
     expect(after.status).toBe("paid");
-    expect(after.reason).toMatch(/simulated/i);
+    expect(after.reason).toMatch(/Booked by the organization/);
     expect(await db.select().from(s.payout).where(eq(s.payout.claimId, claim.id))).toHaveLength(0);
     const [entry] = await db.select().from(s.journalEntry).where(eq(s.journalEntry.idempotencyKey, `org-booking:${claim.id}`));
     const lines = await db.select().from(s.journalLine).where(eq(s.journalLine.entryId, entry.id));

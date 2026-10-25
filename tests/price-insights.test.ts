@@ -58,7 +58,7 @@ describe("market fare check", () => {
     expect(r.evidence).toMatchObject({ basis: "typical_high", capturedOn: "2026-09-01", referenceMinor: "38000", deltaMinor: "11512", flagged: true });
     expect(r.evidence?.priceOnDateMinor).toBe("31500");
     expect(r.check?.passed).toBe(false);
-    expect(failedCheckText(r.check!)).toBe("High for the market: $495.12 is 30% above the typical high of $380.00 (simulated fare table, 2026-09-01; Simulated; lowest on the booking date $315.00)");
+    expect(failedCheckText(r.check!)).toBe("High for the market: $495.12 is 30% above the typical high of $380.00 (fare table, 2026-09-01; lowest on the booking date $315.00)");
     // 25% margin: $475.00 passes, $475.01 flags.
     expect(checkFareMarket({ usdMinor: 47500n, purchasedAt: "2026-10-03T14:00:00Z", snapshots: snaps }).check?.passed).toBe(true);
     expect(checkFareMarket({ usdMinor: 47501n, purchasedAt: "2026-10-03T14:00:00Z", snapshots: snaps }).check?.passed).toBe(false);

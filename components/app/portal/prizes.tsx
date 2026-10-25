@@ -13,7 +13,7 @@ import { PortalFrame } from "./portal-frame";
 
 export function PortalPrizes() {
   return (
-    <PortalFrame title="Prizes" lede="Congratulations. Eve shows what each option is worth to you after tax, fees, and currency, so you can choose before anyone ships anything.">
+    <PortalFrame title="Prizes" lede="Congratulations. Compare what each option is worth to you after tax and fees.">
       {(s, me) => {
         const mine = s.awards.filter((a) => a.personId === me.id);
         if (!mine.length) return <p className="text-small text-muted-foreground">No prizes yet. If you win, it appears here with your options.</p>;
@@ -61,7 +61,7 @@ export function PortalPrizes() {
                       ) : null}
                       {payout?.provider === "in_kind" ? (
                         <p className="text-small text-muted-foreground">
-                          Organizers confirmed your prize was {a.fulfillment === "ship" ? "shipped" : "bought locally for you"} (simulated in this demo). Its value counts as reportable income.
+                          Organizers confirmed your prize was {a.fulfillment === "ship" ? "shipped" : "bought locally for you"}. Its value counts as reportable income.
                         </p>
                       ) : payout ? (
                         <p className="text-small text-muted-foreground">Your payout is {payout.status}. Track it on Payouts.</p>

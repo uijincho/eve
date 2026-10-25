@@ -318,10 +318,11 @@ Body-size links in Graphite, 10px corners. The current item is an Ink pill with 
 White, hairline, 15px corners, 20px padding. A card head is a Subheading title, a Graphite caption, and an optional "Open X →" link at the right in Small 600.
 
 ### Pills and Truth Labels
-- **Pills:** 20px, caption at 600. Positive: Moss on a 25% lime tint. Pending: Burnt Apricot on a 25% apricot tint. Critical: Brick on a 10% tint. Neutral: Graphite on Stone.
-- **Truth labels:** 20px squared labels with a hairline and Graphite caption: "Sample data", "Test mode", "Simulated", "Estimate"; "Unverified rule" takes a dashed Field Edge border. The Overview title always carries "Simulated".
+- **Pills:** 20px, caption at 600. Positive: Moss on a 25% lime tint. Pending: Burnt Apricot on a 25% apricot tint, for anything that needs a person (Escalated, Held, Needs form). Critical: Brick on a 10% tint. Neutral: Graphite on Stone.
+- **Chips over sentences:** a row states its blockers as short pills ("Over limit", "W-8BEN expired", "Frozen") with the full sentence as the pill's title; the detail pane carries the sentence. Airports are outline pills ("YYZ"); airlines are their logo on a white pill (`components/eve/airline.tsx`, SVGs in `public/airlines/` by IATA code).
+- **Truth labels:** 20px squared labels with a hairline and Graphite caption: "Sample data", "Test mode", "Estimate"; "Unverified rule" takes a dashed Field Edge border. Simulated money and providers are the demo's default and carry no label.
 
-**The Truth Label Rule.** Anything that is not real money, real data or a verified rule carries a truth label. Simulation is never implied by colour alone.
+**The Truth Label Rule.** Estimates, test-mode money and unverified rules carry a truth label. Simulated providers are the demo default and stay unlabelled.
 
 ### Overview patterns
 - **Budget hero:** remaining budget in Display, then one column per budget line on a shared scale: the cap as a Stone column, spent in Ink at the bottom, committed hatched apricot above it. Clicking a column selects it (paper fill behind it) and shows its spent, committed, cap and funding source beneath a hairline.
@@ -342,7 +343,7 @@ Unchanged in behaviour: a 6px dusk dot with time remaining in Small 600 and its 
 **The Fixed Scale Rule.** Bars meant for comparison share one scale.
 
 ### Inbox Row, Blocked Action, Tables, Empty States
-Rows: title in body 600, a Graphite meta line and the reason, amount, due chip, actions beneath; hover lifts to white, selection to Stone. A blocked action stays visible, disabled but focusable, with the reason beside it ("Ari Novak is the controller"). Tables right-align figures and become stacked lists under 768px. Empty states are a dashed hairline box with one sentence saying what will appear.
+Rows: who in body 600 with state chips beside it, one Graphite meta line, amount and due chip at the right, actions beneath; the reason in full lives in the detail pane; hover lifts to white, selection to Stone. A blocked action stays visible, disabled but focusable, with the reason beside it ("Ari Novak is the controller"). Tables right-align figures and become stacked lists under 768px. Empty states are a dashed hairline box with one sentence saying what will appear.
 
 ## Do's and Don'ts
 
@@ -351,7 +352,7 @@ Rows: title in body 600, a Graphite meta line and the reason, amount, due chip, 
 - **Do** use lime for money in or ready, apricot for pending, hatching for estimates.
 - **Do** name the blocker: a missing W-8BEN, a frozen bank change, an unconfirmed split.
 - **Do** keep one Ink primary per view.
-- **Do** put a truth label on anything sample, simulated, test-mode, estimated or unverified.
+- **Do** put a truth label on anything estimated, test-mode or unverified.
 - **Do** route every amount through `Money`.
 - **Do** keep dusk hues for deadlines.
 

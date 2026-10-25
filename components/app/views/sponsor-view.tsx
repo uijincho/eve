@@ -16,7 +16,6 @@ import { EmptyState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { DueChip } from "@/components/eve/due-chip";
 import { Money } from "@/components/eve/money";
-import { TruthLabel } from "@/components/eve/truth-label";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, SponsorPacket } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
@@ -30,7 +29,7 @@ export function SponsorView() {
   return (
     <PageFrame
       title="Sponsor"
-      lede={(s) => `${s.org.sponsorName} holds the bank account and pays within about ${s.org.sponsorTurnaroundDays} days. Eve prepares each packet; remittance differences stay open until someone reconciles them.`}
+      lede={(s) => `${s.org.sponsorName} pays within about ${s.org.sponsorTurnaroundDays} days.`}
     >
       {(s) => {
         if (s.org.mode === "direct")
@@ -51,10 +50,6 @@ export function SponsorView() {
         ];
         return (
           <>
-            <div className="flex items-center gap-2">
-              <TruthLabel kind="simulated" />
-              <span className="text-small text-muted-foreground">The sponsor is a simulated counterparty for this demo.</span>
-            </div>
             <DataTable label="Sponsor packets" rows={s.packets} columns={columns} rowKey={(k) => k.id} onRowClick={(k) => setOpenId(k.id)} selectedKey={openId} initialSort={{ key: "due", dir: "asc" }} empty={<EmptyState title="No packets yet">Approved payouts in sponsor mode become packets with the request and its supporting documents.</EmptyState>} />
             {candidates.length ? (
               <Section title="Ready for a packet" aside={`${candidates.length} ${candidates.length === 1 ? "payout" : "payouts"} awaiting release`}>
@@ -129,11 +124,11 @@ function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snaps
             {!portalBusy ? (
               <>
                 <ActionButton wide size="default" variant="secondary" label="Have Eve fill the sponsor portal" pendingLabel="Starting" permission={manage} call={payloads.portalStart(k.id)} />
-                <p className="text-small text-muted-foreground">Eve enters this packet on the sponsor&apos;s portal (a fictional demo portal) on a locked-down desktop and stops before the final Submit for a controller.</p>
+                <p className="text-small text-muted-foreground">Eve fills the sponsor&apos;s portal and stops before Submit for a controller.</p>
               </>
             ) : null}
             <ActionButton wide size="default" variant="default" label="Authorize and submit to sponsor" pendingLabel="Submitting" permission={portalBusy ? { allowed: false, reason: "Eve is entering this packet on the sponsor portal. Approve or stop that run instead, so it is not submitted twice." } : control} call={payloads.sponsorSubmit(k.id)} />
-            <p className="text-small text-muted-foreground">Submitting is the release: the sponsor pays from this packet. Organizers prepare packets; a controller submits them.</p>
+            <p className="text-small text-muted-foreground">Submitting is the release: the sponsor pays from this packet.</p>
           </>
         ) : k.status === "exception" || k.status === "questioned" ? (
           <>

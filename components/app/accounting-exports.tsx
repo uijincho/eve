@@ -47,7 +47,7 @@ export function AccountingExports() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <TruthLabel kind="test" />
-        <span className="text-small text-muted-foreground">For a QuickBooks sandbox or test company. The ledger holds simulated and test-mode money.</span>
+        <span className="text-small text-muted-foreground">For a QuickBooks sandbox or test company.</span>
       </div>
       <div className="grid gap-4 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-end">
         <Field label="Company date format">

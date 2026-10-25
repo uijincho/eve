@@ -4,13 +4,12 @@ import { useState } from "react";
 
 import { ActionButton } from "@/components/app/action-button";
 import { ResolveRule } from "@/components/app/resolve-rule";
-import { TruthLabel } from "@/components/eve/truth-label";
 import type { AppSnapshot, Award } from "@/lib/contracts";
 import { canFulfill } from "@/lib/client/derive";
 import { payloads } from "@/lib/client/payloads";
 
 /**
- * Confirms an item prize was shipped or bought locally. Delivery is simulated;
+ * Confirms an item prize was shipped or bought locally. Eve ships nothing;
  * the server books the item's fair market value as reportable income and any
  * withholding the organization pays on top.
  */
@@ -44,10 +43,7 @@ export function FulfillAction({ award: a, snapshot: s, layout = "pane" }: { awar
         </div>
       ) : null}
       {pane ? (
-        <p className="flex flex-wrap items-center gap-2 text-small text-muted-foreground">
-          <TruthLabel kind="simulated" />
-          Eve does not ship or buy anything. Confirming records the delivery and reports the item&rsquo;s value as income.
-        </p>
+        <p className="text-small text-muted-foreground">Confirming records the delivery and reports the item&rsquo;s value as income.</p>
       ) : null}
     </div>
   );

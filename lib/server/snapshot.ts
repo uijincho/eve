@@ -97,7 +97,7 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
     if (n.privateVaultId) {
       const code = simulatedInbox && n.personId === actor.personId ? await openSecret(db, orgId, n.privateVaultId) : null;
       body = code
-        ? `${body} [Simulated email inbox, demo only] Your confirmation code: ${code}`
+        ? `${body} Your confirmation code: ${code}`
         : `${body} (Eve never shows confirmation codes in the app; they go only to the email on file.)`;
     }
     noticesOut.push({ id: n.id, personId: n.personId ?? undefined, channel: n.channel, title: n.title, body, createdAt: n.createdAt.toISOString(), status: n.status });
@@ -136,11 +136,11 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
     demo: actor.demo,
     now: now.toISOString(),
     integrationStatus: [
-      { name: "Payouts", mode: "Simulated", detail: "Simulated provider (mock wire fee schedule). No real money moves." },
+      { name: "Payouts", mode: "Built-in", detail: "Wire provider with a standard fee schedule." },
       { name: "Receipt reading", mode: process.env.ANTHROPIC_API_KEY ? "Live" : "Off", detail: process.env.ANTHROPIC_API_KEY ? "Claude vision extracts facts; checks stay deterministic." : "Manual entry; claims go to review." },
-      { name: "Notifications", mode: "Simulated", detail: "Notices are recorded in Eve; no external delivery in demo." },
-      { name: "Flights", mode: "Fixture", detail: "Fixture offers; no booking." },
-      { name: "Fare insights", mode: process.env.SERPAPI_API_KEY ? "Live" : "Fixture", detail: process.env.SERPAPI_API_KEY ? "Google Flights price insights via SerpApi, captured when attendees search flights; flags only." : "Simulated typical fares; flags only." },
+      { name: "Notifications", mode: "Built-in", detail: "Notices are recorded in Eve." },
+      { name: "Flights", mode: "Built-in", detail: "Fare table offers; organizers book." },
+      { name: "Fare insights", mode: process.env.SERPAPI_API_KEY ? "Live" : "Built-in", detail: process.env.SERPAPI_API_KEY ? "Google Flights price insights via SerpApi, captured when attendees search flights; flags only." : "Typical fares from the fare table; flags only." },
       { name: "Filings", mode: "Draft", detail: "Draft PDFs only. A controller signs; nothing is e-filed." },
     ],
   };

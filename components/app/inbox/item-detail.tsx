@@ -1,19 +1,20 @@
 "use client";
 
-import { PenLineIcon } from "lucide-react";
+import { FileTextIcon } from "lucide-react";
 
 import { CheckList } from "@/components/app/evidence-sheet";
 import { PortalRunPanel } from "@/components/app/portal-run-panel";
 import { PrizeComparison } from "@/components/app/prize-comparison";
 import { StatusBadge } from "@/components/app/status-badge";
+import { Airline, Airport } from "@/components/eve/airline";
 import { BreakdownBar } from "@/components/eve/breakdown-bar";
 import { DueChip } from "@/components/eve/due-chip";
 import { Evidence } from "@/components/eve/evidence";
 import { Money } from "@/components/eve/money";
+import { TagList } from "@/components/eve/tag-list";
 import { TruthLabel } from "@/components/eve/truth-label";
-import { Badge } from "@/components/ui/badge";
 import type { AppSnapshot, Payout } from "@/lib/contracts";
-import { big, type InboxItem, payoutFees, payoutSource, providerLabel, isInKind, payoutValue, claimStatusLabel, projectStatusLabel } from "@/lib/client/derive";
+import { big, type InboxItem, payoutFees, payoutSource, providerLabel, isInKind, payoutValue, projectStatusLabel } from "@/lib/client/derive";
 import { useEve } from "@/lib/client/use-eve";
 import { documentUrl } from "@/lib/client/api";
 import { fmtDateTime } from "@/lib/client/format";
@@ -31,25 +32,28 @@ export function ItemDetail({
   onEvidence: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
-        <h2 className="text-subheading">{item.title}</h2>
-        <p className="text-small text-muted-foreground">{item.meta}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <DueChip due={item.dueAt} now={snapshot.now} context={`Due for ${item.dueContext}, ${fmtDateTime(item.dueAt)}`} />
-          {item.critical ? <Badge variant="critical">{item.critical}</Badge> : null}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <h2 className="text-subheading">{item.title}</h2>
+            <p className="text-small text-muted-foreground">{item.meta}</p>
+          </div>
+          <Money amountMinor={item.amountMinor} currency={item.currency} className="pt-0.5 text-subheading" />
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <TagList tags={item.tags} />
+          <span title={`Due for ${item.dueContext}, ${fmtDateTime(item.dueAt)}`}>
+            <DueChip due={item.dueAt} now={snapshot.now} context={item.dueContext} inline />
+          </span>
         </div>
       </div>
 
-      {item.detail ? <p className="max-w-[60ch] text-small">{item.detail}</p> : null}
+      {item.detail ? <p className="max-w-[60ch] text-small text-muted-foreground">{item.detail}</p> : null}
 
       <DetailBody item={item} snapshot={snapshot} />
 
-      <div className="flex flex-col gap-3 border-t pt-4">
-        <p className="flex items-start gap-2 text-small text-muted-foreground">
-          <PenLineIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
-          Eve prepares and explains. A human controller signs.
-        </p>
+      <div className="border-t pt-4">
         <ItemActions item={item} snapshot={snapshot} layout="pane" onEvidence={onEvidence} />
       </div>
     </div>
@@ -64,7 +68,7 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
     case "award":
       return <PrizeComparison snapshot={snapshot} award={ref.award} person={ref.person} payout={ref.payout} />;
     case "payout":
-      return <PayoutBreakdown payout={ref.payout} showStatus={!item.critical} />;
+      return <PayoutBreakdown payout={ref.payout} showStatus={false} showUnverified={!item.tags.some((t) => t.label === "Unverified rule")} />;
     case "payouts":
       return (
         <ul aria-label="Payouts in this batch" className="flex flex-col divide-y rounded-xl border">
@@ -73,7 +77,7 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
               <span className="flex min-w-0 flex-col">
                 <span className="truncate font-medium">{p.personName}</span>
                 <span className="truncate text-caption text-muted-foreground">
-                  {snapshot ? payoutSource(snapshot, p) : p.sourceType === "award" ? "Prize" : "Claim"} · {providerLabel(p.provider)}
+                  {snapshot ? payoutSource(snapshot, p) : p.sourceType === "award" ? "Prize" : "Claim"}
                 </span>
               </span>
               <span className="flex flex-col items-end">
@@ -90,7 +94,7 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
       const c = ref.claim;
       return (
         <div className="flex flex-col gap-4">
-          <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-small">
+          <dl className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 text-small">
             <dt className="text-muted-foreground">Receipt</dt>
             <dd className="text-right">
               <Money amountMinor={big(c.amountMinor)} currency={c.currency} />
@@ -105,12 +109,14 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
                 </dd>
               </>
             ) : null}
-            <dt className="text-muted-foreground">Merchant</dt>
-            <dd className="text-right">{c.merchant}</dd>
-            <dt className="text-muted-foreground">Status</dt>
-            <dd className="text-right">
-              <StatusBadge status={c.status} label={claimStatusLabel(c)} />
-            </dd>
+            <dt className="text-muted-foreground">{c.type === "travel" ? "Airline" : "Merchant"}</dt>
+            <dd className="flex justify-end">{c.type === "travel" ? <Airline name={c.merchant} withName /> : c.merchant}</dd>
+            {c.type === "travel" && c.origin ? (
+              <>
+                <dt className="text-muted-foreground">From</dt>
+                <dd className="flex justify-end"><Airport code={c.origin} /></dd>
+              </>
+            ) : null}
             {c.type === "travel" ? (
               <>
                 <dt className="text-muted-foreground">Project</dt>
@@ -120,8 +126,9 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
           </dl>
           <CheckList checks={c.checks} />
           {c.documentId ? (
-            <a href={documentUrl(c.documentId)} target="_blank" rel="noreferrer" className="self-start text-small underline decoration-faint decoration-dotted underline-offset-4 hover:decoration-foreground">
-              Open receipt{c.receiptName ? ` (${c.receiptName})` : ""}
+            <a href={documentUrl(c.documentId)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 self-start text-small underline decoration-faint decoration-dotted underline-offset-4 hover:decoration-foreground">
+              <FileTextIcon aria-hidden className="size-3.5" />
+              Open receipt
             </a>
           ) : null}
         </div>
@@ -158,17 +165,19 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
   }
 }
 
-export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payout; showStatus?: boolean }) {
+export function PayoutBreakdown({ payout: p, showStatus = true, showUnverified = true }: { payout: Payout; showStatus?: boolean; showUnverified?: boolean }) {
   const estimate = p.truth === "Estimate";
   const fees = payoutFees(p);
   const { snapshot } = useEve();
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {showStatus ? <StatusBadge status={p.status} /> : null}
-        <TruthLabel kind={p.truth === "Test mode" ? "test" : p.truth === "Simulated" ? "simulated" : p.truth === "Estimate" ? "estimate" : "unverified"} />
-        {!p.ruleVerified && p.truth !== "Unverified rule" ? <TruthLabel kind="unverified" /> : null}
-      </div>
+      {showStatus || estimate || (showUnverified && !p.ruleVerified) ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {showStatus ? <StatusBadge status={p.status} /> : null}
+          {estimate ? <TruthLabel kind="estimate" /> : null}
+          {showUnverified && !p.ruleVerified ? <TruthLabel kind="unverified" /> : null}
+        </div>
+      ) : null}
       <BreakdownBar
         grossMinor={Number(big(p.grossMinor))}
         currency={p.currency}
@@ -182,7 +191,7 @@ export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payo
       <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-small">
         {fees.org ? (
           <>
-            <dt className="text-muted-foreground">Fees paid by the organization</dt>
+            <dt className="text-muted-foreground">Fees the organization pays</dt>
             <dd className="text-right">
               <Money amountMinor={fees.org} currency={p.currency} />
             </dd>
@@ -192,12 +201,12 @@ export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payo
           <>
             <dt className="text-muted-foreground">Received in {p.destinationCurrency}</dt>
             <dd className="text-right">
-              <Evidence source={`FX ${p.fxRate}`}>
-                <Money amountMinor={big(p.destinationNetMinor)} currency={p.destinationCurrency} estimate={p.status !== "paid"} />
-              </Evidence>
+              <Money amountMinor={big(p.destinationNetMinor)} currency={p.destinationCurrency} estimate={p.status !== "paid"} />
             </dd>
-            <dt className="text-muted-foreground">Destination rate</dt>
-            <dd className="max-w-48 text-right tabular-nums">1 {p.currency} = {p.fxRate} {p.destinationCurrency}</dd>
+            <dd className="col-span-2 -mt-1 text-right text-caption text-muted-foreground tabular-nums">
+              1 {p.currency} = {p.fxRate} {p.destinationCurrency}
+              {p.provider === "mock_wire" ? " · incl. 2% FX spread" : ""}
+            </dd>
           </>
         ) : null}
         <dt className="text-muted-foreground">Rule</dt>
@@ -211,11 +220,8 @@ export function PayoutBreakdown({ payout: p, showStatus = true }: { payout: Payo
           </>
         ) : null}
       </dl>
-      {!isInKind(p) && p.provider === "mock_wire" && p.destinationCurrency !== p.currency ? (
-        <p className="text-small text-muted-foreground">Simulated wire uses USD books, even for a CAD prize paid to a CAD account. The simulator schedule includes a 2% FX spread and a wire fee. The books conversion and destination quote can use different dated reference rates; domestic payment routing is not modeled.</p>
-      ) : null}
       {fees.recipient > 0n && fees.recipient * 10n >= big(p.grossMinor) ? (
-        <p className="text-small">Transfer fees consume at least 10% of this payment. Review the net amount before release; the organizer can choose to cover fees in Settings.</p>
+        <p className="text-small">Transfer fees consume at least 10% of this payment. You can cover fees in Settings.</p>
       ) : null}
     </div>
   );

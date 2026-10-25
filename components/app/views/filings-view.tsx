@@ -20,8 +20,8 @@ export function FilingsView() {
       title="Filings"
       lede={(s) =>
         s.org.country === "CA"
-          ? "Draft T4A and NR4 worksheets per person, in Canadian dollars with the conversion shown. Eve prepares and explains; a human controller signs. Drafts are not filed returns."
-          : "Draft year-end forms per person from the ledger. Eve prepares and explains; a human controller signs. Drafts are not submitted returns."
+          ? "Draft T4A and NR4 worksheets in Canadian dollars. A controller signs."
+          : "Draft year-end forms from the ledger. A controller signs."
       }
       actions={(s) => (
         <>

@@ -1,6 +1,6 @@
 "use client";
 
-import { DownloadIcon, LoaderCircleIcon } from "lucide-react";
+import { DownloadIcon, LoaderCircleIcon, ScrollTextIcon } from "lucide-react";
 import { useState } from "react";
 
 import { ActionButton } from "@/components/app/action-button";
@@ -37,7 +37,7 @@ export function PayoutsView() {
   return (
     <PageFrame
       title="Payouts"
-      lede={(s) => `Eve proposes payouts with withholding, fees, and FX shown up front. Only a controller releases money; ${s.org.mode === "direct" ? "payouts run through the test provider" : "sponsor-mode payouts become packets"}.`}
+      lede={(s) => `${s.payouts.filter((p) => p.status === "proposed" || p.status === "approved").length} ready for the controller.`}
       actions={() => (
         <LinkButton href={exportUrl("payouts")} external variant="outline">
           <DownloadIcon aria-hidden />
@@ -66,7 +66,7 @@ export function PayoutsView() {
 
         const columns: Column<Payout>[] = [
           { key: "who", header: "Recipient", stack: "title", sort: (p) => p.personName, cell: (p) => p.personName },
-          { key: "src", header: "For", stack: "meta", cell: (p) => `${payoutSource(s, p)} · ${providerLabel(p.provider)}` },
+          { key: "src", header: "For", stack: "meta", cell: (p) => payoutSource(s, p) },
           { key: "status", header: "Status", stack: "end", sort: (p) => p.status, cell: (p) => <StatusBadge status={p.status} /> },
           { key: "gross", header: "Gross", align: "end", stack: "hide", sort: (p) => big(p.grossMinor), cell: (p) => <Money amountMinor={big(p.grossMinor)} currency={p.currency} /> },
           { key: "wh", header: "Withheld", align: "end", stack: "hide", cell: (p) => <Money amountMinor={-big(p.withholdingMinor)} currency={p.currency} signDisplay="exceptZero" /> },
@@ -115,7 +115,7 @@ export function PayoutsView() {
                   </span>
                   <span className="text-small text-muted-foreground">
                     {chosen.length
-                      ? "Release sends test-mode money through the provider."
+                      ? "Release sends them by wire."
                       : releasable.length
                         ? "Select payouts to release, or release all you may release."
                         : ready.length
@@ -178,7 +178,7 @@ export function PayoutsView() {
               empty={<EmptyState title="No payouts here">Payouts appear when an approved claim or a prize with a valid tax form is proposed.</EmptyState>}
             />
 
-            <Sheet open={selected !== undefined} onOpenChange={(o) => !o && setOpenId(null)} title={selected ? `Payout to ${selected.personName}` : "Payout"} description={selected ? payoutSource(s, selected) : undefined}>
+            <Sheet open={selected !== undefined} onOpenChange={(o) => !o && setOpenId(null)} title={selected?.personName ?? "Payout"} description={selected ? payoutSource(s, selected) : undefined}>
               {selected ? <PayoutDetail payout={selected} snapshot={s} onEvidence={() => setEvidence(selected)} /> : null}
             </Sheet>
             <EvidenceSheet open={evidence !== null} onOpenChange={(o) => !o && setEvidence(null)} title={evidence ? `Payout ${evidence.id}` : "Evidence"} objectIds={evidence ? [evidence.id, evidence.sourceId] : []} />
@@ -203,14 +203,17 @@ function PayoutDetail({ payout: p, snapshot: s, onEvidence }: { payout: Payout; 
             Release accepted. Sending through {providerLabel(p.provider)}; this updates on its own.
           </p>
         ) : (
-          <DueChip due={p.dueAt} now={s.now} context="release" />
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <StatusBadge status={p.status} />
+            <DueChip due={p.dueAt} now={s.now} context="release" inline />
+          </span>
         )}
-        {p.reason ? <p className="text-small">{p.reason}</p> : null}
+        {p.reason ? <p className="text-small text-muted-foreground">{p.reason}</p> : null}
       </div>
       {releaseStopped(s, p) ? (
         <p role="alert" className="text-small text-critical">Release stopped: {releaseStopped(s, p)!.summary}</p>
       ) : null}
-      <PayoutBreakdown payout={p} />
+      <PayoutBreakdown payout={p} showStatus={p.status === "paid" || releaseInFlight(s, p)} />
       <div className="flex flex-col gap-2 border-t pt-4">
         {p.status === "frozen" ? (
           <VerifyCode personId={p.personId} personName={p.personName} permission={manage} primary />
@@ -221,8 +224,9 @@ function PayoutDetail({ payout: p, snapshot: s, onEvidence }: { payout: Payout; 
         ) : p.status === "proposed" || p.status === "approved" || p.status === "held" ? (
           <ActionButton wide size="default" variant="default" label="Release payout" pendingLabel="Releasing" permission={release} call={payloads.payoutRelease([p.id])} />
         ) : null}
-        <Button size="sm" variant="ghost" className="self-start" onClick={onEvidence}>
-          View evidence
+        <Button size="sm" variant="ghost" className="-ml-2.5 self-start" onClick={onEvidence}>
+          <ScrollTextIcon aria-hidden />
+          Evidence
         </Button>
       </div>
     </div>

@@ -154,9 +154,9 @@ export default function DesignPage() {
               When segregation of duties stops you, the action stays visible and
               disabled, with the reason beside it.
             </Principle>
-            <Principle term="Estimates and simulations say so">
-              Truth labels mark anything that is not real money, real data, or a
-              verified rule.
+            <Principle term="Estimates say so">
+              Truth labels mark estimates, sample data, test mode, and
+              unverified rules.
             </Principle>
           </dl>
         </Section>
@@ -340,18 +340,18 @@ export default function DesignPage() {
           <Specimen
             id="badges"
             title="Badges and labels"
-            note="Badges carry state. Truth labels carry honesty: anything simulated, estimated, sample, or unverified says so."
+            note="Badges carry state. Truth labels carry honesty: anything estimated, sample, test-mode, or unverified says so."
           >
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="critical">Frozen</Badge>
               <Badge variant="positive">Paid</Badge>
+              <Badge variant="pending">Escalated</Badge>
               <Badge variant="outline">Held</Badge>
               <Badge variant="secondary">Draft</Badge>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <TruthLabel kind="sample" />
               <TruthLabel kind="test" />
-              <TruthLabel kind="simulated" />
               <TruthLabel kind="estimate" />
               <TruthLabel kind="unverified" />
             </div>

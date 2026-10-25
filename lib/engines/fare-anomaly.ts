@@ -143,7 +143,7 @@ export interface MarketEvidence {
   flagged: boolean;
 }
 
-const SOURCE_NAME: Record<string, string> = { serpapi: "Google Flights via SerpApi", fixture: "simulated fare table", duffel_test: "Duffel test mode" };
+const SOURCE_NAME: Record<string, string> = { serpapi: "Google Flights via SerpApi", fixture: "fare table", duffel_test: "Duffel test mode" };
 
 /** The snapshot closest to the booking date: the latest taken on or before it, else the earliest after it. */
 function nearest<T extends { capturedOn: string }>(rows: readonly T[], day: string): T | undefined {
@@ -175,7 +175,8 @@ export function checkFareMarket(input: { usdMinor: bigint; purchasedAt: string; 
   const onDate = snap.history?.find((h) => h.date === day)?.minor;
   const aboveBps = ((input.usdMinor - reference) * 10_000n) / reference;
   const what = insights ? `the typical high of ${formatMoney(reference)}` : `the cheapest tracked fare of ${formatMoney(reference)}`;
-  const where = `${SOURCE_NAME[snap.source] ?? snap.source}, ${snap.capturedOn}; ${snap.truth}`;
+  // The fixture table is the demo default; only a test-mode source still says so.
+  const where = `${SOURCE_NAME[snap.source] ?? snap.source}, ${snap.capturedOn}${snap.truth === "Test mode" ? "; Test mode" : ""}`;
   const dated = onDate ? `; lowest on the booking date ${formatMoney(BigInt(onDate))}` : "";
   const detail = flagged
     ? `${formatMoney(input.usdMinor)} is ${aboveBps / 100n}% above ${what} (${where}${dated}). Flag for review; there may be a good reason.`

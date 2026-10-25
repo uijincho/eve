@@ -17,7 +17,7 @@ import { PortalFrame } from "./portal-frame";
 export function PortalClaims() {
   const [submitted, setSubmitted] = useState<string | null>(null);
   return (
-    <PortalFrame title="Claims" lede="Upload a receipt and Eve checks it against the travel policy: your name, dates, cabin, the cap after currency conversion, and duplicates.">
+    <PortalFrame title="Claims" lede="Upload a receipt and Eve checks it against the travel policy.">
       {(s, me) => {
         const mine = s.claims.filter((c) => c.personId === me.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         return (

@@ -9,7 +9,6 @@ import { Field, NativeSelect } from "@/components/app/field";
 import { LinkButton } from "@/components/app/link-button";
 import { ResultText } from "@/components/app/result-text";
 import { ListSkeleton } from "@/components/app/states";
-import { TruthLabel } from "@/components/eve/truth-label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/client/api";
@@ -171,13 +170,10 @@ function SetupForm({ userName, onCreated }: { userName: string; onCreated: () =>
           ))}
         </fieldset>
         {mode !== "direct" ? (
-          <Field label="Fiscal sponsor" help="Optional now. The sponsor stays a simulated counterparty until connected.">
+          <Field label="Fiscal sponsor" help="Optional now.">
             {(p) => <Input {...p} value={sponsorName} onChange={(e) => setSponsorName(e.target.value)} />}
           </Field>
         ) : null}
-        <p className="flex flex-wrap items-center gap-2 text-small text-muted-foreground">
-          <TruthLabel kind="test" /> New organizations move only test-mode or simulated money.
-        </p>
       </fieldset>
 
       <fieldset className="flex flex-col gap-4">

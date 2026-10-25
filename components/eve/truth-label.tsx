@@ -3,7 +3,6 @@ import { cn } from "cn";
 const LABELS = {
   sample: "Sample data",
   test: "Test mode",
-  simulated: "Simulated",
   estimate: "Estimate",
   unverified: "Unverified rule",
 } as const;

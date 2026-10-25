@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
 import { DueChip } from "@/components/eve/due-chip";
 import { Money } from "@/components/eve/money";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResult, AppSnapshot, Award } from "@/lib/contracts";
@@ -37,7 +38,7 @@ export function PrizesView() {
       title="Prizes and winners"
       lede={(s) => {
         const held = s.awards.filter((a) => a.status === "needs_form").length;
-        return `${s.awards.length} prizes entered. ${held} held for a tax form. Item prizes compare shipping, buying locally, and cash.`;
+        return `${s.awards.length} prizes · ${held} held for a tax form.`;
       }}
       actions={(s) =>
         canOrganize(s.actor).allowed ? (
@@ -56,15 +57,43 @@ export function PrizesView() {
         const selected = s.awards.find((a) => a.id === openId);
         const people = new Map(s.people.map((p) => [p.id, p]));
         const columns: Column<Award>[] = [
-          { key: "winner", header: "Winner", stack: "title", sort: (a) => a.personName, cell: (a) => a.personName },
-          { key: "prize", header: "Prize", stack: "meta", sort: (a) => a.track, cell: (a) => `${awardName(a, " · ")}${a.teamId ? " · team" : ""}` },
+          {
+            key: "winner",
+            header: "Winner",
+            stack: "title",
+            sort: (a) => a.personName,
+            cell: (a) => (
+              <span className="flex flex-col">
+                {a.personName}
+                <span className="text-caption font-normal text-muted-foreground">{people.get(a.personId)?.country}</span>
+              </span>
+            ),
+          },
+          {
+            key: "prize",
+            header: "Prize",
+            stack: "meta",
+            sort: (a) => a.track,
+            cell: (a) => (
+              <span className="inline-flex flex-wrap items-center gap-1.5">
+                {awardName(a, " · ")}
+                {a.teamId ? <Badge variant="secondary">Team</Badge> : null}
+              </span>
+            ),
+          },
           {
             key: "form",
             header: "Tax form",
             stack: "meta",
             cell: (a) => {
               const p = people.get(a.personId);
-              return p ? `${p.country} · ${p.taxForm} ${p.taxStatus === "valid" ? "valid" : p.taxStatus === "missing" ? "not signed" : p.taxStatus}` : "—";
+              return p ? (
+                <span className="inline-flex items-center gap-2">
+                  {p.taxForm} <StatusBadge status={p.taxStatus} label={p.taxStatus === "missing" ? "Not signed" : undefined} />
+                </span>
+              ) : (
+                "—"
+              );
             },
           },
           { key: "fulfil", header: "Fulfilment", stack: "meta", cell: (a) => (a.kind === "cash" ? "Cash" : FULFILLMENT_LABEL[a.fulfillment]) },
@@ -170,7 +199,7 @@ export function AwardDetail({ award: a, snapshot: s, onEvidence }: { award: Awar
       <div className="flex flex-col gap-2 border-t pt-4">
         {payout?.provider === "in_kind" ? (
           <p className="text-small text-muted-foreground">
-            {a.fulfillment === "ship" ? "Shipped" : "Bought locally"} (simulated){payout.paidAt ? ` ${fmtDateTime(payout.paidAt)}` : ""}. {payout.reason}
+            {a.fulfillment === "ship" ? "Shipped" : "Bought locally"}{payout.paidAt ? ` ${fmtDateTime(payout.paidAt)}` : ""}. {payout.reason}
           </p>
         ) : payout ? (
           <p className="text-small text-muted-foreground">

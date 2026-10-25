@@ -115,8 +115,8 @@ export function ComputerUseLab() {
     <div className="flex min-h-full flex-col">
       <PageHeader
         title="Computer use lab"
-        lede="University finance portals have no API, so a person retypes every sponsor packet. Here Eve's agent fills one on a live desktop while Eve's code enforces the rules. The portal is fictional and nothing is filed or paid."
-        actions={<><TruthLabel kind="sample" /><TruthLabel kind="simulated" /></>}
+        lede="Sponsor portals have no API. Eve's agent fills one on a live desktop while Eve's code enforces the rules."
+        actions={<TruthLabel kind="sample" />}
       >
         <details className="text-small">
           <summary className="w-fit cursor-pointer rounded-sm font-medium">How a run works</summary>
@@ -144,7 +144,7 @@ export function ComputerUseLab() {
         </div>
 
         <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1">
-          <Panel title="Sponsor portal" badge={<TruthLabel kind="simulated" />}>
+          <Panel title="Sponsor portal">
             <PageTrail state={state} />
             <LiveView state={state} />
           </Panel>

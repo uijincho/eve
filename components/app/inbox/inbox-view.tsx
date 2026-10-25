@@ -11,11 +11,11 @@ import { EmptyState, ErrorState, ListSkeleton } from "@/components/app/states";
 import { DueChip } from "@/components/eve/due-chip";
 import { Horizon } from "@/components/eve/horizon";
 import { Money } from "@/components/eve/money";
-import { Badge } from "@/components/ui/badge";
+import { TagList } from "@/components/eve/tag-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot } from "@/lib/contracts";
-import { buildInbox, groupRuns, runCounters, type InboxCategory, type InboxItem } from "@/lib/client/derive";
+import { buildInbox, type InboxCategory, type InboxItem } from "@/lib/client/derive";
 import { fmtTime } from "@/lib/client/format";
 import { rovingKeyDown } from "@/lib/client/roving";
 import { useEve } from "@/lib/client/use-eve";
@@ -59,10 +59,9 @@ function Inbox({ snapshot }: { snapshot: AppSnapshot }) {
   const q = query.trim().toLowerCase();
   const items = all
     .filter((i) => filter === "all" || i.category === filter)
-    .filter((i) => !q || `${i.title} ${i.meta} ${i.detail}`.toLowerCase().includes(q));
+    .filter((i) => !q || `${i.title} ${i.meta} ${i.detail} ${i.tags.map((t) => t.label).join(" ")}`.toLowerCase().includes(q));
   const selected = items.find((i) => i.id === selectedId) ?? items[0];
   const count = (f: Filter) => (f === "all" ? all.length : all.filter((i) => i.category === f).length);
-  const counters = runCounters(groupRuns(snapshot.decisions), snapshot.now);
   const mobileItem = all.find((i) => i.id === mobileDetail);
 
   const moveSelection = (delta: number) => {
@@ -81,16 +80,10 @@ function Inbox({ snapshot }: { snapshot: AppSnapshot }) {
             <div className="flex flex-col gap-1">
               <h1 className="text-title">Inbox</h1>
               <p className="text-small text-muted-foreground">
-                {all.length
-                  ? `${all.length} ${all.length === 1 ? "item needs" : "items need"} you.`
-                  : "Nothing needs you right now."}{" "}
-                Eve finished {counters.doneToday} {counters.doneToday === 1 ? "run" : "runs"} today and is running {counters.running}.
+                {all.length ? `${all.length} ${all.length === 1 ? "item needs" : "items need"} you.` : "Nothing needs you right now."}
               </p>
             </div>
-            <div className="flex items-start gap-3">
-              <span className="pt-px text-small text-muted-foreground tabular-nums">{fmtTime(snapshot.now)}</span>
-              <DueChip due={snapshot.event.closingAt} now={snapshot.now} context="to closing ceremony" align="end" />
-            </div>
+            <DueChip due={snapshot.event.closingAt} now={snapshot.now} context="to closing ceremony" align="end" />
           </div>
           <Horizon
             items={all.map((i) => ({ id: i.id, label: i.mark, dueAt: i.dueAt }))}
@@ -298,17 +291,15 @@ function CompactRow({
           selected && "bg-surface-hover data-active:bg-surface-hover",
         )}
       >
-        <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="flex items-center gap-2">
+        <span className="flex min-w-0 flex-col gap-1">
+          <span className="flex min-w-0 items-center gap-2">
             <span className="truncate font-semibold">{item.title}</span>
-            {item.critical ? <Badge variant="critical">{item.critical}</Badge> : null}
+            <TagList tags={item.tags} max={2} className="flex-nowrap" />
           </span>
           <span className="truncate text-small text-muted-foreground">{item.meta}</span>
-          <span className="truncate text-small text-muted-foreground">{item.detail}</span>
         </span>
-        <span className="flex flex-col items-end gap-0.5">
+        <span className="flex flex-col items-end gap-1">
           <Money amountMinor={item.amountMinor} currency={item.currency} className="font-semibold" />
-          <span className="text-caption text-muted-foreground">{item.amountNote}</span>
           <DueChip due={item.dueAt} now={now} align="end" />
         </span>
       </button>
@@ -333,17 +324,15 @@ function FullRow({
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-semibold">{item.title}</h3>
-            {item.critical ? <Badge variant="critical">{item.critical}</Badge> : null}
+            <TagList tags={item.tags} max={2} />
           </div>
           <p className="text-small text-muted-foreground">{item.meta}</p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-0.5">
+        <div className="flex shrink-0 flex-col items-end gap-1">
           <Money amountMinor={item.amountMinor} currency={item.currency} className="font-semibold" />
-          <span className="text-caption text-muted-foreground">{item.amountNote}</span>
           <DueChip due={item.dueAt} now={snapshot.now} align="end" />
         </div>
       </div>
-      {item.detail ? <p className="text-small text-muted-foreground">{item.detail}</p> : null}
       <div className="flex flex-wrap items-center gap-2 [&_[data-slot=button]]:h-9 [&>div]:contents">
         <ItemActions
           item={item}

@@ -199,7 +199,7 @@ function RunStatus({ run }: { run: Run }) {
       );
     }
     case "escalated":
-      return <Badge variant="outline">Escalated</Badge>;
+      return <Badge variant="pending">Escalated</Badge>;
     case "frozen":
       return <Badge variant="critical">Frozen</Badge>;
     default:

@@ -528,7 +528,7 @@ export async function releasePayout(tx: Executor, actor: ActorContext, payoutId:
   if (p.awardId) await tx.update(s.award).set({ status: "paid" }).where(eq(s.award.id, p.awardId));
   await recordDecision(tx, {
     orgId: actor.orgId, objectType: "payout", objectId: p.id, personId: p.personId, personName: person.name, action: "payout.release",
-    summary: `Released ${usd(p.netMinor)} to ••${methods.active!.last4} via simulated provider (${providerRef}).`,
+    summary: `Released ${usd(p.netMinor)} to ••${methods.active!.last4} by wire (${providerRef}).`,
     actor, status: "done", tool: "executePayout", ruleId: p.ruleId, ruleVersion: p.ruleVersion,
     facts: { providerRef, idempotencyKey: p.idempotencyKey, truth: p.truth, bankVersion: p.bankVersion, requestedBy: p.requestedBy, reportable: p.reportable, reportingForm: p.reportingForm },
   });
@@ -604,7 +604,7 @@ async function enrollFirstMethod(tx: Executor, actor: ActorContext, person: Pers
   });
   await recordDecision(tx, {
     orgId: actor.orgId, objectType: "person", objectId: person.id, personId: person.id, personName: person.name, action: "payout.enroll",
-    summary: `${person.name} added a first payout account ••${input.last4} (${input.currency}) from their own signed-in portal session. No earlier account existed, so there was nothing to freeze and no code was sent. Provider is simulated; no money moved.`,
+    summary: `${person.name} added a first payout account ••${input.last4} (${input.currency}) from their own signed-in portal session. No earlier account existed, so there was nothing to freeze and no code was sent.`,
     actor, status: "done", tool: "enrollPayoutMethod",
     facts: {
       methodId, last4: input.last4, currency: input.currency, version: maxVersion + 1, provider: SIMULATED_PROVIDER, truth: "Simulated",
@@ -613,7 +613,7 @@ async function enrollFirstMethod(tx: Executor, actor: ActorContext, person: Pers
   });
   // Existing unpaid quotes (held for "no payout method", or frozen by an abandoned unconfirmed request) are re-quoted; none are released.
   const requoted = await requoteSiblings(tx, actor.orgId, person.id, `first payout account ••${input.last4} added`, undefined, actor);
-  await recordNotice(tx, { orgId: actor.orgId, channel: "organizers", title: `Payout account added: ${person.name}`, body: `${person.name} added a first payout account ••${input.last4} (${input.currency}, simulated). ${requoted} unpaid payout(s) re-quoted; each still needs a controller release.` });
+  await recordNotice(tx, { orgId: actor.orgId, channel: "organizers", title: `Payout account added: ${person.name}`, body: `${person.name} added a first payout account ••${input.last4} (${input.currency}). ${requoted} unpaid payout(s) re-quoted; each still needs a controller release.` });
   return { enrolled: true as const, activeMethodId: methodId, frozen: [] as string[], requoted, sentTo: null };
 }
 

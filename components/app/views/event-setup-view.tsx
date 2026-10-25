@@ -56,7 +56,7 @@ export function EventSetupView() {
   return (
     <PageFrame
       title="Event setup"
-      lede={(s) => `${s.event.name} is the event in this workspace; each tab saves to it, in any order. Eve reviews each tab and warns inline.`}
+      lede={(s) => `${s.event.name}. Each tab saves on its own.`}
       toolbar={() => (
         <div ref={tabs} role="tablist" aria-label="Event setup" className="-mb-4 flex gap-1 overflow-x-auto">
           {TABS.map((t) => (

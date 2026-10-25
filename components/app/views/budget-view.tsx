@@ -24,7 +24,7 @@ export function BudgetView() {
         const t = budgetTotals(s);
         return (
           <>
-            <Money amountMinor={t.spent + t.committed} currency={booksCurrency(s)} className="font-semibold text-foreground" /> spent and committed of <Money amountMinor={t.cap} currency={booksCurrency(s)} /> across {s.budgets.length} lines. Committed spend is approved but not yet paid.
+            <Money amountMinor={t.spent + t.committed} currency={booksCurrency(s)} className="font-semibold text-foreground" /> spent and committed of <Money amountMinor={t.cap} currency={booksCurrency(s)} />.
           </>
         );
       }}

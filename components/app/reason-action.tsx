@@ -1,5 +1,6 @@
 "use client";
 
+import { cn } from "cn";
 import { useId, useRef, useState } from "react";
 
 import { ActionButton } from "@/components/app/action-button";
@@ -21,6 +22,8 @@ export function ReasonAction({
   build,
   permission,
   variant = "ghost",
+  size = "sm",
+  formClassName,
   required = true,
   primary = false,
 }: {
@@ -31,7 +34,10 @@ export function ReasonAction({
   placeholder?: string;
   build: (reason: string) => ActionCall;
   permission?: Permission;
-  variant?: "secondary" | "ghost" | "destructive";
+  variant?: "secondary" | "ghost" | "outline" | "destructive";
+  size?: "sm" | "default";
+  /** Where the open form goes in its row, e.g. "order-last" to drop below the other actions. */
+  formClassName?: string;
   required?: boolean;
   /** In a detail pane, the opener is the view's one primary and spans it. */
   primary?: boolean;
@@ -43,13 +49,13 @@ export function ReasonAction({
   const ref = useRef<HTMLTextAreaElement>(null);
 
   if (permission && !permission.allowed) {
-    return <ActionButton call={() => null} label={label} permission={permission} />;
+    return <ActionButton call={() => null} label={label} size={size} permission={permission} />;
   }
 
   if (!open) {
     return (
       <Button
-        size={primary ? "default" : "sm"}
+        size={primary ? "default" : size}
         variant={primary ? "default" : variant}
         className={primary ? "w-full" : undefined}
         aria-expanded={false}
@@ -64,7 +70,7 @@ export function ReasonAction({
   }
 
   return (
-    <div className="flex w-full flex-col gap-2 rounded-lg border bg-surface p-3">
+    <div className={cn("flex w-full flex-col gap-2 rounded-lg border bg-surface p-3", formClassName)}>
       <label htmlFor={id} className="text-small font-medium">
         {prompt}
       </label>
