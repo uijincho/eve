@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ActionButton } from "@/components/app/action-button";
 import { LinkButton } from "@/components/app/link-button";
+import { LiveDesktop } from "@/components/app/live-desktop";
 import { Section } from "@/components/app/page-header";
 import { Money } from "@/components/eve/money";
 import type { AppSnapshot, DisbursementBatch } from "@/lib/contracts";
@@ -63,7 +64,12 @@ export function DisbursementBatches({ snapshot: s }: { snapshot: AppSnapshot }) 
           <p className="text-small text-muted-foreground">Released by {b.approvedByName}{b.status === "submitted" ? ` · ${paid} of ${b.count} paid` : ""}</p>
           {b.error ? <p className="text-small text-critical">{b.error}</p> : null}
           {b.confirmation ? <p className="text-small">Portal confirmation: <strong>{b.confirmation}</strong></p> : null}
-          {b.streamUrl ? <iframe src={b.streamUrl} title={`Live portal submission for ${b.count} payments`} className="aspect-[4/3] w-full max-w-3xl rounded-lg border" /> : null}
+          {b.streamUrl ? <LiveDesktop
+            src={b.streamUrl}
+            title={`Live portal submission for ${b.count} payments, view only`}
+            caption={`Eve is submitting ${b.count} payments in one portal session. Live view only.`}
+            className="w-full max-w-3xl"
+          /> : null}
           <div className="flex flex-wrap gap-2">
             {b.documentId ? <LinkButton href={documentUrl(b.documentId)} external size="sm" variant="outline">Download bundle</LinkButton> : null}
             {b.canRetry ? <ActionButton label="Retry batch" pendingLabel="Restarting" permission={s.actor.id === b.approvedBy ? canControl(s.actor, s) : { allowed: false, reason: "The controller who released this batch must retry it." }} call={payloads.batchRetry(b.id)} /> : null}
