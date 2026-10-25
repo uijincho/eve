@@ -106,6 +106,10 @@ export const payloads = {
     call("sponsor.reconcile", { id, ...stripEmpty(fields) }),
 
   orgUpdate: (fields: Record<string, unknown>) => call("org.update", stripEmpty(fields)),
+  slackSettings: (fields: { onDutyMemberId?: string | null; backupMemberId?: string | null }) => call("slack.settings", fields),
+  slackLinkCode: () => call("slack.linkCode", {}),
+  slackUnlink: () => call("slack.unlink", {}),
+  slackDisconnect: () => call("slack.disconnect", {}),
   eventUpdate: (fields: Record<string, unknown>) => call("event.update", stripEmpty(fields)),
   budgetUpdate: (line: { id?: string; name: string; capMinor: string; fundingSource: string; category?: string }) =>
     call("budget.update", stripEmpty(line)),

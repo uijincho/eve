@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 /** A one-time invite link, selectable and copyable. Eve does not email it. */
-export function CopyLink({ url, label = "Invite link" }: { url: string; label?: string }) {
+export function CopyLink({ url, label = "Invite link", help = "Not emailed. Send it yourself; it works once, only for the invited email, and expires in 7 days. It is shown only now." }: { url: string; label?: string; help?: string }) {
   const id = useId();
   const [copied, setCopied] = useState(false);
   return (
@@ -31,9 +31,7 @@ export function CopyLink({ url, label = "Invite link" }: { url: string; label?: 
           {copied ? "Copied" : "Copy"}
         </Button>
       </div>
-      <p id={`${id}-help`} className="text-small text-muted-foreground">
-        Not emailed. Send it yourself; it works once, only for the invited email, and expires in 7 days. It is shown only now.
-      </p>
+      <p id={`${id}-help`} className="text-small text-muted-foreground">{help}</p>
     </div>
   );
 }

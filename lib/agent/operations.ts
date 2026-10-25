@@ -104,6 +104,9 @@ export async function finishAgentRun(target: AgentTarget, runId: string, totals:
   if (target.evaluateDemo) await saveScoreboard(db, target.orgId, board);
   const summary = `Reviewed ${totals.processed} claim(s), proposed ${totals.proposed} prize payout(s), scheduled ${totals.chased} form reminder workflow(s). ${totals.waiting} payout(s) await controller approval. ${totals.blocked} item(s) need attention.`;
   await db.update(s.agentRun).set({ status: "done", finishedAt: new Date(), summary }).where(and(eq(s.agentRun.orgId, target.orgId), eq(s.agentRun.id, runId)));
+  // Escalations and proposals from this run become Slack cards for the people who must act.
+  const { kickSlack } = await import("@/lib/slack/kick");
+  await kickSlack(target.orgId);
   return { ...totals, summary, ...(target.evaluateDemo ? { scoreboard: board } : {}) };
 }
 

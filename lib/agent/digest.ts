@@ -49,4 +49,7 @@ export async function deliverDailyDigest(orgId: string, generation: string): Pro
   for (let offset = 0; offset < ids.length; offset += 5) {
     await Promise.all(ids.slice(offset, offset + 5).map((id) => deliverRecordedNotice(orgId, id)));
   }
+  // The Slack app's digest: one channel message a day, deduplicated by date. No-op without an installation.
+  const { postSlackDigest } = await import("@/lib/slack/kick");
+  await postSlackDigest(orgId);
 }

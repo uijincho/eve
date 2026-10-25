@@ -929,6 +929,18 @@ const handlers: Record<AppAction, Handler> = {
   }) as Handler,
   "flight.search": flightSearch as Handler,
   "flight.request": flightRequest as Handler,
+  "slack.settings": (async (tx, actor, p) => (await import("@/lib/slack/install")).updateSlackSettings(tx, actor, p)) as Handler,
+  "slack.linkCode": (async (tx, actor) => {
+    const { code, expiresAt } = await (await import("@/lib/slack/identity")).issueLinkCode(tx, actor);
+    return ok(`Type /eve link ${code} in Slack within 10 minutes.`, { code, expiresAt: expiresAt.toISOString() });
+  }) as Handler,
+  "slack.unlink": (async (tx, actor) => ok((await (await import("@/lib/slack/identity")).unlinkMember(tx, actor)) ? "Slack account unlinked." : "No Slack account was linked.")) as Handler,
+  "slack.disconnect": (async (tx, actor) => {
+    const { disconnectSlack } = await import("@/lib/slack/install");
+    const { result, token } = await disconnectSlack(tx, actor);
+    if (token) await (await import("@/lib/slack/api")).slackApi(token, "auth.revoke").catch(() => {});
+    return result;
+  }) as Handler,
 };
 
 /** Same path as POST /api/actions: validate, authorize, prepare (outside tx), run in a transaction. */

@@ -15,6 +15,7 @@ import {
   PeriodLockForm,
   TravelPolicyForm,
 } from "@/components/app/settings-forms";
+import { SlackSection } from "@/components/app/slack-section";
 import { TeamSection } from "@/components/app/team-section";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { canControl, canManage, canOrganize, type Permission } from "@/lib/client/derive";
@@ -38,6 +39,7 @@ export function SettingsView() {
           <Section title="Money movement"><MoneyMovementForm snapshot={s} /></Section>
           <Section title="Travel policy"><TravelPolicyForm snapshot={s} /></Section>
           <Section title="Notifications"><NotificationsForm snapshot={s} /></Section>
+          {s.slack ? <Section title="Slack"><SlackSection snapshot={s} /></Section> : null}
           <Section title="Period lock" aside={s.event.locked ? "This event is locked" : undefined}>
             <PeriodLockForm snapshot={s} permission={canControl(s.actor, s)} />
           </Section>

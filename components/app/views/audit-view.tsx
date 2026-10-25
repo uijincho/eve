@@ -52,7 +52,7 @@ export function AuditView() {
             ),
           },
           { key: "sum", header: "Decision", stack: "meta", cell: (d) => <span className="line-clamp-2" title={d.summary}>{d.summary}</span>, className: "max-w-[44ch]" },
-          { key: "who", header: "Actor", stack: "meta", sort: (d) => d.actor, cell: (d) => <span className="whitespace-nowrap">{d.actor}</span> },
+          { key: "who", header: "Actor", stack: "meta", sort: (d) => d.actor, cell: (d) => <span className="whitespace-nowrap">{d.actor}{d.facts?.via === "slack" ? " via Slack" : ""}</span> },
           { key: "status", header: "Result", stack: "end", sort: (d) => d.status, cell: (d) => <StatusBadge status={d.status} /> },
           { key: "at", header: "When", align: "end", stack: "end", sort: (d) => d.createdAt, cell: (d) => <span className="text-small whitespace-nowrap text-muted-foreground">{fmtDateTime(d.createdAt)}</span> },
         ];

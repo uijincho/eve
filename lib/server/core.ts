@@ -67,6 +67,10 @@ export const ACTION_ROLES: Record<C.AppAction, Who[]> = {
   "agent.run": ["organizer", "controller", "agent"],
   "flight.search": ["organizer", "controller", "self"],
   "flight.request": ["organizer", "self"],
+  "slack.settings": ["organizer"],
+  "slack.linkCode": ["organizer", "controller"],
+  "slack.unlink": ["organizer", "controller"],
+  "slack.disconnect": ["organizer"],
 };
 
 export function assertMayInvoke(actor: ActorContext, action: C.AppAction): void {
@@ -269,7 +273,7 @@ export async function methodsFor(db: Executor, personId: string): Promise<{ acti
 
 export interface DecisionInput {
   orgId: string; runId?: string; objectType: string; objectId: string; personId?: string | null; personName?: string;
-  action: string; summary: string; actor: ActorContext | { memberId: string; role: C.Role; name: string };
+  action: string; summary: string; actor: ActorContext | { memberId: string; role: C.Role; name: string; via?: "slack" };
   status: C.Decision["status"]; tool: string; ruleId?: string | null; ruleVersion?: number | null;
   facts?: Record<string, unknown>; checks?: C.Check[] | null; documentId?: string | null; nextActionAt?: Date | null;
 }
@@ -279,7 +283,8 @@ export function decisionRow(d: DecisionInput): typeof s.decisionLog.$inferInsert
     id: newId("dec"), orgId: d.orgId, runId: d.runId ?? newId("run"), objectType: d.objectType, objectId: d.objectId,
     personId: d.personId ?? null, personName: d.personName ?? "", action: d.action, summary: d.summary,
     actor: d.actor.name, actorRole: d.actor.role, status: d.status, tool: d.tool, ruleId: d.ruleId ?? null,
-    ruleVersion: d.ruleVersion ?? null, facts: d.facts ?? {}, checks: d.checks ?? null, documentId: d.documentId ?? null,
+    ruleVersion: d.ruleVersion ?? null, facts: { ...(d.facts ?? {}), ...("via" in d.actor && d.actor.via ? { via: d.actor.via } : {}) },
+    checks: d.checks ?? null, documentId: d.documentId ?? null,
     nextActionAt: d.nextActionAt ?? null,
   };
 }

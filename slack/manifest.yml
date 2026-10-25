@@ -1,0 +1,50 @@
+# Eve Slack app manifest. Create the app at https://api.slack.com/apps → "From a
+# manifest", paste this file, and replace YOUR-EVE-HOST with Eve's public HTTPS
+# host (for local work, a tunnel to localhost:3000). Then copy the Client ID,
+# Client Secret and Signing Secret into SLACK_CLIENT_ID, SLACK_CLIENT_SECRET and
+# SLACK_SIGNING_SECRET. See docs/slack.md.
+#
+# Scopes match SLACK_SCOPES in lib/slack/config.ts.
+display_information:
+  name: Eve
+  description: Event finance approvals, alerts and digests. Names, amounts and last 4 digits only.
+  background_color: "#1f2b44"
+features:
+  app_home:
+    home_tab_enabled: true
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: true
+  bot_user:
+    display_name: Eve
+    always_online: true
+  slash_commands:
+    - command: /eve
+      url: https://YOUR-EVE-HOST/api/webhooks/slack
+      description: Link your Eve account, mute alert categories, or check what is waiting for you
+      usage_hint: link CODE | mute claims | unmute claims | status
+      should_escape: false
+oauth_config:
+  redirect_urls:
+    - https://YOUR-EVE-HOST/api/slack/oauth
+  scopes:
+    bot:
+      - chat:write
+      - chat:write.public
+      - channels:join
+      - commands
+      - im:write
+      - files:write
+      - incoming-webhook
+settings:
+  event_subscriptions:
+    request_url: https://YOUR-EVE-HOST/api/webhooks/slack
+    bot_events:
+      - app_home_opened
+      - app_uninstalled
+      - tokens_revoked
+  interactivity:
+    is_enabled: true
+    request_url: https://YOUR-EVE-HOST/api/webhooks/slack
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

@@ -28,6 +28,8 @@ export interface ActorContext {
   personId: string | null;
   demo: boolean;
   userId: string | null;
+  /** Set when the request came from the Slack app; decision_log rows record it. */
+  via?: "slack";
 }
 
 export function demoModeEnabled(): boolean {

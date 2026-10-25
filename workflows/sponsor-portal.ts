@@ -103,4 +103,7 @@ async function close(target: PortalTarget, sandboxId: string | null) {
   "use step";
   const { closePortalDesktop } = await import("@/lib/computer-use/portal-run");
   await closePortalDesktop(target, sandboxId);
+  // The run's outcome is saved; the team channel hears about it with screenshots in the thread.
+  const { kickSlack } = await import("@/lib/slack/kick");
+  await kickSlack(target.orgId);
 }

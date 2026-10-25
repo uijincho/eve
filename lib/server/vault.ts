@@ -54,6 +54,23 @@ export function constantTimeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ha, hb);
 }
 
+/** Seals a secret kept on its own row (the Slack bot token), bound to the org and its purpose. */
+export function sealValue(orgId: string, purpose: string, value: string): { ciphertext: Buffer; iv: Buffer; tag: Buffer } {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key(), iv);
+  cipher.setAAD(Buffer.from(`${orgId}:${purpose}`));
+  const ciphertext = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  return { ciphertext, iv, tag: cipher.getAuthTag() };
+}
+
+/** Server-only inverse of sealValue. */
+export function openValue(orgId: string, purpose: string, sealed: { ciphertext: Buffer; iv: Buffer; tag: Buffer }): string {
+  const decipher = createDecipheriv("aes-256-gcm", key(), sealed.iv);
+  decipher.setAAD(Buffer.from(`${orgId}:${purpose}`));
+  decipher.setAuthTag(sealed.tag);
+  return Buffer.concat([decipher.update(sealed.ciphertext), decipher.final()]).toString("utf8");
+}
+
 /** Builds encrypted vault rows without touching the database (for bulk inserts). */
 export function sealRow(input: { id: string; orgId: string; personId?: string | null; kind: Kind; value: string }): typeof vaultSecret.$inferInsert {
   const iv = randomBytes(12);

@@ -6,6 +6,7 @@ import { getDb } from "@/lib/db";
 import * as s from "@/lib/db/schema";
 import { deliverBankVerification } from "@/lib/server/bank-verification-delivery";
 import { trackCheapestFares } from "@/lib/server/fares";
+import { slackAppConfig } from "@/lib/slack/config";
 
 export const maxDuration = 120;
 
@@ -41,5 +42,9 @@ export async function GET(request: Request) {
     try { faresRecorded += (await trackCheapestFares(org.id, { maxOrigins: 15 })).recorded; }
     catch { /* No event yet, or a provider outage; tomorrow's run retries. */ }
   }
-  return Response.json({ ok: failed === 0, runs, failed, delivered, bankVerificationsDelivered, faresRecorded, ...(filingYear ? { filingYear } : {}) }, { status: failed ? 207 : 200 });
+  // Slack: catch up cards and timers, and post alert batches whose 15 minutes have passed.
+  const slack = slackAppConfig()
+    ? await (await import("@/lib/slack/sync")).syncAllSlack().catch(() => ({ synced: 0, posted: 0 }))
+    : { synced: 0, posted: 0 };
+  return Response.json({ ok: failed === 0, runs, failed, delivered, bankVerificationsDelivered, faresRecorded, slack, ...(filingYear ? { filingYear } : {}) }, { status: failed ? 207 : 200 });
 }

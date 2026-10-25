@@ -695,6 +695,99 @@ export const journalLine = pgTable("journal_line", {
   check("journal_line_one_side", sql`(${t.debitMinor} > 0 AND ${t.creditMinor} = 0) OR (${t.creditMinor} > 0 AND ${t.debitMinor} = 0)`),
 ]);
 
+// ------------------------------------------------------------------- Slack
+
+/**
+ * The organization's Slack workspace, installed by an organizer through OAuth.
+ * The bot token is AES-256-GCM sealed with EVE_VAULT_KEY and bound to the org,
+ * like vault secrets, but kept on this row so a demo reset leaves Slack connected.
+ */
+export const slackInstallation = pgTable("slack_installation", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull().unique().references(() => organization.id, { onDelete: "cascade" }),
+  teamId: text("team_id").notNull().unique(),
+  teamName: text("team_name").notNull(),
+  botUserId: text("bot_user_id").notNull(),
+  tokenCiphertext: bytea("token_ciphertext").notNull(),
+  tokenIv: bytea("token_iv").notNull(),
+  tokenTag: bytea("token_tag").notNull(),
+  /** Team channel for informational alerts, digests and event-weekend posts (e.g. #eve-finance). */
+  channelId: text("channel_id"),
+  channelName: text("channel_name"),
+  /** Organizer who gets escalated claims and prize decisions. Null: every linked organizer. */
+  onDutyMemberId: text("on_duty_member_id").references(() => orgMember.id, { onDelete: "set null" }),
+  /** Approver who gets approvals that have waited too long. Null: every other linked approver. */
+  backupMemberId: text("backup_member_id").references(() => orgMember.id, { onDelete: "set null" }),
+  installedBy: text("installed_by").notNull(),
+  createdAt: createdAt(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});
+
+/**
+ * Maps one Slack user to one Eve member. The member generates a one-time code in
+ * Eve (its hash is stored here) and types `/eve link CODE` in Slack, so a link
+ * always proves control of both accounts. Role is never stored: it is re-read
+ * from org_member on every Slack request.
+ */
+export const slackUserLink = pgTable("slack_user_link", {
+  memberId: text("member_id").primaryKey().references(() => orgMember.id, { onDelete: "cascade" }),
+  orgId: text("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  teamId: text("team_id"),
+  slackUserId: text("slack_user_id"),
+  codeHash: text("code_hash"),
+  codeExpiresAt: ts("code_expires_at"),
+  /** Alert categories this person does not want as direct messages. */
+  muted: jsonb("muted").$type<string[]>().notNull().default([]),
+  linkedAt: ts("linked_at"),
+  createdAt: createdAt(),
+}, (t) => [
+  uniqueIndex("slack_user_link_user_uq").on(t.teamId, t.slackUserId),
+  uniqueIndex("slack_user_link_code_uq").on(t.codeHash),
+  index("slack_user_link_org_idx").on(t.orgId),
+]);
+
+/**
+ * One Slack message per item and audience (a member's DM, or "channel"). Status
+ * changes go in its thread; resolution edits the original so stale cards never pile up.
+ */
+export const slackMessage = pgTable("slack_message", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  itemKey: text("item_key").notNull(),
+  audience: text("audience").notNull(),
+  category: text("category").notNull(),
+  channelId: text("channel_id"),
+  /** Null until Slack accepted the post; a stale null row is retried. */
+  ts: text("ts"),
+  state: text("state", { enum: ["open", "resolved"] }).notNull().default("open"),
+  /** Hash of the last rendered card, so unchanged cards are not re-sent. */
+  fingerprint: text("fingerprint").notNull().default(""),
+  /** Last status line posted in the thread, so each change is said once. */
+  lastNote: text("last_note"),
+  createdAt: createdAt(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("slack_message_item_uq").on(t.orgId, t.itemKey, t.audience),
+  index("slack_message_org_state_idx").on(t.orgId, t.state),
+]);
+
+/** Informational team-channel alerts. Queued once per key, posted together every 15 minutes. */
+export const slackAlert = pgTable("slack_alert", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  key: text("key").notNull(),
+  category: text("category").notNull(),
+  text: text("text").notNull(),
+  /** Screenshots (document ids) to post in the batch message's thread. */
+  documentIds: jsonb("document_ids").$type<string[]>().notNull().default([]),
+  createdAt: createdAt(),
+  postedAt: ts("posted_at"),
+  messageTs: text("message_ts"),
+}, (t) => [
+  uniqueIndex("slack_alert_key_uq").on(t.orgId, t.key),
+  index("slack_alert_pending_idx").on(t.orgId, t.postedAt),
+]);
+
 // ---------------------------------------------------- Proof: answer key + runs
 
 /** Expected outcomes for planted errors. Kept apart from decisions; never read by checks. */
