@@ -6,12 +6,15 @@ import { ActionButton } from "@/components/app/action-button";
 import { Field, NativeSelect } from "@/components/app/field";
 import { Section } from "@/components/app/page-header";
 import { StatusBadge } from "@/components/app/status-badge";
+import { TaxFormLink } from "@/components/app/tax-form-link";
 import { TruthLabel } from "@/components/eve/truth-label";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, Person } from "@/lib/contracts";
 import { isAdultOn, projectStatusLabel } from "@/lib/client/derive";
 import { fmtDate } from "@/lib/client/format";
 import { payloads } from "@/lib/client/payloads";
+import { selectRule } from "@/lib/tax";
+import { treatyRateText, W8BEN_CERTIFICATION } from "@/lib/tax/w8ben";
 
 import { PortalFrame } from "./portal-frame";
 
@@ -99,9 +102,12 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
   const [certify, setCertify] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const rule = s.rules.find((r) => r.form === form && (r.payeeCountry === me.country || r.payeeCountry === "*"));
+  // The rate Eve prints on W-8BEN line 10 for a treaty article claim (same lookup as the server).
+  const treatyRule = form === "W-8BEN" && treaty ? selectRule(s.rules, { payerCountry: s.org.country, payeeCountry: treaty, paymentType: "cash_prize:treaty", year: Number(s.now.slice(0, 4)) }) : undefined;
+  const treatyRate = treatyRule?.payeeCountry === treaty ? treatyRule.rateBps : undefined;
 
   return (
-    <Section title="Tax form" aside={<span className="inline-flex items-center gap-2">{me.taxForm} <StatusBadge status={me.taxStatus} />{me.taxLast4 ? ` TIN ••${me.taxLast4}` : ""}</span>}>
+    <Section title="Tax form" aside={<span className="inline-flex flex-wrap items-center gap-2">{me.taxForm} <StatusBadge status={me.taxStatus} />{me.taxLast4 ? ` TIN ••${me.taxLast4}` : ""}<TaxFormLink person={me} className="text-foreground" /></span>}>
       <p className="text-small text-muted-foreground">
         {s.org.country === "CA"
           ? <>Because {s.org.name} pays from Canada, Eve asks for a <span className="font-medium text-foreground">{suggested}</span>.</>
@@ -119,7 +125,7 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Form">
             {(p) => (
-              <NativeSelect {...p} value={form} onChange={(e) => setForm(e.target.value as Person["taxForm"])}>
+              <NativeSelect {...p} value={form} onChange={(e) => { setForm(e.target.value as Person["taxForm"]); setNoTin(false); }}>
                 {(["W-9", "W-8BEN", "W-8BEN-E", "Residency declaration"] as const).map((f) => (
                   <option key={f} value={f}>{f}{f === suggested ? " (suggested)" : ""}</option>
                 ))}
@@ -129,10 +135,12 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
           <Field label={form === "W-9" ? "SSN or ITIN" : form === "Residency declaration" ? (me.country === "CA" ? "SIN (optional)" : "Tax ID (optional)") : "Foreign tax ID (optional)"} error={errors.tin} help={form === "W-9" ? "Sent once to the vault. If you cannot provide a TIN yet, choose the option below." : "Sent once to the vault. It is never shown again."}>
             {(p) => <Input {...p} type="password" autoComplete="off" inputMode="text" value={tin} onChange={(e) => { setTin(e.target.value.replace(/[^0-9A-Za-z-]/g, "")); setNoTin(false); setErrors((current) => ({ ...current, tin: "" })); }} />}
           </Field>
-          {form === "W-9" ? (
+          {form === "W-9" || form === "W-8BEN" ? (
             <label className="flex items-start gap-2 text-small sm:col-span-2">
               <input type="checkbox" checked={noTin} onChange={(e) => { setNoTin(e.target.checked); if (e.target.checked) setTin(""); setErrors((current) => ({ ...current, tin: "" })); }} className="mt-0.5 size-4 accent-foreground" />
-              <span>TIN not provided. <span className="text-muted-foreground">Eve applies backup withholding when required.</span></span>
+              {form === "W-9"
+                ? <span>TIN not provided. <span className="text-muted-foreground">Eve applies backup withholding when required.</span></span>
+                : <span>Not legally required in my country.</span>}
             </label>
           ) : null}
           {form === "W-8BEN" ? (
@@ -146,7 +154,7 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
             </Field>
           ) : null}
           {form === "W-8BEN" && treaty ? (
-            <Field label="Treaty article (optional)" help="Part II of the W-8BEN, for example Article XXII. Leave it blank unless you claim a reduced rate.">
+            <Field label="Treaty article (optional)" help={`Part II of the W-8BEN, for example Article XXII. Leave it blank unless you claim a reduced rate.${treatyRate !== undefined ? ` The form claims ${treatyRateText(treatyRate)}%.` : ""}`}>
               {(p) => <Input {...p} value={article} maxLength={40} onChange={(e) => setArticle(e.target.value)} placeholder="Article XXII" />}
             </Field>
           ) : null}
@@ -154,10 +162,19 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
             {(p) => <Input {...p} value={signature} onChange={(e) => setSignature(e.target.value)} />}
           </Field>
         </div>
-        <label className="flex items-start gap-2 text-small">
-          <input type="checkbox" checked={certify} onChange={(e) => setCertify(e.target.checked)} className="mt-0.5 size-4 accent-foreground" aria-describedby="certify-err" />
-          <span>{form === "Residency declaration" ? "I confirm that my residency information is true, correct, and complete." : "I certify under penalties of perjury that the information on this form is true, correct, and complete."} <span className="text-muted-foreground">(Typed signatures are demo-grade.)</span></span>
-        </label>
+        <div className="flex flex-col gap-1.5">
+          <label className="flex items-start gap-2 text-small">
+            <input type="checkbox" checked={certify} onChange={(e) => setCertify(e.target.checked)} className="mt-0.5 size-4 accent-foreground" aria-describedby="certify-err" />
+            <span>
+              {form === "Residency declaration"
+                ? "I confirm that my residency information is true, correct, and complete."
+                : form === "W-8BEN"
+                  ? "I certify under penalties of perjury."
+                  : "I certify under penalties of perjury that the information on this form is true, correct, and complete."}
+            </span>
+          </label>
+          {form === "W-8BEN" ? <W8benCertification /> : null}
+        </div>
         {errors.certify ? <p id="certify-err" className="text-small text-critical">{errors.certify}</p> : null}
         <ActionButton
           className="self-start"
@@ -181,10 +198,35 @@ function TaxForm({ snapshot: s, me }: { snapshot: AppSnapshot; me: Person }) {
             if (!certify) e.certify = "Check the certification to sign.";
             setErrors(e);
             if (Object.keys(e).length) return null;
-            return payloads.taxSubmit({ personId: me.id, form, signature: signature.trim(), tin: tin || undefined, treatyCountry: form === "W-8BEN" ? treaty || undefined : undefined, treatyArticle: form === "W-8BEN" && treaty ? article.trim() || undefined : undefined });
+            return payloads.taxSubmit({ personId: me.id, form, signature: signature.trim(), tin: tin || undefined, ftinNotRequired: form === "W-8BEN" && noTin && !tin ? true : undefined, treatyCountry: form === "W-8BEN" ? treaty || undefined : undefined, treatyArticle: form === "W-8BEN" && treaty ? article.trim() || undefined : undefined });
           }}
         />
       </form>
     </Section>
+  );
+}
+
+/** Part III of the official form, verbatim, collapsed under the certification checkbox. */
+function W8benCertification() {
+  const c = W8BEN_CERTIFICATION;
+  return (
+    <details className="ml-6 text-small">
+      <summary className="w-fit cursor-pointer text-muted-foreground hover:text-foreground">What you&apos;re certifying</summary>
+      <div className="mt-2 flex max-w-prose flex-col gap-2 text-muted-foreground">
+        <p>{c.intro}</p>
+        <ul className="flex list-disc flex-col gap-1 pl-5">
+          {c.items.map((item) => typeof item === "string" ? <li key={item}>{item}</li> : (
+            <li key={item[0]}>
+              {item[0]}
+              <ul className="mt-1 flex flex-col gap-1">
+                {item.slice(1).map((sub) => <li key={sub}>{sub}</li>)}
+              </ul>
+            </li>
+          ))}
+        </ul>
+        <p>{c.closing}</p>
+        <p>{c.capacity}</p>
+      </div>
+    </details>
   );
 }

@@ -7,6 +7,7 @@ import { fixtureSnapshot } from "@/lib/client/fixture";
 import { PortalPrizes } from "@/components/app/portal/prizes";
 import { PortalProfile } from "@/components/app/portal/profile";
 import { PortalTravel } from "@/components/app/portal/travel";
+import { startingRules } from "@/lib/tax";
 
 const state = vi.hoisted(() => ({ snapshot: null as AppSnapshot | null }));
 vi.mock("@/lib/client/use-eve", () => ({
@@ -62,7 +63,41 @@ describe("attendee-scoped portal rendering", () => {
       const s = attendeeSnapshot();
       s.people[0] = { ...s.people[0], taxForm, taxStatus: "valid" };
       state.snapshot = s;
-      expect(renderToStaticMarkup(createElement(PortalProfile))).toContain("I certify under penalties of perjury");
+      const html = renderToStaticMarkup(createElement(PortalProfile));
+      expect(html).toContain("I certify under penalties of perjury");
+      expect(html).not.toContain("demo-grade");
     }
+  });
+
+  it("puts the official W-8BEN Part III text behind a collapsed disclosure", () => {
+    const s = attendeeSnapshot();
+    s.people[0] = { ...s.people[0], taxForm: "W-8BEN", taxStatus: "missing" };
+    state.snapshot = s;
+    const html = renderToStaticMarkup(createElement(PortalProfile));
+    expect(html).toMatch(/<details[^>]*><summary[^>]*>What you&#x27;re certifying<\/summary>/);
+    expect(html).not.toMatch(/<details[^>]*\bopen\b/);
+    expect(html).toContain("Under penalties of perjury, I declare that I have examined the information on this form");
+    expect(html).toContain("The person named on line 1 of this form is not a U.S. person;");
+    expect(html).toContain("I certify that I have the capacity to sign for the person identified on line 1 of this form.");
+    expect(html).toContain("Not legally required in my country.");
+    expect(html).not.toContain("The form claims");
+  });
+
+  it("tells a treaty claimant the line 10 rate the form will print", () => {
+    const s = attendeeSnapshot();
+    s.people[0] = { ...s.people[0], country: "CA", taxForm: "W-8BEN", taxStatus: "missing" };
+    s.rules = [...s.rules, startingRules.find((r) => r.id === "us-ca-prize-treaty")!];
+    state.snapshot = s;
+    expect(renderToStaticMarkup(createElement(PortalProfile))).toContain("The form claims 0%.");
+  });
+
+  it("offers the signed W-8BEN only once a document exists", () => {
+    const s = attendeeSnapshot();
+    s.people[0] = { ...s.people[0], taxForm: "W-8BEN", taxStatus: "valid" };
+    state.snapshot = s;
+    expect(renderToStaticMarkup(createElement(PortalProfile))).not.toContain("View W-8BEN");
+    s.people[0] = { ...s.people[0], taxDocumentId: "doc_w8", taxDocumentForm: "W-8BEN" };
+    const html = renderToStaticMarkup(createElement(PortalProfile));
+    expect(html).toMatch(/<a[^>]*href="\/api\/documents\/doc_w8"[^>]*target="_blank"[^>]*>.*View W-8BEN<\/a>|<a[^>]*target="_blank"[^>]*href="\/api\/documents\/doc_w8"[^>]*>.*View W-8BEN<\/a>/);
   });
 });

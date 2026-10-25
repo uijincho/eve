@@ -59,6 +59,8 @@ export const actionSchemas = {
     /** Typed full legal name; must match the profile name. */
     signature: text(160).min(1),
     tin: z.string().regex(/^[0-9A-Za-z-]{4,20}$/).optional(),
+    /** W-8BEN line 6b: no foreign TIN because none is legally required. Not with `tin`. */
+    ftinNotRequired: z.boolean().optional(),
     treatyCountry: country.optional(), treatyArticle: text(40).optional(),
     certify: z.literal(true),
   }),

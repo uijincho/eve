@@ -237,4 +237,39 @@ describe.skipIf(!hasDatabase)("business flows against real Postgres", { timeout:
     // Members of this org are not demo personas, so they cannot be assumed.
     expect(await m.session.loadDemoPersona(ids.controller)).toBeNull();
   });
+
+  it("stores the filled IRS W-8BEN with only the last four of the foreign TIN, visible to self and staff", async () => {
+    const { db, s } = m;
+    const zoeId = `${orgId}_zoe`;
+    const zoeMember = `${orgId}_m_zoe`;
+    await db.insert(s.person).values({ id: zoeId, orgId, name: "Zoë Tremblay", email: `zoe.${orgId}@example.com`, country: "CA", citizenship: "CA", dateOfBirth: "2001-04-12", address: "88 Queen St W, Toronto, ON M5H 2N2", adult: true, payoutCurrency: "CAD" });
+    await db.insert(s.orgMember).values({ id: zoeMember, orgId, role: "attendee", name: "Zoë Tremblay", email: `zoe.${orgId}@example.com`, personId: zoeId });
+    const zoe = actor(zoeMember, "attendee", zoeId);
+    const tin = "987654324321";
+    expect((await run(zoe, "tax.submit", { personId: zoeId, form: "W-8BEN", signature: "Zoë Tremblay", tin, ftinNotRequired: true, certify: true })).status).toBe(400);
+    expect((await run(zoe, "tax.submit", { personId: zoeId, form: "W-9", signature: "Zoë Tremblay", ftinNotRequired: true, certify: true })).status).toBe(400);
+    const signed = await run(zoe, "tax.submit", { personId: zoeId, form: "W-8BEN", signature: "Zoë Tremblay", tin, treatyCountry: "CA", treatyArticle: "Article XXII", certify: true });
+    expect(signed.data?.status).toBe("valid");
+
+    const [doc] = await db.select().from(s.document).where(eq(s.document.id, signed.data!.documentId as string));
+    expect(doc).toMatchObject({ kind: "tax_form", personId: zoeId, mimeType: "application/pdf" });
+    const { PDFDocument } = await import("pdf-lib");
+    const pdf = await PDFDocument.load(new Uint8Array(doc.bytes));
+    expect(pdf.getPageCount()).toBe(2); // the one-page IRS form plus the signature record
+    expect(pdf.getForm().getFields()).toHaveLength(0);
+    const { pdfStrings } = await import("../pdf-text");
+    const text = await pdfStrings(new Uint8Array(doc.bytes));
+    const [profile] = await db.select().from(s.taxProfile).where(and(eq(s.taxProfile.personId, zoeId), eq(s.taxProfile.documentId, doc.id)));
+    for (const value of ["Zoë Tremblay", "On file, ending 4321", profile.id, "04-12-2001", "Article XXII", "Prize and award income", "Electronic signature record"]) expect(text).toContain(value);
+    expect(text).not.toContain(tin);
+    expect(text).not.toContain(tin.slice(0, 8));
+
+    // The person and staff see the document id; another attendee never sees Zoë at all.
+    for (const viewer of [zoe, actor(ids.organizer, "organizer"), actor(ids.controller, "controller"), actor(ids.auditor, "auditor")]) {
+      const me = (await m.snapshot.buildSnapshot(viewer)).people.find((p) => p.id === zoeId);
+      expect(me).toMatchObject({ taxDocumentId: doc.id, taxDocumentForm: "W-8BEN", taxLast4: "4321" });
+    }
+    const other = await m.snapshot.buildSnapshot(actor(ids.samMember, "attendee", ids.sam));
+    expect(JSON.stringify(other)).not.toContain(doc.id);
+  });
 });

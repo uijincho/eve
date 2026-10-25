@@ -13,6 +13,7 @@ import { ResultText } from "@/components/app/result-text";
 import { Sheet } from "@/components/app/sheet";
 import { EmptyState } from "@/components/app/states";
 import { StatusBadge } from "@/components/app/status-badge";
+import { TaxFormLink } from "@/components/app/tax-form-link";
 import { Money } from "@/components/eve/money";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -151,6 +152,7 @@ function PersonDetail({ person: p, snapshot: s }: { person: Person; snapshot: Ap
         <dd className="flex flex-wrap items-center gap-2">
           {p.taxForm} <StatusBadge status={p.taxStatus} />
           {p.taxLast4 ? <span className="text-muted-foreground">TIN ••{p.taxLast4}</span> : null}
+          <TaxFormLink person={p} />
         </dd>
         <dt className="text-muted-foreground">Signed</dt>
         <dd>{p.taxSignedAt ? fmtDate(p.taxSignedAt, true) : "Not signed"}{p.taxExpiresAt ? ` · expires ${fmtDate(p.taxExpiresAt, true)}` : ""}</dd>

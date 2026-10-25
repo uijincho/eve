@@ -13,6 +13,12 @@ Read on 2026-10-24 from primary sources. Quotes are verbatim. A rule is `verifie
 | `us-nonus-prize`, `us-nonus-item-prize` (30%, no threshold) | [Pub. 515 (2026)](https://www.irs.gov/publications/p515); [Instructions for Form 1042-S (2026)](https://www.irs.gov/instructions/i1042s) | "Most types of U.S. source income received by a foreign person are subject to U.S. tax of 30%." Prizes and awards appear under "Other Grants, Prizes, and Awards Subject to Chapter 3 Withholding"; prizes are "received as the result of entering a contest." 1042-S: "You must file a Form 1042-S even if you did not withhold tax under chapter 3". Appendix A income code 23 is "Other income"; there is no prize-specific code. |
 | W-8BEN validity | [Instructions for Form W-8BEN](https://www.irs.gov/instructions/iw8ben) (Rev. 10/2021) | Remains in effect until "the last day of the third succeeding calendar year", and a change in circumstances must be reported "within 30 days". Implemented as `w8ExpiresAt`. |
 
+## Official forms shipped with Eve
+
+| File | Source | Notes |
+| --- | --- | --- |
+| `lib/tax/forms/fw8ben.pdf` | [Form W-8BEN (Rev. October 2021)](https://www.irs.gov/pub/irs-pdf/fw8ben.pdf), downloaded 2026-10-25, SHA-256 `b821dc1172c91b348a65675529cc792782f11fc1ae8579df92d627113203f918` | US government work, unmodified. `lib/pdf/w8ben.ts` fills it (field map by widget position and the XFA labels), flattens it, prints the foreign TIN as "On file, ending 1234" and appends Eve's signature record. The Part III text in `lib/tax/w8ben.ts` is copied verbatim from this file. When the IRS revises the form, replace the PDF, re-check the field map, and update `W8BEN_REVISION`. |
+
 ## Unresolved (verified: false)
 
 | Rule | Why it is not verified |
