@@ -7,6 +7,7 @@ import type {
   Check,
   Claim,
   Decision,
+  DisbursementBatch,
   Payout,
   Person,
   PortalRun,
@@ -176,9 +177,34 @@ export function projectStatusLabel(status: Person["projectStatus"] | undefined):
   return "Not recorded";
 }
 
-export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "personas"> & Partial<Pick<AppSnapshot, "decisions" | "org" | "people" | "claims" | "event" | "now">>): Permission {
+const BATCH_STATUS: Record<DisbursementBatch["status"], string> = {
+  preparing: "being prepared", filling: "being submitted", submitting: "being submitted",
+  submitted: "submitted", failed: "stopped and waiting for retry or cancel", cancelled: "cancelled",
+};
+
+/**
+ * The sponsor batch or packet that owns a payout. While one does, the sponsor
+ * pays it, so it cannot also be released directly (server: assertNotInBatch).
+ */
+export function sponsorOwner(s: Partial<Pick<AppSnapshot, "batches" | "packets">>, payout: Pick<Payout, "id">): { batch?: DisbursementBatch; packet?: SponsorPacket } | undefined {
+  const batch = s.batches?.find((b) => b.status !== "cancelled" && b.payoutIds.includes(payout.id));
+  const packet = s.packets?.find((k) => k.payoutId === payout.id);
+  return batch || packet ? { batch, packet } : undefined;
+}
+
+/** Why a sponsor-owned payout cannot be released directly, or undefined. */
+export function sponsorOwnerNote(s: Partial<Pick<AppSnapshot, "batches" | "packets">>, payout: Pick<Payout, "id">): string | undefined {
+  const owner = sponsorOwner(s, payout);
+  if (owner?.batch) return `Already in a sponsor batch released by ${owner.batch.approvedByName}, ${BATCH_STATUS[owner.batch.status]}. Follow it on Disburse, or cancel that batch to release this payout here.`;
+  if (owner?.packet) return `The sponsor pays this through its packet (${owner.packet.status}). Follow it on Disburse.`;
+  return undefined;
+}
+
+export function canRelease(actor: Actor, payout: Payout, s: Pick<AppSnapshot, "personas"> & Partial<Pick<AppSnapshot, "decisions" | "org" | "people" | "claims" | "event" | "now" | "batches" | "packets">>): Permission {
   if (s.org?.mode === "sponsor") return no(`${s.org.sponsorName || "The fiscal sponsor"} pays for this organization. Open Disburse to release a batch through the sponsor.`);
   if (s.decisions && releaseInFlight({ decisions: s.decisions }, payout)) return no("Release accepted. Eve is sending it now; this updates on its own.");
+  const owned = sponsorOwnerNote(s, payout);
+  if (owned && (payout.status === "proposed" || payout.status === "approved")) return no(owned);
   if (payout.status === "frozen") return no("Frozen until the bank change is confirmed through the original contact channel.");
   if (payout.status === "held") return no(payout.reason || "Held until the recipient's tax form is valid.");
   if (!["proposed", "approved"].includes(payout.status)) return no(`This payout is ${payout.status}.`);
@@ -451,7 +477,8 @@ export function buildInbox(s: AppSnapshot): InboxItem[] {
   const heldPeople = new Set<string>();
   const source = (p: Payout) => (p.sourceType === "award" ? "Prize payout" : "Claim payout");
 
-  const ready = s.payouts.filter((p) => p.status === "proposed" || p.status === "approved");
+  // A sponsor batch or packet already owns some ready payouts; those are followed on Disburse, not released here.
+  const ready = s.payouts.filter((p) => (p.status === "proposed" || p.status === "approved") && !sponsorOwner(s, p));
   if (ready.length) {
     const gross = sumMinor(ready.map((p) => p.grossMinor));
     const withheld = sumMinor(ready.map((p) => p.withholdingMinor));

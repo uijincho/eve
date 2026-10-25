@@ -41,41 +41,53 @@ export function BatchProgress({ batch: b }: { batch: DisbursementBatch }) {
   </div>;
 }
 
+const BATCH_LIMIT = 200;
+
 export function DisbursementBatches({ snapshot: s }: { snapshot: AppSnapshot }) {
-  const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  // The controller picks each payment; nothing is included until it is ticked.
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const batches = s.batches ?? [];
   const reserved = new Set(batches.filter((b) => b.status !== "cancelled").flatMap((b) => b.payoutIds));
   const pending = s.payouts.filter((p) => !reserved.has(p.id) && !["paid", "processing"].includes(p.status));
   const ready = pending.filter((p) => !batchBlocker(p, s));
-  const selected = ready.filter((p) => !excluded.has(p.id)).slice(0, 200);
+  const selected = ready.filter((p) => picked.has(p.id));
   const blocked = pending.filter((p) => batchBlocker(p, s));
   const gross = selected.reduce((n, p) => n + big(p.grossMinor), 0n);
   const withheld = selected.reduce((n, p) => n + big(p.withholdingMinor), 0n);
-  const permission = selected.length ? canControl(s.actor, s) : { allowed: false as const, reason: "Select at least one eligible payment." };
+  const selectable = ready.slice(0, BATCH_LIMIT);
+  const allChosen = selectable.length > 0 && selectable.every((p) => picked.has(p.id));
+  const permission = selected.length > BATCH_LIMIT ? { allowed: false as const, reason: `Choose ${BATCH_LIMIT} payments or fewer per batch.` }
+    : selected.length ? canControl(s.actor, s) : { allowed: false as const, reason: "Select at least one payment to release." };
+  const toggle = (id: string, on: boolean) => setPicked((before) => { const next = new Set(before); if (on) next.add(id); else next.delete(id); return next; });
   return <>
     <section aria-label="Release a batch" className="flex flex-col gap-4 rounded-2xl border bg-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-subheading">{selected.length} payments ready to release</h2>
+          <h2 className="text-subheading">{selected.length ? `${selected.length} of ${ready.length} selected` : `${ready.length} payments ready to release`}</h2>
           <Money amountMinor={gross - withheld} className="text-title font-semibold" />
-          <p className="text-small text-muted-foreground">Eve prepares the documents and submits one batch to {s.org.sponsorName || "the sponsor"}.</p>
+          <p className="text-small text-muted-foreground">{selected.length ? `Eve prepares the documents for the selected payments and submits them as one batch to ${s.org.sponsorName || "the sponsor"}. The rest stay ready.` : "Tick the payments you want to send in this batch."}</p>
         </div>
-        <ActionButton label={`Release ${selected.length} payments`} pendingLabel="Preparing batch" variant="default" size="default" permission={permission}
+        <ActionButton label={selected.length ? `Release ${selected.length} selected` : "Release selected"} pendingLabel="Preparing batch" variant="default" size="default" permission={permission}
+          onDone={(r) => r.ok && setPicked(new Set())}
           call={payloads.batchRelease(selected.map((p) => ({ id: p.id, quote: batchQuoteKey(p) })))} />
       </div>
       <p className="text-small text-muted-foreground">Gross <Money amountMinor={gross} /> · Withheld <Money amountMinor={withheld} /> · No payment is marked paid until remittance is reconciled.</p>
-      {ready.length > 200 ? <p className="text-small">The first 200 selected payments will be included. Release the remaining payments in another batch.</p> : null}
-      <details>
-        <summary className="cursor-pointer py-1 text-small font-medium">Review recipients ({ready.length})</summary>
-        <ul className="mt-2 divide-y">
+      {ready.length > BATCH_LIMIT ? <p className="text-small">A batch holds up to {BATCH_LIMIT} payments. Release the rest in another batch.</p> : null}
+      <div className="flex flex-col">
+        {ready.length ? <label className="flex items-center gap-3 border-b py-2 text-small font-medium">
+          <input type="checkbox" checked={allChosen} ref={(el) => { if (el) el.indeterminate = selected.length > 0 && !allChosen; }}
+            onChange={(e) => setPicked(e.target.checked ? new Set(selectable.map((p) => p.id)) : new Set())} className="size-4 shrink-0 accent-foreground" />
+          {ready.length > BATCH_LIMIT ? `Select the first ${BATCH_LIMIT}` : `Select all ${ready.length}`}
+        </label> : null}
+        <ul className="divide-y">
           {ready.map((p) => <li key={p.id} className="flex items-center gap-3 py-3">
-            <input type="checkbox" aria-label={`Include ${p.personName}, ${payoutSource(s, p)}`} checked={selected.some((item) => item.id === p.id)} onChange={(e) => setExcluded((before) => { const next = new Set(before); if (e.target.checked) next.delete(p.id); else next.add(p.id); return next; })} className="size-4 shrink-0 accent-foreground" />
+            <input type="checkbox" aria-label={`Include ${p.personName}, ${payoutSource(s, p)}`} checked={picked.has(p.id)} onChange={(e) => toggle(p.id, e.target.checked)} className="size-4 shrink-0 accent-foreground" />
             <span className="min-w-0 flex-1"><span className="font-medium">{p.personName}</span><span className="block text-small text-muted-foreground">{payoutSource(s, p)}</span></span>
             <Money amountMinor={big(p.grossMinor) - big(p.withholdingMinor)} />
           </li>)}
           {!ready.length ? <li className="py-3 text-small text-muted-foreground">Approved, eligible payouts appear here automatically.</li> : null}
         </ul>
-      </details>
+      </div>
       {blocked.length ? <details><summary className="cursor-pointer py-1 text-small font-medium">{blocked.length} payments excluded · need attention</summary><ul className="mt-2 divide-y">
         {blocked.map((p) => <li key={p.id} className="flex flex-col gap-1 py-2"><span className="font-medium">{p.personName}</span><span className="text-small text-muted-foreground">{batchBlocker(p, s)}</span></li>)}
       </ul></details> : null}

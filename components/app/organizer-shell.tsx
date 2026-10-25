@@ -10,7 +10,7 @@ import { AccountMenu } from "@/components/app/account-menu";
 import { Sheet } from "@/components/app/sheet";
 import { EveMark } from "@/components/eve/logo";
 import { Button } from "@/components/ui/button";
-import { buildInbox } from "@/lib/client/derive";
+import { buildInbox, sponsorOwner } from "@/lib/client/derive";
 import { fmtDate, fmtTime } from "@/lib/client/format";
 import { useEve } from "@/lib/client/use-eve";
 
@@ -49,7 +49,7 @@ export function OrganizerShell({ children }: { children: React.ReactNode }) {
       inbox: buildInbox(snapshot).length,
       claims: snapshot.claims.filter((c) => c.status === "escalated" || c.status === "needs_info").length,
       prizes: snapshot.awards.filter((a) => a.status !== "paid" && a.status !== "proposed").length,
-      payouts: snapshot.payouts.filter((p) => ["proposed", "approved", "frozen", "failed", "held"].includes(p.status)).length,
+      payouts: snapshot.payouts.filter((p) => ["proposed", "approved", "frozen", "failed", "held"].includes(p.status) && !sponsorOwner(snapshot, p)).length,
       sponsor: snapshot.packets.filter((p) => p.status === "exception" || p.status === "questioned").length,
     };
   }, [snapshot]);
