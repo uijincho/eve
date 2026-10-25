@@ -202,6 +202,7 @@ export function toPerson(p: PersonRow, extra: {
     address: p.address, role: p.role, adult: p.adult, taxForm: accepted ? extra.profile!.form : expectedForm(p, payerCountry),
     taxStatus: status === "valid" && !profileValidFor(extra.profile, p, payerCountry, extra.now) ? "review" : status, taxSignedAt: iso(extra.profile?.signedAt),
     taxExpiresAt: iso(extra.profile?.expiresAt), taxLast4: extra.profile?.tinLast4 ?? undefined,
+    ...(extra.profile?.documentId ? { taxDocumentId: extra.profile.documentId, taxDocumentForm: extra.profile.form } : {}),
     payoutCurrency: extra.method?.currency ?? p.payoutCurrency, payoutLast4: extra.method?.last4 ?? "",
     payoutChangedAt: iso(extra.method?.verifiedAt ?? extra.method?.createdAt),
     paidYtdMinor: str(extra.paidYtdMinor), outstandingMinor: str(extra.outstandingMinor), chaseCount: p.chaseCount,

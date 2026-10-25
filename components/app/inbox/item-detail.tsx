@@ -6,6 +6,7 @@ import { CheckList } from "@/components/app/evidence-sheet";
 import { PortalRunPanel } from "@/components/app/portal-run-panel";
 import { PrizeComparison } from "@/components/app/prize-comparison";
 import { StatusBadge } from "@/components/app/status-badge";
+import { TaxFormLink } from "@/components/app/tax-form-link";
 import { Airline, Airport } from "@/components/eve/airline";
 import { BreakdownBar } from "@/components/eve/breakdown-bar";
 import { DueChip } from "@/components/eve/due-chip";
@@ -152,14 +153,17 @@ function DetailBody({ item, snapshot }: { item: InboxItem; snapshot: AppSnapshot
     case "person": {
       const p = ref.person;
       return (
-        <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-small">
-          <dt className="text-muted-foreground">Form</dt>
-          <dd className="text-right">{p.taxForm} <StatusBadge status={p.taxStatus} /></dd>
-          <dt className="text-muted-foreground">Chases sent</dt>
-          <dd className="text-right tabular-nums">{p.chaseCount}</dd>
-          <dt className="text-muted-foreground">Outstanding</dt>
-          <dd className="text-right"><Money amountMinor={big(p.outstandingMinor)} /></dd>
-        </dl>
+        <div className="flex flex-col gap-3">
+          <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-small">
+            <dt className="text-muted-foreground">Form</dt>
+            <dd className="text-right">{p.taxForm} <StatusBadge status={p.taxStatus} /></dd>
+            <dt className="text-muted-foreground">Chases sent</dt>
+            <dd className="text-right tabular-nums">{p.chaseCount}</dd>
+            <dt className="text-muted-foreground">Outstanding</dt>
+            <dd className="text-right"><Money amountMinor={big(p.outstandingMinor)} /></dd>
+          </dl>
+          <TaxFormLink person={p} className="self-start" />
+        </div>
       );
     }
   }
