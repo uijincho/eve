@@ -810,7 +810,8 @@ export function suggestedForm(input: { country: string; citizenship: string; ent
  * The withholding rule the server will most likely apply to a prize, for an
  * estimate only (a proposed payout carries the real figures). Rules key the
  * payee as a country, "NON<payer>" or "*", and the payment type as
- * cash_prize / item_prize with a ":treaty" variant that needs a signed form.
+ * cash_prize / item_prize with a ":treaty" variant that needs a signed form
+ * claiming the payee's treaty.
  */
 export function prizeRule(
   s: Pick<AppSnapshot, "rules" | "org"> & { now?: string },
@@ -833,8 +834,10 @@ export function prizeRule(
       ? rs.filter((r) => r.payeeCountry === payer)
       : rs.filter((r) => r.payeeCountry === payee).concat(rs.filter((r) => r.payeeCountry === `NON${payer}` || r.payeeCountry === "*"));
   const base = kind === "item" ? "item_prize" : "cash_prize";
-  // A treaty rate only applies once the recipient has a valid form on file.
-  const treaty = person?.taxStatus === "valid" && payee !== payer ? latest(forPayee(typed(`${base}:treaty`)).filter((r) => r.payeeCountry === payee)) : undefined;
+  // A treaty rate only applies once the recipient has a valid form on file that
+  // claims this country's treaty; a valid form without a claim gets the default, as on the server.
+  const claimsTreaty = person?.taxStatus === "valid" && payee !== payer && person.taxTreatyCountry === payee;
+  const treaty = claimsTreaty ? latest(forPayee(typed(`${base}:treaty`)).filter((r) => r.payeeCountry === payee)) : undefined;
   return treaty ?? latest(forPayee(typed(base))) ?? latest(forPayee(typed("cash_prize"))) ?? latest(forPayee(live.filter((r) => r.paymentType.includes("prize"))));
 }
 

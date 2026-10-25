@@ -16,6 +16,7 @@ import {
   suggestedForm,
 } from "@/lib/client/derive";
 import { toMinor } from "@/lib/client/payloads";
+import { toPerson } from "@/lib/server/core";
 
 const s = fixtureSnapshot();
 const organizer = s.personas.find((p) => p.role === "organizer")!;
@@ -126,11 +127,40 @@ describe("prizeRule with seeded rule shapes", () => {
   it("uses the 30% default until a valid form is on file", () => {
     expect(prizeRule(snap, priya, "item")?.id).toBe("us-nonus-item-prize");
   });
-  it("uses the treaty rule once the form is valid", () => {
-    expect(prizeRule(snap, { ...priya, taxStatus: "valid" }, "item")?.id).toBe("us-ca-item-prize-treaty");
+  it("keeps the 30% default for a valid W-8BEN with no treaty claim", () => {
+    const signed = { ...priya, taxStatus: "valid" as const };
+    expect(prizeRule(snap, signed, "item")?.id).toBe("us-nonus-item-prize");
+    const award = { ...s.awards[0], personId: priya.id, kind: "item" as const, amountMinor: "129900", currency: "USD" };
+    const o = prizeOptions(snap, award, signed);
+    expect(o.withholding).toBe(38970n);
+    expect(o.cashNet).toBe(90930n);
+  });
+  it("uses the treaty rule once a valid W-8BEN claims the payee's treaty", () => {
+    expect(prizeRule(snap, { ...priya, taxStatus: "valid", taxTreatyCountry: "CA" }, "item")?.id).toBe("us-ca-item-prize-treaty");
+  });
+  it("ignores a treaty claim until the form is valid, or one for another country", () => {
+    expect(prizeRule(snap, { ...priya, taxTreatyCountry: "CA" }, "item")?.id).toBe("us-nonus-item-prize");
+    expect(prizeRule(snap, { ...priya, taxStatus: "valid", taxTreatyCountry: "GB" }, "item")?.id).toBe("us-nonus-item-prize");
   });
   it("skips expired versions for domestic winners", () => {
     expect(prizeRule(snap, { ...priya, country: "US" }, "cash")?.id).toBe("us-us-prize");
+  });
+});
+
+describe("treaty claim in the snapshot", () => {
+  type Row = Parameters<typeof toPerson>[0];
+  type Profile = NonNullable<Parameters<typeof toPerson>[1]["profile"]>;
+  const row = { id: "p1", name: "Priya Raman", email: "priya@example.test", country: "CA", citizenship: "CA", dateOfBirth: "2001-04-12", address: "Toronto, ON", role: "Hacker", adult: true, payoutCurrency: "CAD", chaseCount: 0, projectStatus: "none" } as unknown as Row;
+  const claim = (treaty: { treatyCountry?: string; treatyArticle?: string }) => toPerson(row, {
+    profile: { form: "W-8BEN", status: "valid", signatureName: "Priya Raman", signedAt: new Date(), expiresAt: null, tinLast4: null, treatyCountry: null, treatyArticle: null, ...treaty } as unknown as Profile,
+    paidYtdMinor: 0n, outstandingMinor: 0n, now: new Date(), payerCountry: "US",
+  }).taxTreatyCountry;
+
+  it("is set only when the W-8BEN names an article, as payout tax reads it", () => {
+    expect(claim({})).toBeUndefined();
+    expect(claim({ treatyCountry: "CA" })).toBeUndefined();
+    expect(claim({ treatyCountry: "CA", treatyArticle: "XXII" })).toBe("CA");
+    expect(claim({ treatyArticle: "XXII" })).toBe("CA");
   });
 });
 
