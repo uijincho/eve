@@ -3,7 +3,7 @@ import { cn } from "cn";
 /** Eve's mark: the mirrored E and V chevrons on an ink tile. Same art as app/icon.svg. */
 export function EveMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 1024 1024" aria-hidden className={cn("size-7 shrink-0", className)}>
+    <svg viewBox="0 0 1024 1024" aria-hidden className={cn("size-7 shrink-0 rounded-[22.37%] ring-1 ring-mark-edge", className)}>
       <rect width="1024" height="1024" rx="229.0688" fill="#0E0F13" />
       <path
         d="M194.56 379.73 L406.19 379.73 L512.00 644.27 L300.37 644.27 L279.21 591.36 L437.93 591.36 L416.77 538.45 L258.05 538.45 L236.89 485.55 L395.61 485.55 L374.44 432.64 L215.72 432.64 Z M829.44 379.73 L617.81 379.73 L512.00 644.27 L723.63 644.27 L744.79 591.36 L586.07 591.36 L607.23 538.45 L765.95 538.45 L787.11 485.55 L628.39 485.55 L649.56 432.64 L808.28 432.64 Z"

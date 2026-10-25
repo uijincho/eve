@@ -1,6 +1,7 @@
 import { LoaderCircleIcon, SearchIcon, SendIcon } from "lucide-react";
 import type { Metadata } from "next";
 
+import { ThemeSwitcher } from "@/components/app/theme-switcher";
 import { BlockedAction } from "@/components/eve/blocked-action";
 import { BreakdownBar } from "@/components/eve/breakdown-bar";
 import { CapacityBar } from "@/components/eve/capacity-bar";
@@ -25,6 +26,8 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SAMPLE_INBOX, SAMPLE_NOW } from "@/lib/design/sample";
 import {
+  DARK_GROUND,
+  DARK_RAISED,
   DUSK,
   GROUND,
   RADII,
@@ -104,6 +107,7 @@ export default function DesignPage() {
       <aside className="sticky top-0 hidden h-dvh w-44 shrink-0 flex-col gap-8 overflow-y-auto py-10 lg:flex">
         <Wordmark />
         <SectionIndex entries={INDEX} />
+        <ThemeSwitcher className="mt-auto" />
       </aside>
 
       <main className="min-w-0 flex-1 pt-8 pb-32 lg:pt-10">
@@ -164,23 +168,19 @@ export default function DesignPage() {
         <Section
           id="colour"
           title="Colour"
-          lede="Structure is warm paper under white cards. Hairlines separate surfaces; the page itself casts no shadows."
+          lede="Structure is warm paper under white cards. Hairlines separate surfaces; the page itself casts no shadows. Lamplight, the dark theme, swaps each value for its own; switch the theme to see them."
         >
           <Specimen title="Structure">
-            <ColorTable tokens={STRUCTURE} contrast={(t) => (t.name === "--input" ? `${ratio(t.value, GROUND)} on ground` : null)} />
+            <ColorTable tokens={STRUCTURE} contrast={(t, fg, ground) => (t.name === "--input" ? `${ratio(fg, ground)} on ground` : null)} />
           </Specimen>
           <Specimen title="Text" note="Contrast on the ground and on raised surfaces. Faint text stays on the ground or rail.">
-            <ColorTable
-              tokens={TEXT}
-              contrast={(t) => `${ratio(t.value, GROUND)} · ${ratio(t.value, RAISED)}`}
-              sample
-            />
+            <ColorTable tokens={TEXT} contrast={onGroundAndRaised} sample />
           </Specimen>
           <Specimen title="Time" note="Five steps from cool to warm, keyed to how much time is left. Use them for deadlines and nothing else. Contrast on the ground and on raised surfaces.">
-            <ColorTable tokens={DUSK} contrast={(t) => `${ratio(t.value, GROUND)} · ${ratio(t.value, RAISED)}`} sample />
+            <ColorTable tokens={DUSK} contrast={onGroundAndRaised} sample />
           </Specimen>
           <Specimen title="State" note="Contrast on the ground and on raised surfaces.">
-            <ColorTable tokens={STATE} contrast={(t) => `${ratio(t.value, GROUND)} · ${ratio(t.value, RAISED)}`} sample />
+            <ColorTable tokens={STATE} contrast={onGroundAndRaised} sample />
           </Specimen>
         </Section>
 
@@ -511,19 +511,25 @@ function ratio(fg: string, bg: string) {
   return `${contrastRatio(fg, bg).toFixed(1)}:1`;
 }
 
+type Contrast = (t: ColorToken, fg: string, ground: string, raised: string) => string | null;
+
+const onGroundAndRaised: Contrast = (_, fg, ground, raised) => `${ratio(fg, ground)} · ${ratio(fg, raised)}`;
+
 function ColorTable({
   tokens,
   contrast,
   sample = false,
 }: {
   tokens: ColorToken[];
-  contrast: (t: ColorToken) => string | null;
+  contrast: Contrast;
   sample?: boolean;
 }) {
+  // Swatches read the live token; hex values and ratios show the active theme's.
   return (
     <ul className="flex flex-col">
       {tokens.map((t) => {
-        const c = contrast(t);
+        const light = contrast(t, t.value, GROUND, RAISED);
+        const dark = contrast(t, t.dark, DARK_GROUND, DARK_RAISED);
         return (
           <li
             key={t.name}
@@ -532,20 +538,24 @@ function ColorTable({
             <span
               aria-hidden
               className="row-span-2 size-10 rounded-lg ring-1 ring-white/10 ring-inset md:row-span-1"
-              style={{ background: t.value }}
+              style={{ background: `var(${t.name})` }}
             />
             <Code>{t.name}</Code>
-            <span className="font-mono text-caption text-faint max-md:hidden">{t.value}</span>
+            <span className="font-mono text-caption text-faint max-md:hidden">
+              <span className="dark:hidden">{t.value}</span>
+              <span className="not-dark:hidden">{t.dark}</span>
+            </span>
             <span className="text-small text-muted-foreground max-md:col-start-2">
               {sample ? (
-                <span className="mr-2 font-semibold" style={{ color: t.value }}>
+                <span className="mr-2 font-semibold" style={{ color: `var(${t.name})` }}>
                   Aa
                 </span>
               ) : null}
               {t.role}
             </span>
             <span className="text-caption tabular-nums text-muted-foreground max-md:col-start-2 md:text-right">
-              {c ?? ""}
+              <span className="dark:hidden">{light ?? ""}</span>
+              <span className="not-dark:hidden">{dark ?? ""}</span>
             </span>
           </li>
         );

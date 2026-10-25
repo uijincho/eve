@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /*
  * Daylight, Eve's design system. Documented at /design.
@@ -11,6 +11,11 @@
  * still mean time and appear only on deadlines. State colour is critical
  * (brick) and passed (moss) as text; lime and apricot are fills for money in
  * and money pending, and hatched fills mark estimates.
+ *
+ * Lamplight is the dark theme: the same ledger after sundown, set on the
+ * logo's ink. It swaps token values only, under [data-theme="dark"] on <html>
+ * (set before paint by lib/client/theme.ts), so components never need a
+ * `dark:` variant to follow it.
  *
  * Values here are mirrored in lib/design/tokens.ts for the /design page;
  * tests/design.test.ts keeps the two in sync.
@@ -30,6 +35,8 @@
   --color-faint: var(--faint);
   --color-positive: var(--positive);
   --color-money: var(--money);
+  --color-on-money: var(--on-money);
+  --color-mark-edge: var(--mark-edge);
   --color-pending: var(--pending);
   --color-critical: var(--critical);
   --color-dusk-1: var(--dusk-1);
@@ -133,6 +140,14 @@
   /* Fills: money in or cleared, and pending or estimated. Never text. */
   --money: #a3cf5b;
   --pending: #f2a65a;
+  /* Text on a lime fill stays ink in both themes. */
+  --on-money: #17181a;
+  /* The light stripe of a hatched estimate, and text selection. */
+  --hatch-money-stripe: #ddedc2;
+  --hatch-pending-stripe: #fbddbe;
+  --selection: #ddedc2;
+  /* An edge for the ink logo tile, needed only where the ground is dark too. */
+  --mark-edge: transparent;
 
   /* shadcn mapping */
   --card: var(--surface);
@@ -164,6 +179,46 @@
   --sidebar-ring: var(--ring);
 }
 
+/* Lamplight: the ground is the logo's ink (#0e0f13), cards a step above it,
+   with cool white text. The dusk and state hues are lifted to clear 4.5:1 on
+   the dark ground and cards; lime and apricot stay as they are, with ink on
+   them. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --rail: #17181d;
+  --background: #0e0f13;
+  --surface: #17181d;
+  --surface-hover: #212228;
+  --border: #2a2b32;
+  --input: #6b6d77;
+
+  --foreground: #ecedf1;
+  --muted-foreground: #a2a4ad;
+  --faint: #8b8d97;
+
+  --dusk-1: #62a5e3;
+  --dusk-2: #9d9af6;
+  --dusk-3: #c98ae6;
+  --dusk-4: #f27b9c;
+  --dusk-5: #f2a066;
+
+  --critical: #f47a6d;
+  --positive: #a4d16a;
+
+  --hatch-money-stripe: #3b4929;
+  --hatch-pending-stripe: #5e442c;
+  --selection: #3e4c2a;
+  --mark-edge: #ffffff24;
+
+  --primary-foreground: #0e0f13;
+  --ring: #ecedf1;
+  --chart-1: #ecedf1;
+  --chart-4: #6e7079;
+  --chart-5: #2a2b32;
+  --sidebar-primary-foreground: #0e0f13;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -178,7 +233,7 @@
     caret-color: var(--foreground);
   }
   ::selection {
-    background: #ddedc2;
+    background: var(--selection);
     color: var(--foreground);
   }
   a {
@@ -226,6 +281,10 @@
   input[type="checkbox"]:checked {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
   }
+  /* The tick is drawn in the ground colour, so it flips with the ink fill. */
+  [data-theme="dark"] input[type="checkbox"]:checked {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e0f13' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  }
   input[type="radio"]:disabled,
   input[type="checkbox"]:disabled {
     border-color: var(--border);
@@ -235,10 +294,10 @@
 
 /* Estimates: projected withholding, fees, FX and pending amounts. */
 @utility hatch-pending {
-  background: repeating-linear-gradient(135deg, var(--pending) 0 3px, #fbddbe 3px 7px);
+  background: repeating-linear-gradient(135deg, var(--pending) 0 3px, var(--hatch-pending-stripe) 3px 7px);
 }
 @utility hatch-money {
-  background: repeating-linear-gradient(135deg, var(--money) 0 3px, #ddedc2 3px 7px);
+  background: repeating-linear-gradient(135deg, var(--money) 0 3px, var(--hatch-money-stripe) 3px 7px);
 }
 
 @media (prefers-reduced-motion: reduce) {

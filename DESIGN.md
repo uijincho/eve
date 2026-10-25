@@ -244,6 +244,16 @@ Both appear as text on a 12% tint of themselves in pills, and as plain text in e
 - **Graphite** (#5d5e57, `muted-foreground`): secondary text, meta lines, captions, placeholders.
 - **Ash** (#6b6c64, `faint`): tertiary text on paper or white only.
 
+### Lamplight (dark theme)
+The same ledger after sundown, set on the logo's ink: the ground is the mark's tile colour (#0e0f13), cards sit a step above it, and text is a cool white. Lamplight swaps token values only, under `data-theme="dark"` on `<html>`, so every rule above holds unchanged and components never carry a `dark:` variant.
+- **Structure:** ground #0e0f13, cards and rail #17181d, Stone #212228, Hairline #2a2b32, Field Edge #6b6d77.
+- **Text:** Ink #ecedf1, Graphite #a2a4ad, Ash #8b8d97. The primary button and current nav item invert to a white pill with ink text.
+- **Time and state:** each dusk hue, Brick and Moss lifts to a lighter step of itself (#62a5e3, #9d9af6, #c98ae6, #f27b9c, #f2a066; #f47a6d, #a4d16a) so it clears 4.5:1 on the dark ground and cards. `tests/design.test.ts` checks both themes.
+- **Fills:** lime and apricot keep their values. Text on lime stays Ink in both themes (`on-money`); hatching pairs each fill with a dark stripe of itself.
+- **Logo:** the tile is the ground colour, so it gains a faint white edge (`mark-edge`) to keep its shape on the ground and on cards.
+
+The organizer rail, the mobile navigation sheet, the portal account sheet and `/design` carry a Light / Dark / System control. System follows the operating system and is the default; a choice is kept in the browser and applied before first paint.
+
 ### Named Rules
 **The Fill Not Text Rule.** Lime and apricot are fills. When a pill needs that meaning as text, it uses Moss on a lime tint or Burnt Apricot on an apricot tint.
 
@@ -296,7 +306,7 @@ Bars are 8px tall (26px for a featured single bar). A dashed border means "not y
 
 ## Components
 
-shadcn on Base UI, themed through the tokens, plus Eve's patterns in `components/eve/` and the Overview's card parts in `components/app/views/overview-view.tsx`. Daylight is the only theme; the root carries no `.dark` class, so `dark:` variants never apply. Icons are lucide-react at 16px, `aria-hidden` beside a label.
+shadcn on Base UI, themed through the tokens, plus Eve's patterns in `components/eve/` and the Overview's card parts in `components/app/views/overview-view.tsx`. Lamplight follows from the tokens, so components do not add `dark:` variants; the few left in `components/ui` only deepen destructive and invalid tints. Icons are lucide-react at 16px, `aria-hidden` beside a label.
 
 Motion is 150ms colour and opacity on `ease-dusk` (`cubic-bezier(0.16, 1, 0.3, 1)`); floating layers fade and zoom from 95%. Reduced motion cuts all of it. Focus is a 2px Ink outline offset 2px.
 
@@ -361,4 +371,4 @@ Rows: title in body 600, a Graphite meta line and the reason, amount, due chip, 
 - **Don't** add a blue "brand" accent or a gradient.
 - **Don't** shadow cards; only floating layers get the soft shadow.
 - **Don't** use solid fills for estimates.
-- **Don't** write `dark:` variants as if a theme switch exists. Daylight is the only theme.
+- **Don't** reach for `dark:` variants to fix a colour in Lamplight; give the colour a token with a dark value instead.

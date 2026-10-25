@@ -469,7 +469,7 @@ function Overview({ s }: { s: AppSnapshot }) {
               </div>
               <TruthLabel kind="test" />
             </div>
-            <div className="flex flex-col gap-3 rounded-2xl bg-money p-4 text-foreground">
+            <div className="flex flex-col gap-3 rounded-2xl bg-money p-4 text-on-money">
               <div className="flex justify-between gap-2 text-caption font-semibold">
                 <span>Proposed for release</span>
                 <span>{ROLE_LABEL[s.actor.role]} view</span>
