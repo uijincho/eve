@@ -32,6 +32,7 @@ export interface Computer {
 
 export interface BootOptions {
   strictSsn: boolean;
+  bulk?: boolean;
   password: string;
   documents: { path: string; bytes: Uint8Array }[];
   onProgress?: (message: string) => void;
@@ -118,13 +119,15 @@ export async function bootComputer(opts: BootOptions): Promise<Computer> {
     }
     progress("Uploading the Westbrook portal and the packet documents");
     const portalSource = path.join(process.cwd(), "lab", "westbrook-portal");
-    const [html, server] = await Promise.all([
+    const [html, server, bulk] = await Promise.all([
       readFile(path.join(portalSource, "index.html"), "utf8"),
       readFile(path.join(portalSource, "server.py"), "utf8"),
+      readFile(path.join(portalSource, "bulk.py"), "utf8"),
     ]);
     await desktop.files.write([
       { path: `${PORTAL_DIR}/index.html`, data: html },
       { path: `${PORTAL_DIR}/server.py`, data: server },
+      { path: `${PORTAL_DIR}/bulk.py`, data: bulk },
       ...opts.documents.map((d) => ({ path: d.path, data: d.bytes.slice().buffer as ArrayBuffer })),
     ]);
 
@@ -141,7 +144,7 @@ export async function bootComputer(opts: BootOptions): Promise<Computer> {
 
     progress("Locking Chrome to the portal address");
     await lockBrowser(desktop);
-    await detach(desktop, `google-chrome ${CHROME_FLAGS.join(" ")} ${PORTAL_URL}`, "/home/user/chrome.log", { DISPLAY: desktop.display });
+    await detach(desktop, `google-chrome ${CHROME_FLAGS.join(" ")} ${PORTAL_URL}${opts.bulk ? "?bulk=1" : ""}`, "/home/user/chrome.log", { DISPLAY: desktop.display });
     await until(async () => (await windowTitle(desktop)) !== "", 60_000, "Chrome to open the portal");
     const id = (await xdotool(desktop, "search", "--onlyvisible", "--name", "Westbrook Finance")).stdout.split("\n")[0];
     if (id) await xdotool(desktop, "windowactivate", "--sync", id);
@@ -304,4 +307,12 @@ export function portalEvents(desktop: Sandbox) {
 
 export function portalRecords(desktop: Sandbox) {
   return readJson<Record<string, unknown>[]>(desktop, RECORDS_PATH, []);
+}
+
+/** Portal-owned import evidence; never inferred from an agent's summary. */
+export function portalImports(desktop: Sandbox) {
+  return readJson<Record<string, Record<string, unknown>>>(desktop, `${PORTAL_DIR}/imports.json`, {});
+}
+export async function authorizePortalBatch(desktop: Sandbox, batchId: string, manifestHash: string) {
+  await desktop.files.write(`${PORTAL_DIR}/authorization.json`, JSON.stringify({ batchId, manifestHash }));
 }

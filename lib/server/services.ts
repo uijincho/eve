@@ -35,7 +35,7 @@ import {
 import { assertFits, ORG_BOOKED_FLIGHT, prizeBudgetRoom } from "./budget";
 import { computeTax, grossUp, recommendFulfillment, selectRule, splitAward, w8ExpiresAt } from "./engines";
 import {
-  assertNotBeneficiary, changeBankDetails, IN_KIND_PROVIDER, liveOverride, loadSource, requote, loadPayoutContext, lockOrgFinance, lockPayee, payoutCategory, postAccrual, prepareRelease,
+  assertNotInBatch, assertNotBeneficiary, changeBankDetails, IN_KIND_PROVIDER, liveOverride, loadSource, requote, loadPayoutContext, lockOrgFinance, lockPayee, payoutCategory, postAccrual, prepareRelease,
   proposePayout, reevaluatePerson, releasePayout, requoteSiblings, retryPayout, SPONSOR_PROVIDER, taxFor, termsKey, verifyBankChange,
 } from "./payouts";
 import { computeScoreboard, saveScoreboard } from "./scoreboard";
@@ -578,7 +578,7 @@ function sponsorFxNote(payout: Pick<typeof s.payout.$inferSelect, "currency" | "
   return ` About ${money(sponsorDestination(payout, usdMinor), payout.destinationCurrency)} at the payout's quoted rate, 1 ${payout.currency} = ${payout.fxRate} ${payout.destinationCurrency} (estimate; the sponsor's rate may differ).`;
 }
 
-export async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payoutId: string }) {
+export async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payoutId: string }, batchId?: string) {
   await lockOrgFinance(tx, actor.orgId);
   const { org } = await loadOrgEvent(tx, actor.orgId);
   if (org.mode === "direct") throw conflict("This organization pays directly. Switch to sponsor or hybrid mode in Settings to use sponsor packets.");
@@ -587,6 +587,7 @@ export async function sponsorCreate(tx: Executor, actor: ActorContext, p: { payo
   const person = await loadPerson(tx, actor.orgId, peek.personId, true);
   assertNotBeneficiary(actor, person, "request");
   const [payout] = await tx.select().from(s.payout).where(eq(s.payout.id, p.payoutId)).for("update");
+  await assertNotInBatch(tx, payout.id, batchId);
   if (payout.status !== "proposed" && payout.status !== "approved") throw conflict(`Payout is ${payout.status}; only a proposed payout can go to the sponsor.`);
   if (payout.provider === IN_KIND_PROVIDER) throw conflict("In-kind prizes are not paid in cash.");
   const [existing] = await tx.select({ id: s.sponsorPacket.id, status: s.sponsorPacket.status }).from(s.sponsorPacket).where(eq(s.sponsorPacket.payoutId, payout.id));
@@ -625,7 +626,7 @@ async function loadPacket(tx: Executor, actor: ActorContext, id: string) {
 }
 
 /** sponsor.submit: the controller's release for a sponsor-paid payout. */
-export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: string }) {
+export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: string }, batchId?: string) {
   if (actor.role !== "controller") throw forbidden("Submitting a packet releases money through the sponsor, so only a controller can do it.");
   const { pk, payout: pk0 } = await loadPacket(tx, actor, p.id);
   if (pk.status !== "draft" && pk.status !== "questioned") throw conflict(`Packet is ${pk.status}.`);
@@ -639,7 +640,7 @@ export async function sponsorSubmit(tx: Executor, actor: ActorContext, p: { id: 
     await recordDecision(tx, { orgId: actor.orgId, objectType: "packet", objectId: pk.id, personId: pk0.personId, action: "sponsor.withdraw", summary: `Packet withdrawn: fee policy changed from ${pk.feesPaidBy ?? "org"} to ${orgNow.feesPaidBy} after it was drafted. Draft a new packet.`, actor, status: "escalated", tool: "sponsorPacket" });
     return { ok: false, message: `Not submitted: the fee policy changed after this packet was drafted, so it was withdrawn. Draft a new packet with the current terms.`, data: { withdrawn: pk.id } };
   }
-  const check = await prepareRelease(tx, actor, pk.payoutId, "sponsor");
+  const check = await prepareRelease(tx, actor, pk.payoutId, "sponsor", { batchId });
   if (check.kind === "requoted") {
     return { ok: false, message: `Not submitted: the payout was re-quoted (${check.payout.reason}). Draft a new packet for the new terms.`, data: { payoutId: check.payout.id } };
   }
@@ -907,6 +908,9 @@ const handlers: Record<AppAction, Handler> = {
   "sponsor.submit": sponsorSubmit as Handler,
   "sponsor.reconcile": reconcilePacket as Handler,
   // Started, resumed and stopped by the actions route (lib/computer-use/portal-run.ts), never inside a transaction.
+  "sponsor.batchRelease": portalRouteOnly,
+  "sponsor.batchRetry": portalRouteOnly,
+  "sponsor.batchCancel": portalRouteOnly,
   "sponsor.portalStart": portalRouteOnly,
   "sponsor.portalDecide": portalRouteOnly,
   "sponsor.portalStop": portalRouteOnly,

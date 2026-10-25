@@ -451,6 +451,12 @@ export type ReleaseCheck =
   | { kind: "ready"; p: PayoutRow; person: PersonRow; methods: { active?: MethodRow; pending?: MethodRow } }
   | { kind: "requoted"; payout: PayoutRow };
 
+export async function assertNotInBatch(tx: Executor, payoutId: string, allowedBatchId?: string) {
+  const [reservation] = await tx.select().from(s.disbursementBatchItem).where(eq(s.disbursementBatchItem.payoutId, payoutId));
+  if (reservation && reservation.batchId !== allowedBatchId) throw conflict(`This payout belongs to batch ${reservation.batchId}. Open Disburse to follow or cancel that batch.`);
+}
+
+
 /**
  * Shared release gate for direct release and sponsor submission. Takes the
  * org -> person -> payout locks, checks authority (controller, never the
@@ -458,9 +464,11 @@ export type ReleaseCheck =
  * eligibility and budget, then recomputes the quote. A changed quote is
  * written back (status proposed, approval void) and returned as "requoted".
  */
-export async function prepareRelease(tx: Executor, actor: ActorContext, payoutId: string, route: "direct" | "sponsor", opts: { expectTerms?: string } = {}): Promise<ReleaseCheck> {
+
+export async function prepareRelease(tx: Executor, actor: ActorContext, payoutId: string, route: "direct" | "sponsor", opts: { expectTerms?: string; batchId?: string } = {}): Promise<ReleaseCheck> {
   if (actor.role !== "controller") throw forbidden(actor.role === "agent" ? "The agent can never release money." : "Only a controller can release payouts.");
   const { person, p } = await lockPayoutChain(tx, actor.orgId, payoutId);
+  await assertNotInBatch(tx, payoutId, opts.batchId);
   if (p.requestedBy === actor.memberId) throw forbidden("You requested this payout, so another controller must release it.");
   assertNotBeneficiary(actor, person, "release");
   if (p.status === "paid") throw conflict("Payout is already paid.");

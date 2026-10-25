@@ -14,11 +14,11 @@ import { HookNotFoundError } from "workflow/errors";
 
 import { demoModeEnabled, type ActorContext } from "@/lib/auth/session";
 import type * as C from "@/lib/contracts";
-import { getDb } from "@/lib/db";
+import { getDb, type Executor } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
 import { agentActor, currentProfile, loadOrgEvent, recordDecision, storeDocument, usd } from "@/lib/server/core";
-import { assertNotBeneficiary } from "@/lib/server/payouts";
+import { assertNotInBatch, assertNotBeneficiary } from "@/lib/server/payouts";
 
 import { checkReviewPage, type ReviewCheck } from "./agent";
 import { bootComputer, capture, currentPage, portalEvents } from "./computer";
@@ -80,8 +80,7 @@ async function saveRun(id: string, patch: Partial<typeof s.portalRun.$inferInser
 // ----------------------------------------------------------------- packet
 
 /** Reads a drafted packet and everything the portal needs, including the files to upload. */
-export async function loadPortalPacket(orgId: string, packetId: string): Promise<{ packet: PortalPacket; documents: { path: string; bytes: Uint8Array }[]; person: typeof s.person.$inferSelect }> {
-  const db = getDb();
+export async function loadPortalPacket(orgId: string, packetId: string, db: Executor = getDb()): Promise<{ packet: PortalPacket; documents: { path: string; bytes: Uint8Array }[]; person: typeof s.person.$inferSelect }> {
   const [row] = await db.select({ pk: s.sponsorPacket, payout: s.payout, person: s.person }).from(s.sponsorPacket)
     .innerJoin(s.payout, eq(s.payout.id, s.sponsorPacket.payoutId))
     .innerJoin(s.person, eq(s.person.id, s.payout.personId))
@@ -150,6 +149,7 @@ export async function startPortalRun(actor: ActorContext, packetId: string): Pro
     await db.transaction(async (tx) => {
       const [current] = await tx.select().from(s.sponsorPacket)
         .where(and(eq(s.sponsorPacket.id, packetId), eq(s.sponsorPacket.orgId, actor.orgId))).for("update");
+      if (current) await assertNotInBatch(tx, current.payoutId);
       if (!current || current.status !== "draft") throw new PortalPacketError("The packet is no longer a draft. Refresh to see its status.");
       await tx.insert(s.portalRun).values({ id, orgId: actor.orgId, packetId, requestedBy: actor.memberId, status: "starting" });
     });

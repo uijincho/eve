@@ -2,6 +2,7 @@
 
 import { DownloadIcon } from "lucide-react";
 import { useState } from "react";
+import { DisbursementBatches } from "@/components/app/disbursement-batches";
 
 import { ActionButton } from "@/components/app/action-button";
 import { DataTable, type Column } from "@/components/app/data-table";
@@ -9,7 +10,6 @@ import { Field } from "@/components/app/field";
 import { LinkButton } from "@/components/app/link-button";
 import { PageFrame } from "@/components/app/page-frame";
 import { PortalRunPanel } from "@/components/app/portal-run-panel";
-import { Section } from "@/components/app/page-header";
 import { ReasonAction } from "@/components/app/reason-action";
 import { Sheet } from "@/components/app/sheet";
 import { EmptyState } from "@/components/app/states";
@@ -19,7 +19,7 @@ import { Money } from "@/components/eve/money";
 import { Input } from "@/components/ui/input";
 import type { AppSnapshot, SponsorPacket } from "@/lib/contracts";
 import { documentUrl, exportUrl } from "@/lib/client/api";
-import { big, canControl, canManage, canOrganize, isPortalActive, payoutSource, portalRunFor } from "@/lib/client/derive";
+import { big, canControl, canManage, isPortalActive, payoutSource, portalRunFor } from "@/lib/client/derive";
 import { fmtDate } from "@/lib/client/format";
 import { payloads, toMinor } from "@/lib/client/payloads";
 import { initialParam } from "@/lib/client/url-param";
@@ -28,14 +28,12 @@ export function SponsorView() {
   const [openId, setOpenId] = useState<string | null>(() => initialParam("packet"));
   return (
     <PageFrame
-      title="Sponsor"
+      title="Disburse"
       lede={(s) => `${s.org.sponsorName} pays within about ${s.org.sponsorTurnaroundDays} days.`}
     >
       {(s) => {
         if (s.org.mode === "direct")
           return <EmptyState title="Sponsor packets are off">This organization pays directly. Switch to sponsor or hybrid mode in Settings to send packets to a fiscal sponsor.</EmptyState>;
-        const packeted = new Set(s.packets.map((k) => k.payoutId));
-        const candidates = s.payouts.filter((p) => (p.status === "approved" || p.status === "proposed") && !packeted.has(p.id));
         const selected = s.packets.find((k) => k.id === openId);
         const columns: Column<SponsorPacket>[] = [
           { key: "id", header: "Packet", stack: "title", sort: (k) => k.id, cell: (k) => {
@@ -50,25 +48,8 @@ export function SponsorView() {
         ];
         return (
           <>
-            <DataTable label="Sponsor packets" rows={s.packets} columns={columns} rowKey={(k) => k.id} onRowClick={(k) => setOpenId(k.id)} selectedKey={openId} initialSort={{ key: "due", dir: "asc" }} empty={<EmptyState title="No packets yet">Approved payouts in sponsor mode become packets with the request and its supporting documents.</EmptyState>} />
-            {candidates.length ? (
-              <Section title="Ready for a packet" aside={`${candidates.length} ${candidates.length === 1 ? "payout" : "payouts"} awaiting release`}>
-                <ul className="flex flex-col divide-y rounded-xl border">
-                  {candidates.map((p) => (
-                    <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                      <span className="flex flex-col">
-                        <span className="font-medium">{p.personName}</span>
-                        <span className="text-small text-muted-foreground">{payoutSource(s, p)}</span>
-                      </span>
-                      <span className="flex items-center gap-3">
-                        <Money amountMinor={big(p.grossMinor)} currency={p.currency} className="font-semibold" />
-                        <ActionButton label="Create packet" pendingLabel="Creating" permission={canOrganize(s.actor)} call={payloads.sponsorCreate(p.id)} />
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </Section>
-            ) : null}
+            <DisbursementBatches snapshot={s} />
+            <DataTable label="Payment packets" rows={s.packets} columns={columns} rowKey={(k) => k.id} onRowClick={(k) => setOpenId(k.id)} selectedKey={openId} initialSort={{ key: "due", dir: "asc" }} empty={<EmptyState title="No packets yet">Approved payouts in sponsor mode become packets with the request and its supporting documents.</EmptyState>} />
             <Sheet open={selected !== undefined} onOpenChange={(o) => !o && setOpenId(null)} title={selected ? `Packet for ${selected.personName}` : "Packet"} description={selected ? (() => { const payout = s.payouts.find((p) => p.id === selected.payoutId); return payout ? payoutSource(s, payout) : undefined; })() : undefined}>
               {selected ? <PacketDetail packet={selected} snapshot={s} /> : null}
             </Sheet>
@@ -85,6 +66,7 @@ function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snaps
   const diff = big(k.paidMinor) - big(k.requestedMinor);
   const portal = portalRunFor(s, k.id);
   const portalBusy = !!portal && isPortalActive(portal);
+  const batch = s.batches?.find((b) => b.packetIds.includes(k.id) && b.status !== "cancelled");
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2">
@@ -119,7 +101,7 @@ function PacketDetail({ packet: k, snapshot: s }: { packet: SponsorPacket; snaps
       </div>
       <div className="flex flex-col gap-2 border-t pt-4">
         {["submitted", "exception", "questioned"].includes(k.status) ? <RecordRemittance key={`${k.id}:${k.status}`} packet={k} snapshot={s} /> : null}
-        {k.status === "draft" ? (
+        {k.status === "draft" && batch ? <p className="text-small text-muted-foreground">This packet belongs to a batch. Follow its progress or cancel the batch from Disburse.</p> : k.status === "draft" ? (
           <>
             {!portalBusy ? (
               <>

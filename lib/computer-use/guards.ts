@@ -23,6 +23,7 @@ const TITLE_TO_PAGE: Record<string, PortalPage> = {
   Payee: "payee",
   "Payment details": "payment",
   Documents: "documents",
+  "Bulk upload": "documents",
   "Review and submit": "review",
   Submitted: "submitted",
   "Session expired": "expired",

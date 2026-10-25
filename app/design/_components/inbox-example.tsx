@@ -38,7 +38,7 @@ const NAV = [
   "Payouts",
   "People",
   "Budget",
-  "Sponsor",
+  "Disburse",
   "Audit trail",
   "Filings",
   "Agent",

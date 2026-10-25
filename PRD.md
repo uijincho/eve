@@ -82,7 +82,7 @@ At `/events/new`, organized as tabs the organizer can fill in any order. The age
 | Payouts | `/payouts` | Proposed batches with totals, withholding, and fees; the controller releases a batch here; live status per payout |
 | People | `/people` | Every attendee with tax form status, residency, totals paid YTD, outstanding chases |
 | Budget | `/budget` | Lines vs actuals, committed spend from approved but unpaid items, forecast to event end |
-| Sponsor | `/sponsor` | Packets submitted, aging, questioned, paid, and reconciliation exceptions (shown only in sponsor or hybrid mode) |
+| Disburse | `/sponsor` | Packets submitted, aging, questioned, paid, and reconciliation exceptions (shown only in sponsor or hybrid mode) |
 | Audit trail | `/audit` | Searchable decision log; any number links to its source documents and rules |
 | Filings | `/filings` | Year-end packet: forms per person, totals, downloads |
 | Agent | `/agent` | Full-page agent activity feed with filters, scoreboard against the answer key, the computer use stream when it runs |
@@ -361,9 +361,17 @@ In sponsor mode, the agent's job shifts from paying to **getting the sponsor to 
 
 This is the "sources that disagree" case from the Hyphenate brief: the sponsor's ledger, our ledger, and the payee's bank all say slightly different things, and the agent has to say which to trust and why.
 
+### Bulk disbursement flow
+
+The **Disburse** screen replaces per-payment packet creation with a batch release. Eligible approved payouts appear together with their recipients, gross, withholding and net totals; held items remain excluded with reasons. A controller reviews the selection and releases it once.
+
+Eve records the authorized quotes, reserves the payouts, and generates all packets in ordinary durable code steps. It creates one ZIP containing a payment manifest and supporting PDFs, then starts **one portal workflow, one browser session and one agent conversation per batch**. There is no agent per recipient. The fictional portal supports up to 200 USD payments in one upload, with one review screen and one confirmation.
+
+The portal validates every row, document fingerprint and total. Eve compares the complete imported manifest against the controller's release and rechecks payout policy before enabling Submit. A matching batch proceeds under the existing controller authorization; changed details stop for review. Submission is recorded per payout, while payment remains pending until remittance is reconciled. Retrying the same portal batch ID returns the original confirmation rather than creating another request.
+
 ### Stretch: computer use on the sponsor portal
 
-University finance portals have no API, so today a human retypes every packet. Eve's agent fills the portal itself in a sandboxed browser and stops before the final submit.
+University finance portals may have no API. Eve operates a fictional portal in a sandboxed browser. The main demo uses its bulk upload flow; the individual form remains available for the W-8BEN retry and SSN-conflict scenarios.
 
 **Demo setup (nothing real gets filed):** build a separate small app, a fake portal for a fictional school ("Westbrook University Student Org Finance"). Never imitate a real university's or the IRS's site.
 
@@ -371,7 +379,7 @@ University finance portals have no API, so today a human retypes every packet. E
 - **Agent:** a Vercel Workflow orchestrates it; an E2B Desktop sandbox (Linux desktop with screenshot, mouse, keyboard, and a VNC stream) is the computer; Claude's computer use tool picks each action. Steps: create sandbox → open portal → loop (screenshot → model → action, each iteration a durable step) → stop on review page → approval hook → submit → save screenshots → kill sandbox. The VNC stream URL is embedded live in the organizer dashboard.
 - **Planted failure:** first submit is rejected with "Non-US payees require Form W-8BEN attached." The agent reads the error, attaches the form, and retries.
 - **Planted conflict:** the portal demands an SSN for every payee. The agent refuses to invent one, explains the payee is a foreign person with a W-8BEN on file, and escalates to the controller.
-- **Stop point:** the agent halts on the final Submit button and requests controller approval.
+- **Stop point:** individual runs halt on the final Submit button and request controller approval. Bulk runs use the earlier batch release, with a deterministic comparison of the imported batch and a fresh policy check before submission.
 
 **Guardrails:** domain allowlist for the browser; raw TINs never pass through the model (filled from the vault or left for a human); screenshots of every step saved to the decision log.
 

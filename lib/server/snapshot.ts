@@ -103,6 +103,7 @@ export async function buildSnapshot(actor: ActorContext, db: Executor = getDb())
       paidMinor: str(pk.paidMinor), status: pk.status, submittedAt: iso(pk.submittedAt), dueAt: pk.dueAt.toISOString(), reason: pk.reason, documentId: pk.documentId ?? undefined,
     })),
     portalRuns,
+    batches: self ? [] : await (await import("@/lib/computer-use/batch-run")).batchesFor(orgId, db),
     decisions: decisions.map((d) => ({
       id: d.id, runId: d.runId, objectId: d.objectId, objectType: d.objectType, personName: d.personName, action: d.action, summary: d.summary,
       actor: d.actor, createdAt: d.createdAt.toISOString(), status: d.status, tool: d.tool, ruleId: d.ruleId ?? undefined, ruleVersion: d.ruleVersion ?? undefined,

@@ -25,7 +25,7 @@ const PRIMARY: NavItem[] = [
   { href: "/payouts", label: "Payouts", count: (n) => n.payouts },
   { href: "/people", label: "People" },
   { href: "/budget", label: "Budget" },
-  { href: "/sponsor", label: "Sponsor", count: (n) => n.sponsor },
+  { href: "/sponsor", label: "Disburse", count: (n) => n.sponsor },
 ];
 const SECONDARY: NavItem[] = [
   { href: "/audit", label: "Audit trail" },

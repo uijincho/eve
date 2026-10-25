@@ -88,6 +88,12 @@ export interface PortalRun {
   confirmation?: string; approvedByName?: string; approvedAt?: string; error?: string;
   requestedBy: string; createdAt: string; updatedAt: string;
 }
+export interface DisbursementBatch {
+  id: string; status: "preparing" | "filling" | "submitting" | "submitted" | "failed" | "cancelled";
+  payoutIds: string[]; packetIds: string[]; count: number; grossMinor: Minor; withholdingMinor: Minor; netMinor: Minor;
+  documentId?: string; approvedBy: string; approvedByName: string; streamUrl?: string; confirmation?: string; error?: string;
+  canRetry: boolean; canCancel: boolean; turns: number; createdAt: string;
+}
 export interface Decision {
   id: string; runId: string; objectId: string; objectType: string; personName: string;
   action: string; summary: string; actor: string; createdAt: string;
@@ -102,7 +108,7 @@ export interface Scoreboard { total: number; evaluated: number; caught: number; 
 export interface AppSnapshot {
   actor: Actor; personas: Actor[]; org: Organization; event: EventRecord;
   people: Person[]; claims: Claim[]; awards: Award[]; payouts: Payout[];
-  budgets: BudgetLine[]; packets: SponsorPacket[]; portalRuns: PortalRun[]; decisions: Decision[];
+  budgets: BudgetLine[]; batches?: DisbursementBatch[]; packets: SponsorPacket[]; portalRuns: PortalRun[]; decisions: Decision[];
   filings: Filing[]; rules: TaxRule[]; notices: Notice[]; scoreboard: Scoreboard;
   demo: boolean; now: string; integrationStatus: { name: string; mode: string; detail: string }[];
   /** Staff only. Absent for attendees. */
@@ -122,6 +128,7 @@ export type AppAction =
   | "tax.submit" | "claim.submit" | "claim.review" | "claim.explain" | "award.create" | "award.choose"
   | "award.split" | "award.confirm" | "award.fulfill" | "payout.resolveRule" | "payout.propose" | "payout.release"
   | "payout.bankChange" | "payout.verify" | "payout.retry" | "sponsor.create"
+  | "sponsor.batchRelease" | "sponsor.batchRetry" | "sponsor.batchCancel"
   | "sponsor.submit" | "sponsor.reconcile" | "sponsor.portalStart" | "sponsor.portalDecide" | "sponsor.portalStop"
   | "period.lock" | "filings.generate"
   | "demo.reset" | "demo.run" | "agent.run" | "flight.search" | "flight.request"
