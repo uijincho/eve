@@ -282,10 +282,15 @@ export async function loadPayoutContext(db: Executor, orgId: string, personId: s
   const person = await loadPerson(db, orgId, personId);
   const profile = await currentProfile(db, personId);
   const methods = await methodsFor(db, personId);
+  const { rules, payments } = await loadPayoutTaxContext(db, personId, excludePayoutId, releaseRules);
+  return { org, event, person, profile, active: methods.active, pending: methods.pending, payments, rules, now: new Date() };
+}
+
+async function loadPayoutTaxContext(db: Executor, personId: string, excludePayoutId?: string, releaseRules?: TaxRule[]) {
   // CRA thresholds are stated in CAD; the books are USD, so convert them before comparing.
   const rules = releaseRules ?? await loadReleaseRules(db);
   const payments = await paymentsFor(db, personId, excludePayoutId);
-  return { org, event, person, profile, active: methods.active, pending: methods.pending, payments, rules, now: new Date() };
+  return { rules, payments };
 }
 
 /** Fields a controller approves. Any difference means the quote changed. */
@@ -511,7 +516,12 @@ export async function prepareRelease(tx: Executor, actor: ActorContext, payoutId
   }
   await assertBudget(tx, loaded, p.grossMinor, p.id, "Releasing");
   // Recompute tax and quote under the person lock with finalized YTD.
-  const ctx = await loadPayoutContext(tx, actor.orgId, p.personId, p.id, opts.releaseRules);
+  // These facts were just loaded under the same finance/person locks. Reuse
+  // them, but always read current finalized payments for the YTD calculation.
+  const ctx: PayoutContext = {
+    org, event, person, profile, active: methods.active, pending: methods.pending,
+    ...await loadPayoutTaxContext(tx, p.personId, p.id, opts.releaseRules), now: new Date(),
+  };
   const { row } = buildPayout(ctx, loaded.source, p.requestedBy, [], loaded.override);
   if (termsKey(row) !== termsKey(p)) {
     const updated = await requote(tx, p, ctx, "terms changed before release", actor);
