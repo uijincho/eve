@@ -11,6 +11,8 @@ There are two ways to see it, and both run the same engine:
 
 ## What a judge sees in the lab
 
+The lab and in-product run panels use Eve's Daylight theme: white surfaces on warm paper, shared state colors and compact controls. In the lab's phone layout, run controls and controller approval come before the desktop and evidence. Expand **How a run works** for the walkthrough; selecting a scenario reveals its description and expected outcome.
+
 Open `/lab/computer-use`, a standalone page outside the organizer and attendee apps, with no sign-in and no database.
 
 1. **Start a desktop.** E2B boots a Linux desktop, the Westbrook portal starts inside it, and Chrome opens on the sign-in page. The live view streams into the page.
@@ -219,7 +221,7 @@ With `pnpm dev` running:
 pnpm verify:portal
 ```
 
-Like `pnpm verify:workflow`, this creates a disposable hybrid-mode org with a synthetic Canadian winner (W-8BEN, $500 prize) and acts through `/api/actions` as its organizer and controller. It never touches the shared demo, and it deletes the org at the end. It prints each decision-log row as the workflow writes it, and asserts:
+Like `pnpm verify:workflow`, this creates a disposable hybrid-mode org with a synthetic Canadian winner (W-8BEN, $500 prize) and acts through `/api/actions` as its organizer and controller. It never touches the shared demo, and it deletes the desktop and org at the end, including on failure. It prints each decision-log row as the workflow writes it, and asserts:
 
 - The organizer proposes the payout and drafts the packet. **Have Eve fill the sponsor portal** returns 202, and a second start on the same packet returns 409.
 - The run reaches *awaiting approval* through Documents and Review. All Review values match the packet. Every turn is logged with a screenshot, the portal's W-8BEN rejection is in the decision log, and the packet is still a draft.
@@ -232,7 +234,7 @@ Measured on Oct 24, 2026: passed, confirmation `WB-26-37503`, 17 Claude turns, 4
 
 With `pnpm dev` running, open `/lab/computer-use` and walk this checklist:
 
-- [ ] Before starting: both scenarios are listed with what to expect, and the live view says "No desktop running".
+- [ ] Before starting: scenarios and drills are listed, selecting one reveals what to expect, and the live view says "No desktop running".
 - [ ] **Start a desktop**: the progress lines tick through creating the desktop, uploading, starting the portal, locking Chrome and starting the live view, in about 30 seconds. The live view shows Chrome on Westbrook's sign-in page. *No internet* reads **Enforced**.
 - [ ] **Next action** runs exactly one turn and then pauses. The timeline gains one entry with a note, actions and a screenshot.
 - [ ] **Finish this page** on Sign in runs until the trail moves to Payee. *Password stays with Eve* reads **Typed by Eve**, and the action reads "Type the portal password (hidden from the model)".
@@ -301,6 +303,7 @@ Every agent check, drills included, also asserts two things: the portal password
 | "Computer use is not set up: add …" | `E2B_API_KEY`, `ANTHROPIC_API_KEY` or `EVE_VAULT_KEY` is missing from the server environment. |
 | "relation \"portal_run\" does not exist" | The migration has not been applied to this database. Run `pnpm db:migrate`. |
 | A new portal run never moves past Starting | The dev server was started before `workflows/sponsor-portal.ts` existed. Restart `pnpm dev` so the workflow is registered. |
+| `CORRUPTED_EVENT_LOG` or a missing workflow step during local testing | Do not run `pnpm build` while a dev workflow is active: the local SDK stores its event log in `.next/workflow-data`, which the build replaces. Finish or stop the run first, then build. Restart the local check with a fresh run if its log was removed. |
 | "The Westbrook portal takes USD requests only" | The payout is in another currency. The fictional portal, like most US university portals, takes USD. |
 | Review values show red crosses | The structured-output check read the screenshot differently from the packet. Look at the live view. A real mismatch is exactly what this check exists to catch. |
 | Runs are slow | Each turn is one model call plus screenshots. Try `EVE_COMPUTER_USE_MODEL=claude-sonnet-5-5` or `EVE_COMPUTER_USE_EFFORT=low`. |

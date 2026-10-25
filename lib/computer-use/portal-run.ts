@@ -145,15 +145,31 @@ export async function startPortalRun(actor: ActorContext, packetId: string): Pro
 
   const id = newId("prn");
   try {
-    await db.insert(s.portalRun).values({ id, orgId: actor.orgId, packetId, requestedBy: actor.memberId, status: "starting" });
+    // Serialize reservation with sponsorSubmit's packet lock. A manual submission
+    // that won the race must not also get a new desktop and a second portal request.
+    await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(s.sponsorPacket)
+        .where(and(eq(s.sponsorPacket.id, packetId), eq(s.sponsorPacket.orgId, actor.orgId))).for("update");
+      if (!current || current.status !== "draft") throw new PortalPacketError("The packet is no longer a draft. Refresh to see its status.");
+      await tx.insert(s.portalRun).values({ id, orgId: actor.orgId, packetId, requestedBy: actor.memberId, status: "starting" });
+    });
   } catch (error) {
+    if (error instanceof PortalPacketError) return { ok: false, status: 409, message: error.message };
     if ((error as { code?: string }).code === "23505" || (error as { cause?: { code?: string } }).cause?.code === "23505") {
       return { ok: false, status: 409, message: "Eve is already working on the portal for this packet." };
     }
     throw error;
   }
-  const { sponsorPortalWorkflow } = await import("@/workflows/sponsor-portal");
-  const run = await start(sponsorPortalWorkflow, [{ orgId: actor.orgId, portalRunId: id, packetId }]);
+  let run: { runId: string };
+  try {
+    const { sponsorPortalWorkflow } = await import("@/workflows/sponsor-portal");
+    run = await start(sponsorPortalWorkflow, [{ orgId: actor.orgId, portalRunId: id, packetId }]);
+  } catch {
+    // A service can accept the start before its response is lost. Cancel that
+    // possible late worker as well as releasing the reservation for a retry.
+    await saveRun(id, { status: "failed", stopRequested: true, error: "The background service could not start the portal run. Try starting a new run." });
+    return { ok: false, status: 503, message: "The background service could not start the portal run. Try again shortly." };
+  }
   await saveRun(id, { workflowRunId: run.runId });
   await recordDecision(db, {
     orgId: actor.orgId, runId: run.runId, objectType: "packet", objectId: packetId, personId: person.id, personName: person.name,
@@ -195,11 +211,15 @@ export async function stopPortalRun(actor: ActorContext, portalRunId: string): P
   if (!run) return { ok: false, status: 404, message: "Portal run not found." };
   if (!(s.PORTAL_RUN_ACTIVE as readonly string[]).includes(run.status)) return { ok: false, status: 409, message: `The run already ended (${run.status}).` };
   await saveRun(run.id, { stopRequested: true });
-  if (run.status === "awaiting_approval") {
+  // Deliver the rejection even while filling: holdForApproval may be reading the
+  // screenshot right now and enter its wait after this request reads the row.
+  if (run.status !== "submitting") {
     try { await resumeHook(portalToken({ orgId: run.orgId, portalRunId: run.id }), { decision: "reject", memberId: actor.memberId, reason: `Stopped by ${actor.name}` } satisfies PortalDecision); }
     catch (error) { if (!HookNotFoundError.is(error)) throw error; }
   }
-  return { ok: true, status: 202, message: "Stopping. Eve finishes the current turn, then deletes the desktop. Nothing is submitted." };
+  return { ok: true, status: 202, message: run.status === "submitting"
+    ? "Stopping after the current turn. An approved submission may already have reached the portal; check the confirmation before starting again."
+    : "Stopping. Eve finishes the current turn, then deletes the desktop. Nothing is submitted." };
 }
 
 /** True while a workflow is registered for the run, so the UI can tell a stuck run from a live one. */

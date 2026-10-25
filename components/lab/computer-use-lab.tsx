@@ -118,32 +118,40 @@ export function ComputerUseLab() {
         lede="University finance portals have no API, so a person retypes every sponsor packet. Here Eve's agent fills one on a live desktop while Eve's code enforces the rules. The portal is fictional and nothing is filed or paid."
         actions={<><TruthLabel kind="sample" /><TruthLabel kind="simulated" /></>}
       >
-        <ol className="grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="How a run works">
-          {HOW_IT_WORKS.map(([title, body], i) => (
-            <li key={title} className="flex gap-3">
-              <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-full border text-caption font-medium tabular-nums">{i + 1}</span>
-              <span className="flex flex-col">
-                <span className="font-medium">{title}</span>
-                <span className="text-small text-muted-foreground">{body}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
+        <details className="text-small">
+          <summary className="w-fit cursor-pointer rounded-sm font-medium">How a run works</summary>
+          <ol className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="How a run works">
+            {HOW_IT_WORKS.map(([title, body], i) => (
+              <li key={title} className="flex gap-3">
+                <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-full border text-caption font-medium tabular-nums">{i + 1}</span>
+                <span className="flex flex-col">
+                  <span className="font-medium">{title}</span>
+                  <span className="text-small text-muted-foreground">{body}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </details>
       </PageHeader>
 
-      <main className="mx-auto grid w-full max-w-[96rem] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <PageTrail state={state} />
-          <LiveView state={state} />
-          <Timeline state={state} />
-        </div>
-
-        <aside className="flex min-w-0 flex-col gap-4" aria-label="Controls and guardrails">
+      <main className="mx-auto grid w-full max-w-[96rem] items-start gap-4 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-start-1" aria-label="Run controls">
           {loadError ? <p role="alert" className="text-small text-critical">{loadError}</p> : null}
           <Controls data={data} state={state} scenario={scenario} setScenario={setScenario} pending={pending} send={send} notice={notice} />
           {state?.status === "awaiting_approval" || (state?.approval && state.status !== "submitted") ? <Approval state={state} pending={pending} send={send} /> : null}
           {state?.escalation ? <Escalation state={state} /> : null}
           {state?.status === "submitted" ? <Submitted state={state} /> : null}
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-4 lg:col-start-1 lg:row-span-2 lg:row-start-1">
+          <Panel title="Sponsor portal" badge={<TruthLabel kind="simulated" />}>
+            <PageTrail state={state} />
+            <LiveView state={state} />
+          </Panel>
+          <Timeline state={state} />
+        </div>
+
+        <aside className="flex min-w-0 flex-col gap-4 lg:col-start-2" aria-label="Guardrails and packet evidence">
           <Guardrails state={state} />
           <Packet state={state} />
           <PortalSaid state={state} />
@@ -156,8 +164,8 @@ export function ComputerUseLab() {
 
 function Panel({ title, badge, children, className }: { title: string; badge?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <section className={cn("flex flex-col gap-3 rounded-[10px] border p-4", className)} aria-label={title}>
-      <div className="flex items-center justify-between gap-3">
+    <section className={cn("flex min-w-0 flex-col gap-3 rounded-2xl border bg-surface p-5", className)} aria-label={title}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-subheading">{title}</h2>
         {badge}
       </div>
@@ -199,7 +207,7 @@ function LiveView({ state }: { state: LabState | null }) {
   if (state?.streamUrl) {
     return (
       <div className="flex flex-col gap-2">
-        <div className="overflow-hidden rounded-[10px] border bg-rail">
+        <div className="overflow-hidden rounded-xl border bg-background">
           <iframe src={state.streamUrl} title="Live view of the E2B desktop, view only" className="block aspect-[4/3] w-full" />
         </div>
         <p className="text-caption text-muted-foreground">
@@ -210,7 +218,7 @@ function LiveView({ state }: { state: LabState | null }) {
     );
   }
   return (
-    <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-[10px] border border-dashed p-6 text-center">
+    <div className="flex min-h-56 w-full lg:aspect-[4/3] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-input bg-background p-6 text-center">
       {state?.status === "starting" ? (
         <>
           <LoaderCircleIcon aria-hidden className="size-5 animate-spin text-muted-foreground" />
@@ -254,15 +262,17 @@ function Controls({ data, state, scenario, setScenario, pending, send, notice }:
               <label
                 key={s.id}
                 className={cn(
-                  "flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors duration-150",
-                  scenario === s.id ? "border-input bg-surface" : "border-border hover:bg-surface",
+                  "flex cursor-pointer gap-3 rounded-xl border p-3 transition-colors duration-150 ease-dusk",
+                  scenario === s.id ? "border-input bg-surface-hover" : "border-transparent hover:bg-surface-hover",
                 )}
               >
                 <input type="radio" name="scenario" value={s.id} checked={scenario === s.id} onChange={() => setScenario(s.id)} className="mt-0.5 size-4 accent-foreground" />
                 <span className="flex flex-col gap-0.5">
                   <span className="flex flex-wrap items-center gap-2 font-medium">{s.label}{s.drill ? <Badge variant="outline">Drill</Badge> : null}</span>
-                  <span className="text-small text-muted-foreground">{s.summary}</span>
-                  <span className="text-small text-muted-foreground">Expect: {s.expected}</span>
+                  {scenario === s.id ? <>
+                    <span className="text-small text-muted-foreground">{s.summary}</span>
+                    <span className="text-small text-muted-foreground">Expect: {s.expected}</span>
+                  </> : null}
                 </span>
               </label>
             ))}
@@ -308,7 +318,7 @@ function RunButtons({ state, pending, send }: { state: LabState; pending: Op["op
       <Button size="lg" className="w-full" disabled={working} focusableWhenDisabled {...blocked} onClick={() => send({ op: "run", id: state.id, goal: "review" })}>
         <ChevronsRightIcon aria-hidden /> Run to Review
       </Button>
-      <div className="grid grid-cols-2 gap-2">
+      <div className="flex flex-wrap gap-2 [&>button]:flex-1">
         <Button variant="secondary" disabled={working} focusableWhenDisabled {...blocked} onClick={() => send({ op: "run", id: state.id, goal: "action" })}>
           <StepForwardIcon aria-hidden /> Next action
         </Button>
@@ -358,14 +368,14 @@ function Approval({ state, pending, send }: { state: LabState; pending: Op["op"]
             <li key={c.label} className="flex flex-col border-b py-1.5 last:border-b-0">
               <span className="flex items-start justify-between gap-3">
                 <span className="text-muted-foreground">{c.label}</span>
-                <span className="flex items-center gap-1.5 text-right">
+                <span className="flex min-w-0 items-start gap-1.5 text-right [overflow-wrap:anywhere]">
                   {c.portal || "Not read"}
                   {c.ok
                     ? <CheckIcon className="size-4 shrink-0 text-positive" aria-label="Matches the packet" />
                     : <XIcon className="size-4 shrink-0 text-critical" aria-label="Differs from the packet" />}
                 </span>
               </span>
-              {!c.ok ? <span className="text-right text-caption text-critical">Packet: {c.packet}</span> : null}
+              {!c.ok ? <span className="text-right text-caption text-critical [overflow-wrap:anywhere]">Packet: {c.packet}</span> : null}
             </li>
           ))}
         </ul>
@@ -429,7 +439,7 @@ function Submitted({ state }: { state: LabState }) {
         {rows.map(([k, v]) => (
           <div key={k} className="flex justify-between gap-3 border-b py-1.5 last:border-b-0">
             <dt className="text-muted-foreground">{k}</dt>
-            <dd className="text-right">{v}</dd>
+            <dd className="min-w-0 text-right [overflow-wrap:anywhere]">{v}</dd>
           </div>
         ))}
       </dl>
@@ -471,7 +481,7 @@ function Guardrails({ state }: { state: LabState | null }) {
       <ul className="flex flex-col">
         {rows.map((r) => (
           <li key={r.name} className="flex flex-col gap-0.5 border-b py-2 first:pt-0 last:border-b-0 last:pb-0">
-            <span className="flex items-center justify-between gap-3">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-medium">{r.name}</span>
               <Badge variant={r.badge.variant}>{r.badge.label}</Badge>
             </span>
@@ -502,7 +512,7 @@ function Packet({ state }: { state: LabState | null }) {
         {rows.map(([k, v]) => (
           <div key={k} className="flex justify-between gap-3 border-b py-1.5 last:border-b-0">
             <dt className="text-muted-foreground">{k}</dt>
-            <dd className="text-right">{v}</dd>
+            <dd className="min-w-0 text-right [overflow-wrap:anywhere]">{v}</dd>
           </div>
         ))}
       </dl>
@@ -551,7 +561,7 @@ function Usage({ state }: { state: LabState | null }) {
         {rows.map(([k, v]) => (
           <div key={k} className="flex justify-between gap-3 border-b py-1.5 last:border-b-0">
             <dt className="text-muted-foreground">{k}</dt>
-            <dd className="text-right tabular-nums">{v}</dd>
+            <dd className="min-w-0 text-right tabular-nums [overflow-wrap:anywhere]">{v}</dd>
           </div>
         ))}
       </dl>
@@ -564,17 +574,17 @@ function Timeline({ state }: { state: LabState | null }) {
   const turns = [...state.turns].reverse();
   return (
     <section aria-label="Step timeline" className="flex flex-col gap-3">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-heading">Every step</h2>
         <span className="text-small text-muted-foreground">Newest first. Each turn keeps Claude&apos;s note, its actions and the screen after them.</span>
       </div>
       {turns.length === 0 ? (
-        <div className="rounded-[10px] border border-dashed p-6">
+        <div className="rounded-2xl border border-dashed border-input bg-surface p-5">
           <p className="font-semibold">No turns yet</p>
           <p className="text-small text-muted-foreground">When Eve starts working, each Claude turn appears here with what it saw and what it did.</p>
         </div>
       ) : (
-        <ol className="flex flex-col rounded-[10px] border">
+        <ol className="flex flex-col rounded-2xl border bg-surface">
           {turns.map((t) => <TurnRow key={t.n} turn={t} sessionId={state.id} />)}
         </ol>
       )}
@@ -601,13 +611,13 @@ function TurnRow({ turn, sessionId }: { turn: TurnLog; sessionId: string }) {
           <img src={shot} alt={`Screen after turn ${turn.n}`} width={176} height={132} className="block aspect-[4/3] w-full bg-rail" loading="lazy" />
         </a>
       ) : <span />}
-      <div className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-w-0 flex-col gap-2 [overflow-wrap:anywhere]">
         <div className="flex flex-wrap items-baseline gap-x-2">
           <span className="font-semibold">Turn {turn.n}</span>
           <span className="text-caption text-muted-foreground tabular-nums">
             {(turn.ms / 1000).toFixed(1)} s{moved ? ` · ${PAGE_LABELS[turn.pageBefore]} → ${PAGE_LABELS[turn.pageAfter]}` : ` · ${PAGE_LABELS[turn.pageAfter]}`}
           </span>
-          <span className="font-mono text-caption text-muted-foreground">{turn.model}</span>
+          <span className="text-caption text-muted-foreground [overflow-wrap:anywhere]">{turn.model}</span>
         </div>
         {turn.fellBackFrom ? <p className="text-small text-muted-foreground">{turn.fellBackFrom} declined this turn; {turn.model} answered instead.</p> : null}
         {turn.notes.length > 0 ? <p className="max-w-[62ch]">{turn.notes.join(" ")}</p> : null}

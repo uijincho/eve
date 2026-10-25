@@ -33,10 +33,10 @@ export function PortalRunPanel({ run, packet, snapshot, live = true, actions = t
   const checks = run.reviewCheck ?? [];
   const differ = checks.filter((c) => !c.ok).length;
   return (
-    <section aria-label="Eve on the sponsor portal" className="flex flex-col gap-3 rounded-[10px] border p-4">
+    <section aria-label="Eve on the sponsor portal" className="flex min-w-0 flex-col gap-3 rounded-2xl border bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-subheading">Eve on the sponsor portal</h3>
-        <span className="flex items-center gap-2">
+        <span className="flex flex-wrap items-center gap-2">
           <TruthLabel kind="simulated" />
           <Badge variant={status.variant}>{status.label}</Badge>
         </span>
@@ -76,12 +76,12 @@ export function PortalRunPanel({ run, packet, snapshot, live = true, actions = t
                 <li key={c.label} className="flex flex-col border-b py-1.5 last:border-b-0">
                   <span className="flex items-start justify-between gap-3">
                     <span className="text-muted-foreground">{c.label}</span>
-                    <span className="flex items-center gap-1.5 text-right">
+                    <span className="flex min-w-0 items-start gap-1.5 text-right [overflow-wrap:anywhere]">
                       {c.portal || "Not read"}
                       {c.ok ? <CheckIcon className="size-4 shrink-0 text-positive" aria-label="Matches the packet" /> : <XIcon className="size-4 shrink-0 text-critical" aria-label="Differs from the packet" />}
                     </span>
                   </span>
-                  {!c.ok ? <span className="text-right text-caption text-critical">Packet: {c.packet}</span> : null}
+                  {!c.ok ? <span className="text-right text-caption text-critical [overflow-wrap:anywhere]">Packet: {c.packet}</span> : null}
                 </li>
               ))}
             </ul>
@@ -98,7 +98,7 @@ export function PortalRunPanel({ run, packet, snapshot, live = true, actions = t
       ) : null}
 
       {run.escalation ? (
-        <dl className="flex flex-col gap-1.5 text-small">
+        <dl className="flex flex-col gap-1.5 text-small [overflow-wrap:anywhere]">
           <div><dt className="text-muted-foreground">Portal field</dt><dd>{run.escalation.field}</dd></div>
           <div><dt className="text-muted-foreground">Eve&apos;s reason</dt><dd>{run.escalation.reason}</dd></div>
         </dl>

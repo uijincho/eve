@@ -130,6 +130,10 @@ async function main() {
     }
     console.log(JSON.stringify({ ok: true, packetId, confirmation: done.confirmation, turns: done.turns, seconds: Math.round((Date.now() - started) / 1000), usage: done.usage }, null, 2));
   } finally {
+    // A failed assertion or interrupted workflow must not leave a billable desktop
+    // behind when the disposable organization's rows are removed.
+    const desktops = await db.select({ sandboxId: s.portalRun.sandboxId }).from(s.portalRun).where(eq(s.portalRun.orgId, orgId));
+    await Promise.all(desktops.flatMap((r) => r.sandboxId ? [Sandbox.kill(r.sandboxId).catch(() => false)] : []));
     await db.transaction((tx) => purgeOrg(tx, orgId, { deleteOrg: true }));
   }
 }

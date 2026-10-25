@@ -141,7 +141,7 @@ export async function checkReviewPage(screenshotBase64: string, p: PortalPacket)
     gross: [`$${dollars(p.grossCents)}`, (v) => amount(v) === amount(dollars(p.grossCents))],
     withheld: [`$${dollars(p.withheldCents)}`, (v) => amount(v) === amount(dollars(p.withheldCents))],
     net: [`$${dollars(p.netCents)}`, (v) => amount(v) === amount(dollars(p.netCents))],
-    account_code: [p.accountCode, (v) => v.includes("5300")],
+    account_code: [p.accountCode, (v) => v.trim().split(/\s|·/)[0] === p.accountCode.split(/\s|·/)[0]],
     method: [p.paymentMethod, (v) => v.trim() === p.paymentMethod],
     supporting_document: [fileName(p.documents.supporting), (v) => v.includes(fileName(p.documents.supporting))],
     tax_form: taxForm ? [fileName(taxForm), (v) => v.includes(fileName(taxForm))] : ["Not required", (v) => /not required/i.test(v)],
