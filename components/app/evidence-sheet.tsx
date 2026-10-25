@@ -66,7 +66,7 @@ export function EvidenceSheet({
                     <StatusBadge status={d.status} />
                   </div>
                   <p className="text-caption text-muted-foreground">
-                    {fmtDateTime(d.createdAt)} · {d.actor} · <span className="font-mono">{d.tool}{d.ruleId ? ` · ${d.ruleId} v${d.ruleVersion}` : ""}</span>
+                    {fmtDateTime(d.createdAt)} · {d.actor}{d.facts?.via === "slack" ? " via Slack" : ""} · <span className="font-mono">{d.tool}{d.ruleId ? ` · ${d.ruleId} v${d.ruleVersion}` : ""}</span>
                   </p>
                   {rule ? (
                     <div className="flex flex-col gap-1 text-small text-muted-foreground">

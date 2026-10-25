@@ -40,7 +40,7 @@ export function AuditView() {
         const columns: Column<Decision>[] = [
           { key: "obj", header: "Object", stack: "title", sort: (d) => d.objectId, cell: (d) => `${d.objectId} · ${d.personName}` },
           { key: "sum", header: "Decision", stack: "meta", cell: (d) => d.summary, className: "max-w-[36ch]" },
-          { key: "who", header: "Actor", stack: "meta", sort: (d) => d.actor, cell: (d) => <span>{d.actor} · <span className="font-mono text-caption">{d.tool}{d.ruleId ? ` · ${d.ruleId} v${d.ruleVersion}` : ""}</span></span> },
+          { key: "who", header: "Actor", stack: "meta", sort: (d) => d.actor, cell: (d) => <span>{d.actor}{d.facts?.via === "slack" ? " via Slack" : ""} · <span className="font-mono text-caption">{d.tool}{d.ruleId ? ` · ${d.ruleId} v${d.ruleVersion}` : ""}</span></span> },
           { key: "status", header: "Result", stack: "end", sort: (d) => d.status, cell: (d) => <StatusBadge status={d.status} /> },
           { key: "at", header: "When", align: "end", stack: "end", sort: (d) => d.createdAt, cell: (d) => <span className="text-small whitespace-nowrap text-muted-foreground">{fmtDateTime(d.createdAt)}</span> },
         ];

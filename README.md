@@ -58,6 +58,7 @@ With the local server running, `pnpm verify:workflow` exercises the real HTTP ro
 | FX and fulfillment | Seeded reference-rate and shipping/duty estimates. These are demo inputs, not live quotes. |
 | Accounting | Balanced journal CSV, account mapping and import manifest for the documented QuickBooks fallback. See [import instructions](lib/accounting/README.md). |
 | Notifications | Persisted portal notices and simulated delivery by default. Optional email/Slack/Discord adapters require configuration and an explicit live-delivery switch. |
+| Slack app | Approvals by DM with buttons, channel alerts batched every 15 minutes, daily and end-of-weekend digests, event-weekend countdown. Off until the Slack app credentials are set and an organizer connects a workspace; then it posts for that organization, including the sample one. See [Slack app](docs/slack.md). |
 | Invitations | Copyable, expiring, single-use links. No invitation email is sent. Accounts do not yet require email verification. |
 | Tax output | Signature receipts, filing worksheets, sponsor PDFs and annual 1042 reconciliation summary. Custom drafts, not official IRS/CRA forms or e-filing submissions. |
 

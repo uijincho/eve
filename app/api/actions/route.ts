@@ -91,6 +91,13 @@ export async function POST(request: Request) {
     }
   }
   if (result.ok && action !== "flight.search") {
+    // Slack cards follow every committed change, whoever made it and wherever. No-op without an installation.
+    after(async () => {
+      const { kickSlack } = await import("@/lib/slack/kick");
+      await kickSlack(actor.orgId);
+    });
+  }
+  if (result.ok && action !== "flight.search") {
     // demo.reset may have replaced the actor's org data; persona ids are stable.
     const snapshot = await buildSnapshot(actor);
     return json({ ...result, data: { ...(result.data ?? {}), snapshot } }, status);

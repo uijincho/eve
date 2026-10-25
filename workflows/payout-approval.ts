@@ -26,7 +26,13 @@ export async function payoutApprovalWorkflow(target: ApprovalTarget) {
 async function waitForController(target: ApprovalTarget, runId: string, stage: number) {
   "use step";
   const { recordApprovalWait } = await import("@/lib/agent/payout-approval");
-  return recordApprovalWait(target, runId, stage);
+  const waiting = await recordApprovalWait(target, runId, stage);
+  // Each reminder is also when a release that has waited too long reaches the backup approver in Slack.
+  if (waiting && stage > 0) {
+    const { kickSlack } = await import("@/lib/slack/kick");
+    await kickSlack(target.orgId);
+  }
+  return waiting;
 }
 
 async function completeApproval(target: ApprovalTarget, approval: ControllerApproval, runId: string) {
@@ -40,6 +46,8 @@ async function completeApproval(target: ApprovalTarget, approval: ControllerAppr
       const { startPendingApprovals } = await import("@/lib/agent/triggers");
       await startPendingApprovals(target.orgId);
     } catch { console.warn("[workflow] Updated approval waits will be retried by the scheduled sweep."); }
+    const { kickSlack } = await import("@/lib/slack/kick");
+    await kickSlack(target.orgId);
     return result;
   } catch (error) {
     // Only known business errors may enter the visible log; database/provider errors may contain private values.
@@ -47,6 +55,8 @@ async function completeApproval(target: ApprovalTarget, approval: ControllerAppr
     const { LedgerError } = await import("@/lib/ledger");
     if (error instanceof ActionError || error instanceof ApprovalConflictError || error instanceof LedgerError) {
       await recordApprovalFailure(target, runId, error.message);
+      const { kickSlack } = await import("@/lib/slack/kick");
+      await kickSlack(target.orgId);
       throw new FatalError(error.message);
     }
     // An interrupted database transaction can be retried: the payout row lock and ledger keys deduplicate it.

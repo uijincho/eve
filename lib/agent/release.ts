@@ -18,9 +18,9 @@ export async function startPayoutApproval(orgId: string, payoutId: string): Prom
   return (await start(payoutApprovalWorkflow, [target])).runId;
 }
 
-async function resumeRegistered(target: ApprovalTarget, memberId: string): Promise<string> {
+async function resumeRegistered(target: ApprovalTarget, memberId: string, via?: "slack"): Promise<string> {
   const token = approvalToken(target);
-  const payload = { memberId, quoteFingerprint: target.quoteFingerprint };
+  const payload = { memberId, quoteFingerprint: target.quoteFingerprint, ...(via ? { via } : {}) };
   try { return (await resumeHook(token, payload)).runId; }
   catch (error) { if (!HookNotFoundError.is(error)) throw error; }
   await start(payoutApprovalWorkflow, [target]);
@@ -51,7 +51,7 @@ export async function queueControllerRelease(actor: ActorContext, ids: string[])
     const target = { orgId: actor.orgId, payoutId: row.id, quoteFingerprint: payoutQuoteFingerprint(row) };
     try {
       const submittedAt = new Date();
-      const runId = await resumeRegistered(target, actor.memberId);
+      const runId = await resumeRegistered(target, actor.memberId, actor.via);
       queued.push({ payoutId: id, runId });
       // Distinguish a controller's submitted approval from a workflow that
       // is merely waiting for one. The UI must still allow the latter.
@@ -62,7 +62,7 @@ export async function queueControllerRelease(actor: ActorContext, ids: string[])
           personId: row.personId, action: "Controller approval submitted",
           summary: "The controller submitted this quote for final checks. The payment is not complete until settlement is recorded.",
           actor: actor.name, actorRole: actor.role, status: "running", tool: "queueControllerRelease",
-          facts: { quoteFingerprint: target.quoteFingerprint, approverId: actor.memberId },
+          facts: { quoteFingerprint: target.quoteFingerprint, approverId: actor.memberId, ...(actor.via ? { via: actor.via } : {}) },
         }).onConflictDoNothing();
       } catch {
         // The hook is already resumed. A feed write must not misreport that
