@@ -31,6 +31,8 @@ export interface Person {
   taxForm: "W-9" | "W-8BEN" | "W-8BEN-E" | "Residency declaration";
   taxStatus: "missing" | "valid" | "expired" | "review";
   taxSignedAt?: string; taxExpiresAt?: string; taxLast4?: string;
+  /** Country of the treaty claimed on the current W-8BEN. Set only when it names an article, which is what the server treats as a claim. */
+  taxTreatyCountry?: string;
   /**
    * PDF of the current signed form (GET /api/documents/:id). For a W-8BEN, the
    * filled IRS form plus Eve's signature record; for other forms, Eve's receipt.

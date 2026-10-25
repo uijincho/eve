@@ -202,6 +202,8 @@ export function toPerson(p: PersonRow, extra: {
     address: p.address, role: p.role, adult: p.adult, taxForm: accepted ? extra.profile!.form : expectedForm(p, payerCountry),
     taxStatus: status === "valid" && !profileValidFor(extra.profile, p, payerCountry, extra.now) ? "review" : status, taxSignedAt: iso(extra.profile?.signedAt),
     taxExpiresAt: iso(extra.profile?.expiresAt), taxLast4: extra.profile?.tinLast4 ?? undefined,
+    // Payout tax claims a treaty only when an article is named (payouts.ts); the country defaults to residence, as on the form PDF.
+    taxTreatyCountry: extra.profile?.treatyArticle ? extra.profile.treatyCountry ?? p.country : undefined,
     ...(extra.profile?.documentId ? { taxDocumentId: extra.profile.documentId, taxDocumentForm: extra.profile.form } : {}),
     payoutCurrency: extra.method?.currency ?? p.payoutCurrency, payoutLast4: extra.method?.last4 ?? "",
     payoutChangedAt: iso(extra.method?.verifiedAt ?? extra.method?.createdAt),
