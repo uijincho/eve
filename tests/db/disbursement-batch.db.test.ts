@@ -19,6 +19,7 @@ describe.skipIf(!hasDatabase)("bulk sponsor releases", { timeout: 180000 }, () =
   const actor = (role: "organizer" | "controller") => ({ orgId, memberId: `${orgId}_${role}`, role, name: role, email: `${role}@example.test`, personId: null, userId: null, demo: false });
   beforeAll(async () => {
     db = (await import("@/lib/db")).getDb(); s = await import("@/lib/db/schema"); services = await import("@/lib/server/services"); batch = await import("@/lib/computer-use/batch-run");
+    await db.insert(s.fxRate).values({ rateDate: "2026-09-01", base: "CAD", quote: "USD", rate: "0.72876000", source: "Synthetic reference" }).onConflictDoNothing();
     vi.stubEnv("E2B_API_KEY", "unused"); vi.stubEnv("ANTHROPIC_API_KEY", "unused");
     orgId = await createTestOrg("bulk");
     await db.update(s.organization).set({ mode: "sponsor", sponsorName: "Test Sponsor" }).where(eq(s.organization.id, orgId));
@@ -92,7 +93,22 @@ describe.skipIf(!hasDatabase)("bulk sponsor releases", { timeout: 180000 }, () =
     expect(computer.authorizePortalBatch).toHaveBeenCalledTimes(1);
     expect((await batch.cancelBatch(actor("controller"), b.id)).ok).toBe(false);
     computer.portalRecords.mockResolvedValue([receipt]);
-    await batch.finishBatch(target);
+    const originalSubmit = services.sponsorSubmit;
+    const failedSubmit = vi.spyOn(services, "sponsorSubmit")
+      .mockImplementationOnce(originalSubmit)
+      .mockRejectedValueOnce(new Error("synthetic journal failure"));
+    try {
+      await expect(batch.finishBatch(target)).rejects.toThrow("synthetic journal failure");
+      expect(failedSubmit).toHaveBeenCalledTimes(2);
+      expect(await db.select().from(s.journalEntry).where(eq(s.journalEntry.orgId, orgId))).toHaveLength(0);
+      for (const p of payouts) expect((await db.select().from(s.payout).where(eq(s.payout.id, p.id)))[0].status).toBe("proposed");
+    } finally { failedSubmit.mockRestore(); }
+    const submitted = vi.spyOn(services, "sponsorSubmit");
+    try {
+      await batch.finishBatch(target);
+      // One real submission per payment, without a redundant rolled-back pass.
+      expect(submitted).toHaveBeenCalledTimes(2);
+    } finally { submitted.mockRestore(); }
     const entries = await db.select().from(s.journalEntry).where(eq(s.journalEntry.orgId, orgId));
     expect(entries).toHaveLength(2);
     await batch.finishBatch(target);
@@ -114,5 +130,42 @@ describe.skipIf(!hasDatabase)("bulk sponsor releases", { timeout: 180000 }, () =
     await db.update(s.disbursementBatch).set({ status: "failed", state: { submissionAuthorized: true } }).where(eq(s.disbursementBatch.id, id));
     expect((await batch.retryBatch(actor("controller"), id)).ok).toBe(false);
     expect((await batch.cancelBatch(actor("controller"), id)).ok).toBe(false);
+  });
+  it("replays preparation chunks safely and bulk-loads ordered packets in three SQL reads", async () => {
+    const payouts = [];
+    for (let i = 0; i < 12; i++) payouts.push(await proposed());
+    const released = await batch.releaseBatch(actor("controller"), { payouts });
+    expect(released.ok, released.message).toBe(true);
+    const target = { orgId, batchId: String(released.data!.batchId) };
+    const ids = await batch.beginBatch(target, "chunked-preparation");
+    expect(ids).toHaveLength(12);
+    await expect(batch.prepareBatchItems(target, [ids![0], "missing-payout"])).rejects.toThrow("not in this batch");
+    const [interrupted] = await db.select().from(s.disbursementBatch).where(eq(s.disbursementBatch.id, target.batchId));
+    expect(interrupted.evidence).toHaveLength(1);
+    expect(await batch.prepareBatchItems(target, ids!.slice(0, 10))).toBe(true);
+    expect(await batch.prepareBatchItems(target, ids!.slice(0, 10))).toBe(true);
+    expect(await batch.prepareBatchItems(target, ids!.slice(10))).toBe(true);
+    const [prepared] = await db.select().from(s.disbursementBatch).where(eq(s.disbursementBatch.id, target.batchId));
+    expect(prepared.evidence).toHaveLength(12);
+    expect(new Set(prepared.evidence.map((e) => e.packetId)).size).toBe(12);
+    const { loadPortalPacket, loadPortalPackets } = await import("@/lib/computer-use/portal-run");
+    const packetIds = prepared.evidence.map((e) => e.packetId).reverse();
+    const query = vi.spyOn(db.$pool, "query");
+    let loaded: Awaited<ReturnType<typeof loadPortalPackets>> = [];
+    try {
+      loaded = await loadPortalPackets(orgId, packetIds);
+      expect(query).toHaveBeenCalledTimes(3);
+      query.mockClear();
+      const metadata = await loadPortalPackets(orgId, packetIds, db, { includeDocuments: false });
+      expect(query).toHaveBeenCalledTimes(2);
+      expect(metadata.map((p) => p.packet)).toEqual(loaded.map((p) => p.packet));
+      expect(metadata.every((p) => p.documents.length === 0)).toBe(true);
+    } finally { query.mockRestore(); }
+    expect(loaded.map((p) => p.packet.id)).toEqual(packetIds);
+    expect(loaded[0]).toEqual(await loadPortalPacket(orgId, packetIds[0]));
+    await expect(loadPortalPackets("other-org", packetIds)).rejects.toThrow("Packet not found");
+    expect(await batch.prepareBatchBundle(target)).toBe(true);
+    expect((await batch.cancelBatch(actor("controller"), target.batchId)).ok).toBe(true);
+    expect(await batch.prepareBatchItems(target, ids!)).toBe(false);
   });
 });

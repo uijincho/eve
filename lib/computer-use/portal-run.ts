@@ -8,7 +8,7 @@
 import { createHmac } from "node:crypto";
 
 import { Sandbox } from "@e2b/desktop";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getHookByToken, resumeHook, start } from "workflow/api";
 import { HookNotFoundError } from "workflow/errors";
 
@@ -17,7 +17,7 @@ import type * as C from "@/lib/contracts";
 import { getDb, type Executor } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import * as s from "@/lib/db/schema";
-import { agentActor, currentProfile, loadOrgEvent, recordDecision, storeDocument, usd } from "@/lib/server/core";
+import { agentActor, loadOrgEvent, recordDecision, storeDocument, usd } from "@/lib/server/core";
 import { assertNotInBatch, assertNotBeneficiary } from "@/lib/server/payouts";
 
 import { checkReviewPage, type ReviewCheck } from "./agent";
@@ -79,48 +79,71 @@ async function saveRun(id: string, patch: Partial<typeof s.portalRun.$inferInser
 
 // ----------------------------------------------------------------- packet
 
-/** Reads a drafted packet and everything the portal needs, including the files to upload. */
-export async function loadPortalPacket(orgId: string, packetId: string, db: Executor = getDb()): Promise<{ packet: PortalPacket; documents: { path: string; bytes: Uint8Array }[]; person: typeof s.person.$inferSelect }> {
-  const [row] = await db.select({ pk: s.sponsorPacket, payout: s.payout, person: s.person }).from(s.sponsorPacket)
-    .innerJoin(s.payout, eq(s.payout.id, s.sponsorPacket.payoutId))
-    .innerJoin(s.person, eq(s.person.id, s.payout.personId))
-    .where(and(eq(s.sponsorPacket.id, packetId), eq(s.sponsorPacket.orgId, orgId)));
-  if (!row) throw new PortalPacketError("Packet not found.");
-  const { org, event } = await loadOrgEvent(db, orgId);
-  const profile = await currentProfile(db, row.person.id);
-  const [award] = row.payout.awardId ? await db.select().from(s.award).where(eq(s.award.id, row.payout.awardId)) : [];
-  const [claim] = row.payout.claimId ? await db.select().from(s.claim).where(eq(s.claim.id, row.payout.claimId)) : [];
-  const packet = toPortalPacket({
-    packetId: row.pk.id,
-    sponsorName: org.sponsorName,
-    eventName: event.name,
-    person: { name: row.person.name, email: row.person.email, country: row.person.country },
-    taxForm: profile?.form ?? null,
-    signedAt: profile?.signedAt ? profile.signedAt.toISOString() : null,
-    payout: { currency: row.payout.currency, grossMinor: row.payout.grossMinor, withholdingMinor: row.payout.withholdingMinor, ruleId: row.payout.ruleId, ruleVersion: row.payout.ruleVersion, ruleVerified: row.payout.ruleVerified },
-    requestedMinor: row.pk.requestedMinor,
-    source: award ? { kind: "award", track: award.track, title: award.title } : { kind: "claim", type: claim?.type ?? "expense", category: claim?.category ?? "", description: claim?.description ?? "" },
-  });
+type LoadedPortalPacket = { packet: PortalPacket; documents: { path: string; bytes: Uint8Array }[]; person: typeof s.person.$inferSelect };
+type PacketLoadOptions = { includeDocuments?: boolean };
 
-  const stored = async (id: string | null | undefined) => {
-    if (!id) return null;
-    const [doc] = await db.select({ bytes: s.document.bytes, mimeType: s.document.mimeType }).from(s.document).where(and(eq(s.document.id, id), eq(s.document.orgId, orgId)));
-    return doc?.mimeType === "application/pdf" ? new Uint8Array(doc.bytes) : null;
-  };
-  const documents = [{
-    path: packet.documents.supporting,
-    bytes: (await stored(row.pk.documentId)) ?? await samplePdf(`Sponsor packet ${packet.id}`, [`Payee: ${packet.payee.name}`, `Net: USD ${(packet.netCents / 100).toFixed(2)}`]),
-  }];
-  if (packet.documents.taxForm) {
-    documents.push({
-      path: packet.documents.taxForm,
-      bytes: (await stored(profile?.documentId)) ?? await samplePdf(`Form ${profile?.form ?? "W-8BEN"} on file with Eve`, [
-        `Name: ${row.person.name}`, `Country: ${packet.payee.country}`, `Form: ${profile?.form ?? "W-8BEN"}`,
-        `Signed: ${profile?.signedAt ? profile.signedAt.toISOString().slice(0, 10) : "on file"}`, "Identifying numbers are vaulted in Eve and not printed here.",
-      ]),
+/** Reads one packet through the same loader used for bulk submissions. */
+export async function loadPortalPacket(orgId: string, packetId: string, db: Executor = getDb(), options: PacketLoadOptions = {}): Promise<LoadedPortalPacket> {
+  return (await loadPortalPackets(orgId, [packetId], db, options))[0];
+}
+
+/** Two metadata queries and at most one document query, independent of batch size. */
+export async function loadPortalPackets(orgId: string, packetIds: string[], db: Executor = getDb(), options: PacketLoadOptions = {}): Promise<LoadedPortalPacket[]> {
+  if (!packetIds.length) return [];
+  const ids = [...new Set(packetIds)];
+  // The partial unique index on current tax profiles keeps this one row per packet.
+  const rows = await db.select({ pk: s.sponsorPacket, payout: s.payout, person: s.person, profile: s.taxProfile, award: s.award, claim: s.claim }).from(s.sponsorPacket)
+    .innerJoin(s.payout, and(eq(s.payout.id, s.sponsorPacket.payoutId), eq(s.payout.orgId, orgId)))
+    .innerJoin(s.person, and(eq(s.person.id, s.payout.personId), eq(s.person.orgId, orgId)))
+    .leftJoin(s.taxProfile, and(eq(s.taxProfile.personId, s.person.id), eq(s.taxProfile.orgId, orgId), isNull(s.taxProfile.supersededAt)))
+    .leftJoin(s.award, and(eq(s.award.id, s.payout.awardId), eq(s.award.orgId, orgId)))
+    .leftJoin(s.claim, and(eq(s.claim.id, s.payout.claimId), eq(s.claim.orgId, orgId)))
+    .where(and(inArray(s.sponsorPacket.id, ids), eq(s.sponsorPacket.orgId, orgId)));
+  if (rows.length !== ids.length) throw new PortalPacketError("Packet not found.");
+  const { org, event } = await loadOrgEvent(db, orgId);
+  const byId = new Map(rows.map((row) => [row.pk.id, row]));
+  const prepared = packetIds.map((id) => {
+    const row = byId.get(id)!;
+    const { profile, award, claim } = row;
+    const packet = toPortalPacket({
+      packetId: row.pk.id,
+      sponsorName: org.sponsorName,
+      eventName: event.name,
+      person: { name: row.person.name, email: row.person.email, country: row.person.country },
+      taxForm: profile?.form ?? null,
+      signedAt: profile?.signedAt ? profile.signedAt.toISOString() : null,
+      payout: { currency: row.payout.currency, grossMinor: row.payout.grossMinor, withholdingMinor: row.payout.withholdingMinor, ruleId: row.payout.ruleId, ruleVersion: row.payout.ruleVersion, ruleVerified: row.payout.ruleVerified },
+      requestedMinor: row.pk.requestedMinor,
+      source: award ? { kind: "award", track: award.track, title: award.title } : { kind: "claim", type: claim?.type ?? "expense", category: claim?.category ?? "", description: claim?.description ?? "" },
     });
+    return { row, packet };
+  });
+  // Only bundle construction needs blobs or fallback PDFs. Policy checks compare metadata.
+  if (options.includeDocuments === false) return prepared.map(({ row, packet }) => ({ packet, documents: [], person: row.person }));
+  const documentIds = [...new Set(prepared.flatMap(({ row, packet }) => [row.pk.documentId, ...(packet.documents.taxForm ? [row.profile?.documentId] : [])]).filter((id): id is string => Boolean(id)))];
+  const documents = documentIds.length ? await db.select({ id: s.document.id, bytes: s.document.bytes }).from(s.document)
+    .where(and(inArray(s.document.id, documentIds), eq(s.document.orgId, orgId), eq(s.document.mimeType, "application/pdf"))) : [];
+  const stored = new Map(documents.map((doc) => [doc.id, new Uint8Array(doc.bytes)]));
+  const loaded: LoadedPortalPacket[] = [];
+  // Generate any fallback PDFs sequentially rather than scheduling up to 200 CPU-heavy tasks.
+  for (const { row, packet } of prepared) {
+    const { profile } = row;
+    const files = [{
+      path: packet.documents.supporting,
+      bytes: (row.pk.documentId ? stored.get(row.pk.documentId) : undefined) ?? await samplePdf(`Sponsor packet ${packet.id}`, [`Payee: ${packet.payee.name}`, `Net: USD ${(packet.netCents / 100).toFixed(2)}`]),
+    }];
+    if (packet.documents.taxForm) {
+      files.push({
+        path: packet.documents.taxForm,
+        bytes: (profile?.documentId ? stored.get(profile.documentId) : undefined) ?? await samplePdf(`Form ${profile?.form ?? "W-8BEN"} on file with Eve`, [
+          `Name: ${row.person.name}`, `Country: ${packet.payee.country}`, `Form: ${profile?.form ?? "W-8BEN"}`,
+          `Signed: ${profile?.signedAt ? profile.signedAt.toISOString().slice(0, 10) : "on file"}`, "Identifying numbers are vaulted in Eve and not printed here.",
+        ]),
+      });
+    }
+    loaded.push({ packet, documents: files, person: row.person });
   }
-  return { packet, documents, person: row.person };
+  return loaded;
 }
 
 // ---------------------------------------------------------------- actions

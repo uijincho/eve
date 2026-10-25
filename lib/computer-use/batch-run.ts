@@ -13,7 +13,7 @@ import { assertNotBeneficiary, lockOrgFinance, prepareRelease, termsKey } from "
 import { sponsorCreate, sponsorSubmit } from "@/lib/server/services";
 import { BATCH_FILE, batchBrief, buildBatchBundle, canonical, matchesBatchImport } from "./batch-packet";
 import { authorizePortalBatch, bootComputer, capture, portalImports, portalRecords } from "./computer";
-import { loadPortalPacket, portalConfigured, portalPassword } from "./portal-run";
+import { loadPortalPacket, loadPortalPackets, portalConfigured, portalPassword } from "./portal-run";
 import { newAgentState, runAgentTurn, type AgentState } from "./turn";
 
 type Batch = typeof s.disbursementBatch.$inferSelect;
@@ -43,16 +43,24 @@ async function controller(db: Executor, b: Batch): Promise<ActorContext> {
   return { memberId: m.id, orgId: m.orgId, role: m.role, name: m.name, email: m.email, personId: m.personId, userId: m.userId, demo: m.demoPersona && org.isDemo };
 }
 
-/** Run the full existing settlement gate in a savepoint, then roll it back. No money/status is posted during validation. */
-async function checkBatch(tx: Tx, actor: ActorContext, b: Pick<Batch, "id" | "orgId" | "feesPaidBy" | "evidence">) {
+/** Recheck authorized terms and packet metadata under the organization lock. */
+async function checkBatchEvidence(tx: Tx, actor: ActorContext, b: Pick<Batch, "id" | "orgId" | "feesPaidBy" | "evidence">) {
   const { org } = await loadOrgEvent(tx, b.orgId);
   if (org.mode === "direct" || org.feesPaidBy !== b.feesPaidBy) throw conflict("The sponsor payment policy changed. Cancel this batch and release a new one.");
   for (const item of b.evidence) {
     const check = await prepareRelease(tx, actor, item.payoutId, "sponsor", { expectTerms: item.terms, batchId: b.id });
     if (check.kind !== "ready") throw conflict("A payment was re-quoted. Cancel this batch and review the current amounts.");
-    const { packet } = await loadPortalPacket(b.orgId, item.packetId, tx);
+  }
+  const packets = await loadPortalPackets(b.orgId, b.evidence.map((item) => item.packetId), tx, { includeDocuments: false });
+  for (const [index, item] of b.evidence.entries()) {
+    const { packet } = packets[index];
     if (canonical(packet) !== canonical(item.packet)) throw conflict("A recipient or packet changed. Cancel this batch and release a new one.");
   }
+}
+
+/** Run the full existing settlement gate in a savepoint, then roll it back. No money/status is posted during validation. */
+async function checkBatch(tx: Tx, actor: ActorContext, b: Pick<Batch, "id" | "orgId" | "feesPaidBy" | "evidence">) {
+  await checkBatchEvidence(tx, actor, b);
   const rollback = new Error("batch-preflight-complete");
   try {
     await tx.transaction(async (sp) => {
@@ -119,12 +127,12 @@ export async function beginBatch(t: BatchTarget, runId: string): Promise<string[
 
 /** Ordinary deterministic code, checkpointed per payout. This starts no agent or browser. */
 export async function prepareBatchItem(t: BatchTarget, payoutId: string) {
-  await getDb().transaction(async (tx) => {
+  return getDb().transaction(async (tx) => {
     await lockOrgFinance(tx, t.orgId);
     const b = await load(t, tx);
-    if (b.status === "cancelled") return;
+    if (b.status === "cancelled") return false;
     if (b.status !== "preparing") throw conflict("Batch is no longer preparing.");
-    if (b.evidence.some((e) => e.payoutId === payoutId)) return;
+    if (b.evidence.some((e) => e.payoutId === payoutId)) return true;
     const requested = b.requestedPayouts.find((p) => p.id === payoutId);
     if (!requested) throw conflict("Payment is not in this batch.");
     const actor = await controller(tx, b);
@@ -138,9 +146,16 @@ export async function prepareBatchItem(t: BatchTarget, payoutId: string) {
     if (packetRow.status !== "draft") throw conflict(`Packet ${packetRow.id} is ${packetRow.status}.`);
     const [activePortal] = await tx.select({ id: s.portalRun.id }).from(s.portalRun).where(and(eq(s.portalRun.packetId, packetRow.id), inArray(s.portalRun.status, [...s.PORTAL_RUN_ACTIVE])));
     if (activePortal) throw conflict("An individual portal run is already handling this payment. Cancel the batch and wait for that run.");
-    const item = await loadPortalPacket(t.orgId, packetRow.id, tx);
+    const item = await loadPortalPacket(t.orgId, packetRow.id, tx, { includeDocuments: false });
     await tx.update(table).set({ evidence: [...b.evidence, { payoutId, packetId: packetRow.id, terms: termsKey(check.p), packet: item.packet }], updatedAt: new Date() }).where(eq(table.id, b.id));
+    return true;
   });
+}
+
+/** Each item commits its own checkpoint; retrying a chunk skips completed items. */
+export async function prepareBatchItems(t: BatchTarget, payoutIds: string[]): Promise<boolean> {
+  for (const id of payoutIds) if (!await prepareBatchItem(t, id)) return false;
+  return true;
 }
 
 export async function prepareBatchBundle(t: BatchTarget): Promise<boolean> {
@@ -148,7 +163,7 @@ export async function prepareBatchBundle(t: BatchTarget): Promise<boolean> {
   if (b.status === "cancelled") return false;
   if (b.documentId) return true;
   if (!b.evidence.length || b.evidence.length !== b.requestedPayouts.length) throw conflict("Batch preparation is incomplete.");
-  const loaded = await Promise.all(b.evidence.map((e) => loadPortalPacket(t.orgId, e.packetId)));
+  const loaded = await loadPortalPackets(t.orgId, b.evidence.map((e) => e.packetId));
   loaded.forEach((item, i) => { if (canonical(item.packet) !== canonical(b.evidence[i].packet)) throw conflict("A prepared packet changed. Cancel and release a new batch."); });
   const bundle = buildBatchBundle(t.batchId, loaded);
   await getDb().transaction(async (tx) => {
@@ -165,7 +180,7 @@ export async function prepareBatchBundle(t: BatchTarget): Promise<boolean> {
 async function launch(target: BatchTarget): Promise<Result> {
   try {
     const { disbursementWorkflow } = await import("@/workflows/disbursement");
-    const run = await start(disbursementWorkflow, [target]);
+    const run = await start(disbursementWorkflow, [target, { batchPreparation: true }]);
     // The workflow claims workflowRunId at boot; do not overwrite a worker's final state here.
     return { ok: true, status: 202, message: "Batch released. Eve is uploading one bundle to the sponsor portal.", data: { batchId: target.batchId, runId: run.runId } };
   } catch {
@@ -290,7 +305,9 @@ export async function finishBatch(t: BatchTarget): Promise<void> {
     const current = await load(t, tx);
     if (current.status === "submitted") return;
     const actor = await controller(tx, current);
-    await checkBatch(tx, actor, current);
+    // The real submissions below already run every settlement gate atomically.
+    // A second rolled-back submission pass here duplicates all journal writes.
+    await checkBatchEvidence(tx, actor, current);
     for (const item of current.evidence) {
       const result = await sponsorSubmit(tx, actor, { id: item.packetId }, current.id);
       if (!result.ok) throw conflict(result.message);

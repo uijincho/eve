@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getHookByToken, resumeHook, start } from "workflow/api";
 import { HookNotFoundError } from "workflow/errors";
 
@@ -40,11 +40,21 @@ export async function queueControllerRelease(actor: ActorContext, ids: string[])
   const queued: { payoutId: string; runId: string }[] = [];
   const completed: string[] = [];
   const failed: { payoutId: string; reason: string }[] = [];
+  const unique = [...new Set(ids)];
+  const db = getDb();
+  // Pin the whole selection before resuming any workflow. Loading later rows
+  // after earlier payments finish could silently authorize a sibling's new quote.
+  const rows = await db.select({ payout, recipient: { email: person.email } }).from(payout)
+    .leftJoin(person, and(eq(person.id, payout.personId), eq(person.orgId, actor.orgId)))
+    .where(and(eq(payout.orgId, actor.orgId), inArray(payout.id, unique))).catch(() => null);
+  if (!rows) return { ok: false, status: 503, message: "The release service is temporarily unavailable. Try again shortly." };
+  const byId = new Map(rows.map((row) => [row.payout.id, row]));
+  const events: (typeof decisionLog.$inferInsert)[] = [];
+  const uncertain: string[] = [];
   async function queueOne(id: string) {
-    const [row] = await getDb().select().from(payout).where(and(eq(payout.id, id), eq(payout.orgId, actor.orgId)));
+    const { payout: row, recipient } = byId.get(id) ?? {};
     if (!row) { failed.push({ payoutId: id, reason: "Payout not found." }); return; }
     if (row.status === "paid") { completed.push(row.id); return; }
-    const [recipient] = await getDb().select({ email: person.email }).from(person).where(and(eq(person.id, row.personId), eq(person.orgId, actor.orgId)));
     if (!recipient) { failed.push({ payoutId: id, reason: "Recipient not found." }); return; }
     try { assertControllerApproval(actor, row, recipient.email); }
     catch (error) { failed.push({ payoutId: id, reason: (error as Error).message }); return; }
@@ -56,27 +66,18 @@ export async function queueControllerRelease(actor: ActorContext, ids: string[])
       // Distinguish a controller's submitted approval from a workflow that
       // is merely waiting for one. The UI must still allow the latter.
       const eventId = createHash("sha256").update(`${runId}:controller-queued:${actor.memberId}`).digest("hex").slice(0, 32);
-      try {
-        await getDb().insert(decisionLog).values({
-          id: `dec_${eventId}`, orgId: actor.orgId, runId, objectType: "payout", objectId: id, createdAt: submittedAt,
-          personId: row.personId, action: "Controller approval submitted",
-          summary: "The controller submitted this quote for final checks. The payment is not complete until settlement is recorded.",
-          actor: actor.name, actorRole: actor.role, status: "running", tool: "queueControllerRelease",
-          facts: { quoteFingerprint: target.quoteFingerprint, approverId: actor.memberId, ...(actor.via ? { via: actor.via } : {}) },
-        }).onConflictDoNothing();
-      } catch {
-        // The hook is already resumed. A feed write must not misreport that
-        // committed request as rejected; execution records its own evidence.
-        console.warn("[workflow] Release request queued; activity update unavailable.");
-      }
+      events.push({
+        id: `dec_${eventId}`, orgId: actor.orgId, runId, objectType: "payout", objectId: id, createdAt: submittedAt,
+        personId: row.personId, action: "Controller approval submitted",
+        summary: "The controller submitted this quote for final checks. The payment is not complete until settlement is recorded.",
+        actor: actor.name, actorRole: actor.role, status: "running", tool: "queueControllerRelease",
+        facts: { quoteFingerprint: target.quoteFingerprint, approverId: actor.memberId, ...(actor.via ? { via: actor.via } : {}) },
+      });
     }
     catch {
-      const [latest] = await getDb().select({ status: payout.status }).from(payout).where(and(eq(payout.id, id), eq(payout.orgId, actor.orgId)));
-      if (latest?.status === "paid") completed.push(id);
-      else failed.push({ payoutId: id, reason: "The workflow could not confirm the release request. Check the payout status before retrying." });
+      uncertain.push(id);
     }
   }
-  const unique = [...new Set(ids)];
   for (let offset = 0; offset < unique.length; offset += 5) {
     const batch = unique.slice(offset, offset + 5);
     const results = await Promise.allSettled(batch.map(queueOne));
@@ -84,9 +85,29 @@ export async function queueControllerRelease(actor: ActorContext, ids: string[])
       if (result.status === "rejected") failed.push({ payoutId: batch[index], reason: "The release service is temporarily unavailable. Check this payout before retrying." });
     });
   }
+  if (events.length) {
+    try { await db.insert(decisionLog).values(events).onConflictDoNothing(); }
+    catch {
+      // Hooks are already resumed; an activity-feed failure cannot undo them.
+      console.warn("[workflow] Release requests queued; activity update unavailable.");
+    }
+  }
+  if (uncertain.length) {
+    const paid = new Set<string>();
+    try {
+      const latest = await db.select({ id: payout.id, status: payout.status }).from(payout)
+        .where(and(eq(payout.orgId, actor.orgId), inArray(payout.id, uncertain)));
+      for (const row of latest) if (row.status === "paid") paid.add(row.id);
+    } catch { /* An unavailable status read must not report an uncertain payment as completed. */ }
+    for (const id of uncertain) {
+      if (paid.has(id)) completed.push(id);
+      else failed.push({ payoutId: id, reason: "The workflow could not confirm the release request. Check the payout status before retrying." });
+    }
+  }
   return {
     ok: queued.length > 0 || completed.length > 0, status: queued.length ? 202 : completed.length ? 200 : 409,
-    message: queued.length ? `Controller approval recorded for ${queued.length} payout${queued.length === 1 ? "" : "s"}. Release checks are running.` : completed.length ? "These payouts have already completed." : failed.map((f) => f.reason).join(" "),
+    message: (queued.length ? `Controller approval recorded for ${queued.length} payout${queued.length === 1 ? "" : "s"}. Release checks are running.` : completed.length ? "These payouts have already completed." : failed.map((f) => f.reason).join(" "))
+      + ((queued.length || completed.length) && failed.length ? ` ${failed.length} payout${failed.length === 1 ? " was" : "s were"} not queued; review before retrying.` : ""),
     data: { queued, completed, failed },
   };
 }

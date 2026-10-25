@@ -2,7 +2,7 @@ import { createHook, getWorkflowMetadata } from "workflow";
 import type { BatchTarget } from "@/lib/computer-use/batch-run";
 
 /** One workflow and desktop for the whole batch. No per-payee agent fan-out. */
-export async function disbursementWorkflow(target: BatchTarget) {
+export async function disbursementWorkflow(target: BatchTarget, options?: { batchPreparation: boolean }) {
   "use workflow";
   using hook = createHook({ token: `bulk:${target.orgId}:${target.batchId}` });
   if (await hook.getConflict()) return;
@@ -11,7 +11,16 @@ export async function disbursementWorkflow(target: BatchTarget) {
   try {
     const payoutIds = await begin(target, workflowRunId);
     if (!payoutIds) return;
-    for (const id of payoutIds) await prepareItem(target, id);
+    // New runs amortize durable step dispatch across ten payments. Each payment
+    // still commits independently, so retries resume from database checkpoints.
+    // Older runs have no options: preserve their recorded per-item step sequence.
+    if (options?.batchPreparation) {
+      for (let offset = 0; offset < payoutIds.length; offset += 10) {
+        if (!await prepareItems(target, payoutIds.slice(offset, offset + 10))) return;
+      }
+    } else {
+      for (const id of payoutIds) await prepareItem(target, id);
+    }
     if (!await bundle(target)) return;
     desktop = await boot(target, workflowRunId);
     if (!desktop) return;
@@ -20,14 +29,12 @@ export async function disbursementWorkflow(target: BatchTarget) {
       const outcome = await turn(target);
       if (outcome === "stopped") return;
       if (outcome === "review" && !await authorize(target)) return;
-      if (outcome === "submitted") { await finish(target); return;
-}
+      if (outcome === "submitted") { await finish(target); return; }
     }
     throw new Error("The portal task reached its 24-turn limit.");
   } catch (error) {
     await failed(target, error instanceof Error ? error.message : "The portal task stopped.");
-  } finally { await close(target, desktop);
-}
+  } finally { await close(target, desktop); }
 }
 async function boot(t: BatchTarget, id: string) {
   "use step";
@@ -61,6 +68,10 @@ async function begin(t: BatchTarget, id: string) {
 async function prepareItem(t: BatchTarget, id: string) {
   "use step";
   return (await import("@/lib/computer-use/batch-run")).prepareBatchItem(t, id);
+}
+async function prepareItems(t: BatchTarget, ids: string[]) {
+  "use step";
+  return (await import("@/lib/computer-use/batch-run")).prepareBatchItems(t, ids);
 }
 async function bundle(t: BatchTarget) {
   "use step";

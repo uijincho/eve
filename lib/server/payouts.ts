@@ -271,11 +271,16 @@ export async function loadPayoutContext(db: Executor, orgId: string, personId: s
   const person = await loadPerson(db, orgId, personId);
   const profile = await currentProfile(db, personId);
   const methods = await methodsFor(db, personId);
+  const { rules, payments } = await loadPayoutTaxContext(db, personId, excludePayoutId);
+  return { org, event, person, profile, active: methods.active, pending: methods.pending, payments, rules, now: new Date() };
+}
+
+async function loadPayoutTaxContext(db: Executor, personId: string, excludePayoutId?: string) {
   // CRA thresholds are stated in CAD; the books are USD, so convert them before comparing.
   const rules = await Promise.all((await loadRules(db)).map(async (r) => r.payerCountry !== "CA" || r.thresholdMinor === "0" ? r
     : { ...r, thresholdMinor: (await toUsd(db, BigInt(r.thresholdMinor), "CAD", new Date())).usdMinor.toString() }));
   const payments = await paymentsFor(db, personId, excludePayoutId);
-  return { org, event, person, profile, active: methods.active, pending: methods.pending, payments, rules, now: new Date() };
+  return { rules, payments };
 }
 
 /** Fields a controller approves. Any difference means the quote changed. */
@@ -501,7 +506,12 @@ export async function prepareRelease(tx: Executor, actor: ActorContext, payoutId
   }
   await assertBudget(tx, loaded, p.grossMinor, p.id, "Releasing");
   // Recompute tax and quote under the person lock with finalized YTD.
-  const ctx = await loadPayoutContext(tx, actor.orgId, p.personId, p.id);
+  // These facts were just loaded under the same finance/person locks. Reuse
+  // them, but always read current finalized payments for the YTD calculation.
+  const ctx: PayoutContext = {
+    org, event, person, profile, active: methods.active, pending: methods.pending,
+    ...await loadPayoutTaxContext(tx, p.personId, p.id), now: new Date(),
+  };
   const { row } = buildPayout(ctx, loaded.source, p.requestedBy, [], loaded.override);
   if (termsKey(row) !== termsKey(p)) {
     const updated = await requote(tx, p, ctx, "terms changed before release", actor);

@@ -90,4 +90,25 @@ describe.skipIf(!hasDatabase)("portal run reservation and cancellation", { timeo
     expect(workflow.start).toHaveBeenCalledTimes(before);
     expect((await rows()).some((r) => (s.PORTAL_RUN_ACTIVE as readonly string[]).includes(r.status))).toBe(false);
   });
+
+  it("bulk-loads the current foreign tax form and the exact stored PDF bytes", async () => {
+    const { storeDocument } = await import("@/lib/server/core");
+    const supportingBytes = new Uint8Array([1, 2, 3]);
+    const taxBytes = new Uint8Array([4, 5, 6]);
+    const supporting = await storeDocument(db, { orgId, uploadedBy: "test", kind: "sponsor_packet", name: "packet.pdf", mimeType: "application/pdf", bytes: supportingBytes });
+    const tax = await storeDocument(db, { orgId, uploadedBy: "test", kind: "tax_form", name: "current.pdf", mimeType: "application/pdf", bytes: taxBytes });
+    await db.update(s.sponsorPacket).set({ documentId: supporting.id }).where(eq(s.sponsorPacket.id, packetId()));
+    await db.insert(s.taxProfile).values([
+      { id: `${orgId}_old_tax`, orgId, personId: `${orgId}_person`, form: "W-9", status: "valid", supersededAt: new Date() },
+      { id: `${orgId}_current_tax`, orgId, personId: `${orgId}_person`, form: "W-8BEN", status: "valid", documentId: tax.id, signedAt: new Date("2026-10-01") },
+    ]);
+    const query = vi.spyOn(db.$pool, "query");
+    try {
+      const [loaded] = await portal.loadPortalPackets(orgId, [packetId()], db);
+      expect(query).toHaveBeenCalledTimes(3);
+      expect(loaded.packet.payee.foreign).toBe(true);
+      expect(loaded.packet.payee.taxStatus).toContain("W-8BEN");
+      expect(loaded.documents.map((d) => d.bytes)).toEqual([supportingBytes, taxBytes]);
+    } finally { query.mockRestore(); }
+  });
 });
