@@ -5,7 +5,7 @@ describe.skipIf(!hasDatabase)("compact demo seed", () => {
   it("offers 15 diverse payments while retaining review and blocked cases", async () => {
     const { getDb } = await import("@/lib/db");
     const s = await import("@/lib/db/schema");
-    const { seedDemoOrg } = await import("@/lib/server/seed");
+    const { seedDemoOrg, resetDemoOrg } = await import("@/lib/server/seed");
     const { prepareRelease } = await import("@/lib/server/payouts");
     const { DEMO_ORG_ID } = await import("@/lib/server/http");
     const rollback = new Error("Roll back the isolated seed fixture");
@@ -21,6 +21,9 @@ describe.skipIf(!hasDatabase)("compact demo seed", () => {
         END LOOP;
       END $$`));
       await tx.execute(sql.raw(`SET LOCAL search_path TO "${schema}", public`));
+      // Include the cascades responsible for losing connections during a reset.
+      await tx.execute(sql.raw(`ALTER TABLE slack_installation ADD FOREIGN KEY (org_id) REFERENCES organization(id) ON DELETE CASCADE`));
+      await tx.execute(sql.raw(`ALTER TABLE slack_user_link ADD FOREIGN KEY (member_id) REFERENCES org_member(id) ON DELETE CASCADE`));
       await seedDemoOrg(tx);
       const people = await tx.select().from(s.person);
       const claims = await tx.select().from(s.claim);
@@ -40,6 +43,17 @@ describe.skipIf(!hasDatabase)("compact demo seed", () => {
       expect(claims.some((c) => c.checks.some((check) => check.code === "duplicate" && !check.passed))).toBe(true);
       const actor = { orgId: DEMO_ORG_ID, memberId: "mem_demo_ari", role: "controller" as const, name: "Ari Novak", email: "ari@bayview.example", personId: null, userId: null, demo: true };
       for (const p of ready) expect((await prepareRelease(tx, actor, p.id, "sponsor")).kind).toBe("ready");
+      const [installation] = await tx.insert(s.slackInstallation).values({
+        id: "slack_reset_test", orgId: DEMO_ORG_ID, teamId: "T_RESET", teamName: "Reset test",
+        botUserId: "U_BOT", tokenCiphertext: Buffer.from("encrypted"), tokenIv: Buffer.alloc(12), tokenTag: Buffer.alloc(16),
+        channelId: "C_FINANCE", channelName: "finance", installedBy: actor.memberId, backupMemberId: actor.memberId,
+      }).returning();
+      const [link] = await tx.insert(s.slackUserLink).values({
+        memberId: actor.memberId, orgId: DEMO_ORG_ID, teamId: "T_RESET", slackUserId: "U_ARI", muted: ["digest"], linkedAt: new Date(),
+      }).returning();
+      await resetDemoOrg(tx);
+      expect(await tx.select().from(s.slackInstallation)).toEqual([installation]);
+      expect(await tx.select().from(s.slackUserLink)).toEqual([link]);
       throw rollback;
     })).rejects.toBe(rollback);
   }, 180_000);

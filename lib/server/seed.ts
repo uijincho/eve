@@ -438,10 +438,22 @@ export async function seedDemoOrg(tx: Executor, preset: DemoSeedPreset = "demo")
   await tx.insert(s.notice).values({ id: newId("ntc"), orgId: ORG, personId: priya.id, channel: `email p•••@example.com`, title: "You won First Overall: MacBook Air", body: "Congratulations! Complete your W-8BEN in the Eve portal so we can deliver your prize.", status: "simulated" });
 }
 
-/** Deletes and re-seeds only the demo org. */
+/** Deletes and re-seeds only the demo org, preserving its Slack connections. */
 export async function resetDemoOrg(tx: Executor, preset: DemoSeedPreset = "demo") {
+  // Lock before reading: the organization and member cascades remove these rows.
+  await tx.select({ id: s.organization.id }).from(s.organization).where(eq(s.organization.id, ORG)).for("update");
+  const installations = await tx.select().from(s.slackInstallation).where(eq(s.slackInstallation.orgId, ORG));
+  const links = await tx.select().from(s.slackUserLink).where(eq(s.slackUserLink.orgId, ORG));
   await purgeOrg(tx, ORG, { deleteOrg: true });
   await seedDemoOrg(tx, preset);
+  const members = new Set((await tx.select({ id: s.orgMember.id }).from(s.orgMember).where(eq(s.orgMember.orgId, ORG))).map((member) => member.id));
+  if (installations.length) await tx.insert(s.slackInstallation).values(installations.map((installation) => ({
+    ...installation,
+    onDutyMemberId: installation.onDutyMemberId && members.has(installation.onDutyMemberId) ? installation.onDutyMemberId : null,
+    backupMemberId: installation.backupMemberId && members.has(installation.backupMemberId) ? installation.backupMemberId : null,
+  })));
+  const retainedLinks = links.filter((link) => members.has(link.memberId));
+  if (retainedLinks.length) await tx.insert(s.slackUserLink).values(retainedLinks);
 }
 
 /** Seeds the demo org once (serialized with a transaction-scoped advisory lock). */

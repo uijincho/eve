@@ -44,7 +44,7 @@ export async function purgeOrg(tx: Executor, orgId: string, opts: { deleteOrg?: 
   await tx.delete(s.scoreboardRun).where(eq(s.scoreboardRun.orgId, orgId));
   await tx.delete(s.actionIdempotency).where(eq(s.actionIdempotency.orgId, orgId));
   await tx.delete(s.agentRun).where(eq(s.agentRun.orgId, orgId));
-  // Slack stays connected and linked across a reset; posted cards and queued alerts refer to deleted rows.
+  // Clear cards and alerts for deleted data. Callers deleting the org must restore Slack connections.
   await tx.delete(s.slackMessage).where(eq(s.slackMessage.orgId, orgId));
   await tx.delete(s.slackAlert).where(eq(s.slackAlert.orgId, orgId));
   if (opts.deleteOrg) {
